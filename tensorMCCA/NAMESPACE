@@ -1,0 +1,3 @@
+export("check.arguments", "deflate.v", "deflate.x", "image.scores",
+       "init.v.ones", "init.v.random", "init.v.svd", "init.v.svd2", "InnerProd",
+       "mCCA.cor", "objective.cor", "permutation.test", "scale.v")

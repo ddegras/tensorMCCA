@@ -1,0 +1,107 @@
+mCCA.cor <- function(x, r, c = 1, maxit = 1000, tol = 1e-6, 
+	init.type = c("svd", "ones", "random"), init.value = NULL, 
+	ortho = c("block.score", "global.score", "canon.t.1", "canon.t.all"),
+	balance = TRUE, verbose = FALSE)
+{
+
+## Check arguments
+test <- check.arguments(x, init.value)
+
+## Data dimensions
+m <- length(x) # number of datasets
+dimx <- lapply(x, dim) # tensor dimensions for each dataset
+dim.img <- lapply(dimx, function(x) x[-length(x)]) 
+# tensor dimensions for each dataset, last mode (instances) omitted
+ndim.img <- sapply(dim.img, length) 
+# numbers of image dimensions for each dataset
+n <- tail(dimx[[1]], 1) # numbers of instances per dataset
+
+## Objective weights
+stopifnot(length(c) == 1 || (is.matrix(c) && all(dim(c) == length(x))))
+stopifnot(all(c >= 0) && any(c > 0))
+if (length(c) == 1) c <- matrix(1, m, m)
+c <- c / sum(c)
+
+## Match arguments
+init.type <- match.arg(init.type)
+ortho <- match.arg(ortho)
+
+## Data centering
+for(i in 1:m) {
+    mu <- rowMeans(x[[i]], dims = ndim.img[i])
+    x[[i]] <- x[[i]] - as.vector(mu)
+}
+		
+## Adjust number of canonical components as needed
+r0 <- as.integer(r)
+r <- switch(ortho, 
+	block.score = min(r0, n-1), global.score = min(r0, n-1),
+	canon.t.1 = min(r0, unlist(lapply(dim.img, "[[", 1))),
+	canon.t.all = min(r0, unlist(dim.img)))
+if (verbose && r != r0)
+	warning(paste("Argument 'r' set to", r,
+		"to satisfy orthogonality constraints"))
+				
+## Create output objects 
+v <- vector("list", m) # canonical vectors
+for (i in 1:m) 
+	v[[i]] <- lapply(dim.img[[i]], function(dd) matrix(0,dd,r))
+scores <- array(, dim = c(n,m,r)) 
+# instance scores along canonical vectors for each dataset
+
+## Initialize canonical vectors
+v0 <- init.value
+if (is.null(init.value)) v0 <- switch(init.type, 
+	svd = init.v.svd(x, type = "var", balance = balance),
+	ones = init.v.ones(x, type = "var", balance = balance),
+	random = init.v.random(x, type = "var", balance = balance))
+
+
+## Main loop
+objective <- iters <- numeric(r)
+for (k in 1:r) {	
+	## Run MCCA and store results
+	if (verbose) cat("\n\nMCCA: Component",k,"\n")
+	out <- mCCA.single.cor(x = x, v = v0, c = c, maxit = maxit, 
+		tol = tol, balance = balance, verbose = verbose)
+	objective[k] <- out$objective
+	scores[,,k] <- out$y # component scores
+	iters[k] <- out$iters
+
+	## Deflate canonical vectors (necessary?)
+	vk <- out$v 
+	if (k > 1 && ortho %in% c("canon.t.1", "canon.t.all")) {
+		vk <- deflate.v(out$v, v, ortho)	
+		vk <- scale.v(vk, x, type = "var", balance = balance)
+		scores[,,k] <- image.scores(x, vk) 
+		objective[k] <- sum(c * crossprod(scores[,,k])) / n
+	}
+	
+	## Add new canonical vectors to output	
+	for (i in 1:m) 
+		for (dd in 1:ndim.img[i]) 
+			v[[i]][[dd]][,k] <- vk[[i]][[dd]] 
+	
+	## Deflate data matrix
+	if (k < r) 	
+		x <- deflate.x(x, vk, scores[,,k], ortho, check.args = FALSE)	
+	
+} 
+
+## Re-order results according to objective values if needed
+o <- order(objective, decreasing = TRUE)
+if (!identical(o,1:r)) {
+	for (i in 1:m)
+		for (k in seq_along(v[[i]]))
+			v[[i]][[k]] <- v[[i]][[k]][,o] 
+	scores <- scores[,,o]
+	objective <- objective[o]
+	iters <- iters[o]
+}
+
+return(list(v = v, scores = scores, objective = objective, 
+	iters = iters, c = c, maxit = maxit, tol = tol, init.type = init.type,
+	init.value = init.value, ortho = ortho))
+}
+
+
