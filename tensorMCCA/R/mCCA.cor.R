@@ -19,8 +19,12 @@ n <- tail(dimx[[1]], 1) # numbers of instances per dataset
 ## Objective weights
 stopifnot(length(c) == 1 || (is.matrix(c) && all(dim(c) == length(x))))
 stopifnot(all(c >= 0) && any(c > 0))
-if (length(c) == 1) c <- matrix(1, m, m)
-c <- c / sum(c)
+if (length(c) == 1) {
+	c <- matrix(1/m^2, m, m)
+} else {
+	c <- (c + t(c)) / (2 * sum(c))
+}
+csum <- colSums(c)
 
 ## Match arguments
 init.type <- match.arg(init.type)
@@ -45,9 +49,10 @@ if (verbose && r != r0)
 ## Create output objects 
 v <- vector("list", m) # canonical vectors
 for (i in 1:m) 
-	v[[i]] <- lapply(dim.img[[i]], function(dd) matrix(0,dd,r))
-scores <- array(, dim = c(n,m,r)) 
-# instance scores along canonical vectors for each dataset
+	v[[i]] <- lapply(dim.img[[i]], function(dd) matrix(0, dd, r))
+block.score <- array(, dim = c(n, m, r)) 
+global.score <- matrix(, n, r) 
+
 
 ## Initialize canonical vectors
 v0 <- init.value
@@ -65,7 +70,7 @@ for (k in 1:r) {
 	out <- mCCA.single.cor(x = x, v = v0, c = c, maxit = maxit, 
 		tol = tol, balance = balance, verbose = verbose)
 	objective[k] <- out$objective
-	scores[,,k] <- out$y # component scores
+	block.score[,,k] <- out$y # canonical scores
 	iters[k] <- out$iters
 
 	## Deflate canonical vectors (necessary?)
@@ -73,9 +78,11 @@ for (k in 1:r) {
 	if (k > 1 && ortho %in% c("canon.t.1", "canon.t.all")) {
 		vk <- deflate.v(out$v, v, ortho)	
 		vk <- scale.v(vk, x, type = "var", balance = balance)
-		scores[,,k] <- image.scores(x, vk) 
-		objective[k] <- sum(c * crossprod(scores[,,k])) / n
+		block.score[,,k] <- image.scores(x, vk) 
+		objective[k] <- sum(c * crossprod(block.score[,,k])) / n
 	}
+	
+	global.score[,k] <- block.score[,,k] %*% csum
 	
 	## Add new canonical vectors to output	
 	for (i in 1:m) 
@@ -84,7 +91,7 @@ for (k in 1:r) {
 	
 	## Deflate data matrix
 	if (k < r) 	
-		x <- deflate.x(x, vk, scores[,,k], ortho, check.args = FALSE)	
+		x <- deflate.x(x, vk, block.score[,,k], ortho, check.args = FALSE)	
 	
 } 
 
@@ -94,14 +101,15 @@ if (!identical(o,1:r)) {
 	for (i in 1:m)
 		for (k in seq_along(v[[i]]))
 			v[[i]][[k]] <- v[[i]][[k]][,o] 
-	scores <- scores[,,o]
+	block.score <- block.score[,,o]
+	global.score <- global.score[,o]
 	objective <- objective[o]
 	iters <- iters[o]
 }
 
-return(list(v = v, scores = scores, objective = objective, 
-	iters = iters, c = c, maxit = maxit, tol = tol, init.type = init.type,
-	init.value = init.value, ortho = ortho))
+list(v = v, block.score = block.score, global.score = global.score,
+	objective = objective, iters = iters, c = c, maxit = maxit, tol = tol, 
+	init.type = init.type, init.value = init.value, ortho = ortho)
 }
 
 

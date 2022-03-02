@@ -63,9 +63,6 @@ if (type == "norm" && scope == "block") {
 ## rescale each canonical vector in a given mode/dimension
 ## by the global norm of all canonical vectors in this mode
 if (type == "norm" && scope == "global") {
-	avg.nrm <- sqrt(mean(nrmt^2))
-	if (avg.nrm < 1e-15) break
-
 	## Find global scaling constant
 	coefs <- numeric(max(d)+1)
 	coefs[1] <- -m

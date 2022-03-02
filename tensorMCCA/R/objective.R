@@ -33,83 +33,6 @@ return(y)
 
 
 
-
-#########################################
-# Function for scaling canonical vectors
-#########################################
-
-scale.v <- function(v, x = NULL, type = c("norm", "var"), 
-	scope = c("block", "global"), balance = TRUE)
-{
-type <- match.arg(type)   # norm or variance constraints
-scope <- match.arg(scope) # block or global constraints
-m <- length(v)
-ndimv <- sapply(v, length)
-
-## If variance constraints, calculate variances and rescale
-if (type == "var") {
-	y <- image.scores(x, v)
-	sdy <- sqrt(colMeans(y^2))
-	for (i in 1:m) {
-		if (sdy[i] == 0) next
-		for (k in 1:ndimv[i]) 
-			v[[i]][[k]] <- v[[i]][[k]] / sdy[i]^(1/ndimv[i])
-	}
-	if (!balance) return(v)	
-}
-
-## Calculate (Euclidean) norms of canonical vectors
-nrmv <- vector("list",m)
-nrmfun <- function(vv) sqrt(sum(vv^2))
-for (i in 1:m) 
-	nrmv[[i]] <- sapply(v[[i]], nrmfun)
-	
-## If variance constraints and balancing requirement,
-## make norms of canonical vectors equal in each block
-## without changing their product  
-if (type == "var") {
-	for (i in 1:m) {
-		if (any(nrmv[[i]] == 0)) next
-		s <- (prod(nrmv[[i]]))^(1/ndimv[i]) / nrmv[[i]]
-		for (k in 1:ndimv[i]) 
-			v[[i]][[k]] <- s[k] * v[[i]][[k]] 
-	}
-	return(v)
-} 
-
-## If Euclidean norm constraints at the block level,
-## rescale each canonical vector by its norm
-if (type == "norm" && scope == "block") {
-	for (i in 1:m) {
-		for (k in 1:ndimv[i]) {
-			if (nrmv[[i]][k] > 0) 
-				v[[i]][[k]] <- v[[i]][[k]] / nrmv[[i]][k]
-		}
-	}
-	return(v)	
-} 
-
-## If Euclidean norm constraints at the global level,
-## rescale each canonical vector in a given mode/dimension
-## by the global norm of all canonical vectors in this mode
-if (type == "norm" && scope == "global") {
-	for (k in 1:max(ndimv)) {
-		idx <- which(ndimv >= k)
-		sum.nrmv <- sqrt(sum((sapply(nrmv[idx], "[", k))^2))
-		if (sum.nrmv == 0) next
-		for (i in 1:m) 	
-			v[[i]][[k]] <- v[[i]][[k]] / sum.nrmv	
-
-	}
-	return(v)	
-} 
-
-## Other cases (should not happen)
-return(NULL)
-}
-
-
-
 ###########################################
 # Internal function to calculate objective
 ###########################################
@@ -118,7 +41,7 @@ return(NULL)
 # For speed, it does not check the dimensions of arguments. 
 # To calculate the sum of correlations with this funtion, 
 # the canonical vectors should be scaled beforehand to have 
-# unit variance, .e.g., with function 'scale.v'.
+# unit variance, e.g., with function 'scale.v'.
 
 objective.internal <- function(x, v, c = 1)
 {
