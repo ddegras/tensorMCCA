@@ -29,7 +29,8 @@ mCCA.cor(x, r, c = 1, maxit = 1000, tol = 1e-06, init.type = c("svd", "ones", "r
 A list with components
 \describe{
 \item{\code{v}}{canonical tensors}
-\item{\code{scores}}{canonical scores: array of dimensions individuals x datasets x canonical components}
+\item{\code{block.score}}{canonical scores: array of dimensions individuals x datasets x canonical components}
+\item{\code{global.score}}{weighted average of the canonical scores with weights given by the column sums of \code{c} (individuals x canonical components)}
 \item{\code{objective}}{objective value (sum of correlations) for each canonical component (vector of length \code{r})}
 \item{\code{iters}}{Number of algorithm iterations for each canonical component (length \code{r})}
 \item{\code{c}}{Input argument \code{c}}
