@@ -36,31 +36,31 @@ for (it in 1:maxit) {
 			2:m } else if (i == 1) { m 
 			} else (i-1)
 		for (j in idxj) {
-			iprod <- x[[j]]
+			tvprod <- x[[j]] # tvprod stands for tensor-vector product
 			if (ndim.img[j] == 1) { # 1D case
-				w[j,] <- c[i,j] * crossprod(v[[j]][[1]], iprod) 
+				w[j,] <- c[i,j] * crossprod(v[[j]][[1]], tvprod) 
 			} else if (ndim.img[j] == 2) { # 2D case
-				dim(iprod) <- c(dimx[[j]][1], prod(dimx[[j]][-1]))
-				iprod <- crossprod(v[[j]][[1]], iprod)
-				dim(iprod) <- c(dimx[[j]][2], n) 
-				w[j,] <- c[i,j] * crossprod(v[[j]][[2]], iprod) 
+				dim(tvprod) <- c(dimx[[j]][1], prod(dimx[[j]][-1]))
+				tvprod <- crossprod(v[[j]][[1]], tvprod)
+				dim(tvprod) <- c(dimx[[j]][2], n) 
+				w[j,] <- c[i,j] * crossprod(v[[j]][[2]], tvprod) 
 			} else { # 3D case
-				dim(iprod) <- c(dimx[[j]][1], prod(dimx[[j]][-1]))
-				iprod <- crossprod(v[[j]][[1]], iprod)
-				dim(iprod) <- c(dimx[[j]][2], dimx[[j]][3] * n)
-				iprod <- crossprod(v[[j]][[2]], iprod)
-				dim(iprod) <- c(dimx[[j]][3], n) 
-				w[j,] <- c[i,j] * crossprod(v[[j]][[3]], iprod)
+				dim(tvprod) <- c(dimx[[j]][1], prod(dimx[[j]][-1]))
+				tvprod <- crossprod(v[[j]][[1]], tvprod)
+				dim(tvprod) <- c(dimx[[j]][2], dimx[[j]][3] * n)
+				tvprod <- crossprod(v[[j]][[2]], tvprod)
+				dim(tvprod) <- c(dimx[[j]][3], n) 
+				w[j,] <- c[i,j] * crossprod(v[[j]][[3]], tvprod)
 			}
 		}
 		colsumw <- colSums(w[-i,, drop = FALSE]) / n
-		a <- x[[i]]		
-		dim(a) <- c(prod(dimx[[i]][-ndimx[i]]), n)
-		a <- a %*% colsumw
-		dim(a) <- dimx[[i]][-ndimx[i]]
+		tvprod <- x[[i]]		
+		dim(tvprod) <- c(prod(dimx[[i]][-ndimx[i]]), n)
+		tvprod <- tvprod %*% colsumw
+		dim(tvprod) <- dimx[[i]][-ndimx[i]]
 		
 		## Update canonical vectors
-		v[[i]] <- optim.cor(v[[i]], a, x[[i]], maxit, tol)				
+		v[[i]] <- optim.cor(v[[i]], tvprod, x[[i]], maxit, tol)				
 	}								
 	
 	## Calculate objective value (sum of correlations)
