@@ -1,7 +1,7 @@
-mCCA.cor <- function(x, r, c = 1, maxit = 1000, tol = 1e-6, 
+mCCA.cov <- function(x, r, c = 1, maxit = 1000, tol = 1e-6, 
 	init.type = c("svd", "ones", "random"), init.value = NULL, 
-	ortho = c("block.score", "global.score", "canon.t.1", "canon.t.all"),
-	balance = TRUE, verbose = FALSE)
+	cnstr = c("block", "global"), ortho = c("block.score", 
+	"global.score", "canon.t.1", "canon.t.all"), verbose = FALSE)
 {
 
 ## Check arguments
@@ -24,11 +24,13 @@ if (length(c) == 1) {
 } else {
 	c <- (c + t(c)) / (2 * sum(c))
 }
+c <- c / n
 csum <- colSums(c)
 
 ## Match arguments
 init.type <- match.arg(init.type)
 ortho <- match.arg(ortho)
+cnstr <- match.arg(cnstr)
 
 ## Data centering
 for(i in 1:m) {
@@ -50,9 +52,8 @@ if (verbose && r != r0)
 v <- vector("list", m) # canonical vectors
 for (i in 1:m) 
 	v[[i]] <- lapply(dim.img[[i]], function(dd) matrix(0, dd, r))
-block.score <- array(, dim = c(n, m, r)) 
-global.score <- matrix(, n, r) 
-
+block.score <- array(dim = c(n, m, r)) 
+global.score <- matrix(nrow = n, ncol = r) 
 
 
 
@@ -70,15 +71,15 @@ for (k in 1:r) {
 		} 
 	} else {
 		v0 <- switch(init.type, 
-			svd = init.v.svd(x, type = "var", balance = balance),
-			ones = init.v.ones(x, type = "var", balance = balance),
-			random = init.v.random(x, type = "var", balance = balance))
+			svd = init.v.svd(x, type = "norm", scope = cnstr),
+			ones = init.v.ones(x, type = "norm", scope = cnstr),
+			random = init.v.random(x, type = "norm", scope = cnstr))
 	}
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component",k,"\n")
-	out <- mCCA.single.cor(x = x, v = v0, c = c, maxit = maxit, 
-		tol = tol, balance = balance, verbose = verbose)
+	out <- mCCA.single.cov(x = x, v = v0, c = c, maxit = maxit, 
+		tol = tol, verbose = verbose)
 	objective[k] <- out$objective
 	block.score[,,k] <- out$y # canonical scores
 	iters[k] <- out$iters
@@ -87,7 +88,7 @@ for (k in 1:r) {
 	vk <- out$v 
 	if (k > 1 && ortho %in% c("canon.t.1", "canon.t.all")) {
 		vk <- deflate.v(out$v, v, ortho)	
-		vk <- scale.v(vk, x, type = "var", balance = balance)
+		vk <- scale.v(vk, x, type = "norm", scope = cnstr)
 		block.score[,,k] <- image.scores(x, vk) 
 		objective[k] <- sum(c * crossprod(block.score[,,k])) / n
 	}

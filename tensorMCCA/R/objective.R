@@ -12,19 +12,20 @@ ndim.img <- sapply(dimx, length) - 1 # number of dimensions in images/features
 y <- matrix(0, n, m) # image/individual scores on canonical components
 for (i in 1:m) { 		
 	iprod <- x[[i]]
+	pi <- dimx[[i]]
 	if (ndim.img[i] == 1) { # 1D case
 		y[,i] <- crossprod(iprod, v[[i]][[1]]) 
 	} else if (ndim.img[i] == 2) { # 2D case
-		dim(iprod) <- c(dimx[[i]][1], dimx[[i]][2] * n)
+		dim(iprod) <- c(pi[1], pi[2] * n)
 		iprod <- crossprod(v[[i]][[1]], iprod)
-		dim(iprod) <- c(dimx[[i]][2], n) 
+		dim(iprod) <- c(pi[2], n) 
 		y[,i] <- crossprod(iprod, v[[i]][[2]]) 
 	} else { # 3D case
-		dim(iprod) <- c(dimx[[i]][1], prod(dimx[[i]][2:4]))
+		dim(iprod) <- c(pi[1], prod(pi[2:4]))
 		iprod <- crossprod(v[[i]][[1]], iprod)
-		dim(iprod) <- c(dimx[[i]][2], dimx[[i]][3] * n)
+		dim(iprod) <- c(pi[2], pi[3] * n)
 		iprod <- crossprod(v[[i]][[2]], iprod)
-		dim(iprod) <- c(dimx[[i]][3], n) 
+		dim(iprod) <- c(pi[3], n) 
 		y[,i] <- crossprod(iprod, v[[i]][[3]])
 	}
 }
@@ -64,8 +65,11 @@ test <- check.arguments(x, v)
 
 ## Objective weights
 m <- length(v)
-if (length(c) == 1) c <- matrix(c,m,m)
-c <- c / sum(c)
+if (length(c) == 1) {
+	c <- matrix(1/m^2, m, m)
+} else { 
+	c <- (c + t(c)) / (2 * sum(c))
+}
 
 ## Center the data
 for(i in 1:m) {
@@ -94,6 +98,52 @@ if (r == 1) {
 		out[k] <- sum(c * crossprod(y) / tcrossprod(sdy)) / n
 	}
 }
-out
+sum(out)
+}
+
+
+
+
+############################################
+# Function to calculate sum of covariances
+############################################
+
+
+objective.cov <- function(x, v, c = 1)
+{
+# Check arguments
+test <- check.arguments(x, v)
+
+## Objective weights
+m <- length(v)
+if (length(c) == 1) {
+	c <- matrix(1/m^2, m, m)
+} else { 
+	c <- (c + t(c)) / (2 * sum(c))
+}
+
+## Center the data
+for(i in 1:m) {
+    mu <- rowMeans(x[[i]], dims = ndim.img[i])
+    x[[i]] <- x[[i]] - as.vector(mu)
+}
+
+## Number of canonical components 
+r <- NCOL(v[[1]][[1]])
+
+if (r == 1) {
+	y <- image.scores(x, v)
+	out <- sum(c * crossprod(y)) / n
+} else {
+	out <- numeric(r)
+	for (k in 1:r) {
+		vk <- vector("list", m)
+		for (i in 1:m)
+			vk[[i]] <- lapply(v[[i]], function(mat) mat[,k])
+		y <- image.scores(x, vk)
+		out[k] <- sum(c * crossprod(y)) / n
+	}
+}
+sum(out)
 }
 
