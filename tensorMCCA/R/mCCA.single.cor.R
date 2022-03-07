@@ -9,14 +9,13 @@
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-mCCA.single.cor <- function(x, v, c, maxit = 1000, tol = 1e-6, 
-	balance, verbose)
+mCCA.single.cor <- function(x, v, c, sweep, maxit, tol, balance, verbose)
 {
 	
 ## Data dimensions
 dimx <- lapply(x, dim)
 ndimx <- sapply(dimx, length)
-ndim.img <- ndimx - 1
+d <- ndimx - 1
 m <- length(x)
 n <- dimx[[1]][ndimx[1]]
 
@@ -25,42 +24,50 @@ objective[1] <- objective.internal(x, v, c)
 if (verbose) 
 	cat("\nIteration",0,"Objective",objective[1])
 
-w <- matrix(0, m, n)
+iprod <- matrix(0, m, n)
+if (sweep == "cyclical") idxi <- 1:m
+
+
 for (it in 1:maxit) {
+	if (sweep == "random") idxi <- sample(m)
 	for (i in 1:m) { 		
-		## Calculate/update objective weights w_jt = <X_jt, v_j> 
+		## Calculate the inner products <X_jt, v_j> 
 		## After the first algorithm iteration (it = 1), in each 
-		## iteration of the i loop, only w_{i-1,t}, t=1:n, 
-		## (resp. w_mt, t=1:n) need updating if i > 1 (resp. i = 1)
-		idxj <- if (it == 1 && i == 1) {
-			2:m } else if (i == 1) { m 
-			} else (i-1)
+		## iteration of the i loop, only the inner products associated 
+		## with the previous value of i need being updated
+		idxj <- if (it == 1 && i == 1) { idxi[-1] 
+			} else if (i == 1) { lastidx } else idxi[i-1]
 		for (j in idxj) {
-			tvprod <- x[[j]] # tvprod stands for tensor-vector product
-			if (ndim.img[j] == 1) { # 1D case
-				w[j,] <- c[i,j] * crossprod(v[[j]][[1]], tvprod) 
-			} else if (ndim.img[j] == 2) { # 2D case
-				dim(tvprod) <- c(dimx[[j]][1], prod(dimx[[j]][-1]))
-				tvprod <- crossprod(v[[j]][[1]], tvprod)
-				dim(tvprod) <- c(dimx[[j]][2], n) 
-				w[j,] <- c[i,j] * crossprod(v[[j]][[2]], tvprod) 
-			} else { # 3D case
-				dim(tvprod) <- c(dimx[[j]][1], prod(dimx[[j]][-1]))
-				tvprod <- crossprod(v[[j]][[1]], tvprod)
-				dim(tvprod) <- c(dimx[[j]][2], dimx[[j]][3] * n)
-				tvprod <- crossprod(v[[j]][[2]], tvprod)
-				dim(tvprod) <- c(dimx[[j]][3], n) 
-				w[j,] <- c[i,j] * crossprod(v[[j]][[3]], tvprod)
+			## Calculate tensor-vector products between X_j and 
+			## all vectors v_(jk) for k != i
+			tvprod <- x[[j]] 
+			pj <- head(dimx[[j]], d[j])
+			vj <- v[[j]]
+			for (k in 1:d[j]) {
+				if (k < d[j]) {
+					dim(tvprod) <- c(pj[k], prod(pj[(k+1):d[j]], n))
+					tvprod <- drop(crossprod(vj[[k]], tvprod))
+					dim(tvprod) <- c(pj[k+1], length(tvprod) / pj[k+1])	
+				} else {
+					iprod[j,] <- crossprod(vj[[k]], tvprod)
+				}				
 			}
 		}
-		colsumw <- colSums(w[-i,, drop = FALSE]) / n
-		tvprod <- x[[i]]		
-		dim(tvprod) <- c(prod(dimx[[i]][-ndimx[i]]), n)
-		tvprod <- tvprod %*% colsumw
-		dim(tvprod) <- dimx[[i]][-ndimx[i]]
+		lastidx <- idxi[m]
+		
+		## Set up linear program
+		w <- crossprod(iprod[-i,, drop = FALSE], c[-i, i] / n)
+		if (d[i] == 1) {
+			a <- x[[i]] %*% w	
+		} else {
+			a <- x[[i]]
+			dim(a) <- c(prod(dimx[[i]][-ndimx[i]]), n)
+			a <- a %*% w
+			dim(a) <- dimx[[i]][-ndimx[i]]
+		}
 		
 		## Update canonical vectors
-		v[[i]] <- optim.cor(v[[i]], tvprod, x[[i]], maxit, tol)				
+		v[[i]] <- optim.block.cor(v[[i]], a, x[[i]], maxit, tol)				
 	}								
 	
 	## Calculate objective value (sum of correlations)
@@ -73,11 +80,11 @@ for (it in 1:maxit) {
 	## so they have equal norm
 	if (balance) {
 		for (i in 1:m) {
-			nrm <- sapply(v[[i]], function(x) sqrt(sum(x^2)))
-			if (any(nrm < 1e-15)) next
-			d <- length(nrm)
-			s <- prod(nrm)^(1/d) / nrm
-			for (k in 1:d)
+			nrmv <- sapply(v[[i]], function(x) sqrt(sum(x^2)))
+			nrmt <- prod(nrmv)
+			s <- if (nrmt < 1e-15) { 
+				numeric(d[i]) } else nrmt^(1/d[i]) / nrmv
+			for (k in 1:d[i])
 				v[[i]][[k]] <- s[k] * v[[i]][[k]]			
 		}
 	}

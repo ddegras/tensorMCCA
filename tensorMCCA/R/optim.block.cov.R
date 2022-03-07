@@ -63,7 +63,7 @@ if (any(bzero)) {
 			objective <- colSums(delta * z^2) + 2 * colSums(b * z)
 			idx <- which.max(objective)
 			v <- P %*% z[,idx]
-			objective.best <- objective[i]
+			objective.best <- objective[idx]
 		}	
 	}			
 }

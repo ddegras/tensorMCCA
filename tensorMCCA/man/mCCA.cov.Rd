@@ -6,22 +6,22 @@
 \description{Perform multiple CCA by maximizing sum of covariances between canonical components.}
 
 \usage{
-mCCA.cov(x, r, c = 1, maxit = 1000, tol = 1e-06, init.type = c("svd", 
-	"ones", "random"), init.value = NULL, cnstr = c("block", "global"), 
-	ortho = c("block.score", "global.score", "canon.t.1", "canon.t.all"), 
-	verbose = FALSE)
+mCCA.cov(x, r, c = 1, init.type = c("svd", "ones", "random"), init.value = NULL,
+	cnstr = c("block", "global"), ortho = c("block.score", "global.score", "canon.t.1", "canon.t.all"), 
+	maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), verbose = FALSE)
 }
 
 \arguments{
 \item{x}{Data: list of arrays. All arrays must have the same number of dimensions in their last mode (= individual or object).}
 \item{r}{Number of canonical components to calculate.}
 \item{c}{Weight matrix for pairs of datasets.}
-\item{maxit}{Maximum number of algorihm iterations.}
-\item{tol}{Tolerance for algorithm convergence.}
 \item{init.type}{Initialization method.}
 \item{init.value}{Optional starting point for optimization.}
 \item{cnstr}{Norm constraints for canonical tensors.}
 \item{ortho}{Orthogonality constraints for higher order canonical components.}
+\item{maxit}{Maximum number of algorihm iterations.}
+\item{tol}{Tolerance for algorithm convergence.}
+\item{sweep}{Sweeping method}
 \item{verbose}{Display algorithm progress?}
 }
 

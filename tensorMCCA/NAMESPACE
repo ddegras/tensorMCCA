@@ -1,4 +1,4 @@
-export("check.arguments", "deflate.v", "deflate.x", "image.scores",
-	"init.v.ones", "init.v.random", "init.v.svd", "init.v.svd2", "InnerProd",
-	"mCCA.cor", "mCCA.cov", "objective.cor", "objective.cov", "permutation.test", 
-	"scale.v", "tnsr3d.rk1")
+export("check.arguments", "deflate.v", "deflate.x", "image.scores", "init.v.ones", "init.v.random", "init.v.svd", "mCCA.cor", "mCCA.cov", "objective.cor", "objective.cov", "permutation.test", "scale.v", "tnsr3d.rk1")
+importFrom("MASS", "ginv")
+importFrom("parallel", "mclapply")
+importFrom("RSpectra", "svds", "eigs_sym")

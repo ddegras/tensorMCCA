@@ -21,3 +21,32 @@ InnerProd <- function(x, v)
 		as.numeric(crossprod(v[[2]], iprod %*% v[[3]]))
 	} else NULL
 }
+
+
+
+##############################################
+# Function to calculate tensor-vector product 
+##############################################
+
+tnsr.vec.prod <- function(tnsr, vec, mode)
+{
+	dims <- dim(tnsr) 
+	d <- length(dims)
+	if (mode == 1) {
+		dim(tnsr) <- c(dims[1], prod(dims[-1]))
+		tnsr <- crossprod(vec, tnsr)
+		dim(tnsr) <- dims[-1]
+	} else if (mode == d) {
+		dim(tnsr) <- c(prod(dims[-d]), dims[d])
+		tnsr <- tnsr %*% vec
+		dim(tnsr) <- dims[-d]
+	} else {
+		perm <- c(1:(mode-1), (mode+1):d, mode)
+		tnsr <- aperm(tnsr, perm)
+		dim(tnsr) <- c(prod(dims[-mode]), mode)
+		tnsr <- tnsr %*% vec
+		dim(tnsr) <- dims[-mode]
+	}
+	tnsr
+}
+

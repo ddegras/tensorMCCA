@@ -1,7 +1,7 @@
-mCCA.cor <- function(x, r, c = 1, maxit = 1000, tol = 1e-6, 
-	init.type = c("svd", "ones", "random"), init.value = NULL, 
-	ortho = c("block.score", "global.score", "canon.t.1", "canon.t.all"),
-	balance = TRUE, verbose = FALSE)
+mCCA.cor <- function(x, r, c = 1, init.type = c("svd", "ones", "random"), 
+	init.value = NULL, ortho = c("block.score", "global.score", "canon.t.1",
+	"canon.t.all"), balance = TRUE, maxit = 1000, tol = 1e-6, 
+	sweep = c("cyclical", "random"), verbose = FALSE)
 {
 
 ## Check arguments
@@ -52,6 +52,9 @@ for (i in 1:m)
 	v[[i]] <- lapply(dim.img[[i]], function(dd) matrix(0, dd, r))
 block.score <- array(, dim = c(n, m, r)) 
 global.score <- matrix(, n, r) 
+input <- list(obj = "cor", r = r, c = c, init.type = init.type, 
+	init.value = init.value, ortho = ortho, balance = balance, 
+	maxit = maxit, tol = tol, sweep = sweep) 
 
 
 
@@ -77,12 +80,11 @@ for (k in 1:r) {
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component",k,"\n")
-	out <- mCCA.single.cor(x = x, v = v0, c = c, maxit = maxit, 
-		tol = tol, balance = balance, verbose = verbose)
+	out <- mCCA.single.cor(x, v0, c, sweep, maxit, tol, balance, verbose)
 	objective[k] <- out$objective
 	block.score[,,k] <- out$y # canonical scores
 	iters[k] <- out$iters
-
+	
 	## Deflate canonical vectors (necessary?)
 	vk <- out$v 
 	if (k > 1 && ortho %in% c("canon.t.1", "canon.t.all")) {
@@ -118,8 +120,7 @@ if (!identical(o,1:r)) {
 }
 
 list(v = v, block.score = block.score, global.score = global.score,
-	objective = objective, iters = iters, c = c, maxit = maxit, tol = tol, 
-	init.type = init.type, init.value = init.value, ortho = ortho)
+	objective = objective, iters = iters, input = input)
 }
 
 

@@ -7,7 +7,7 @@
 
 ##########################################
 # Maximize linear form v'a subject to
-# (1/n) v'BB'v = 1 where B has n columns 
+# (1/n) v'BB'v = 1 where B has n columns  
 ##########################################
 
 
@@ -149,7 +149,7 @@ return(v)
 ####################################
 
 
-optim.block.cor <- function(v, a, b, maxit = 1000, tol = 1e-6)
+optim.block.cor <- function(v, a, b, maxit, tol)
 {
 if (length(v) == 1) {
 	optim1D.cor(a, b)
