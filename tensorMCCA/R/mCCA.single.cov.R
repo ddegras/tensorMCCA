@@ -274,7 +274,7 @@ for (it in 1:maxit) {
 	## Debugging: Compare objective value calculated in loop 
 	## to full calculation
 	# test <- objective.internal(x, v, c)
-	if (any(group[,groupsize] == 0))
+	if (any(group[,ngroups] == 0))
 		objective[it+1] <- objective.internal(x, v, c)
 	if (verbose) 
 		cat("\nIteration",it,"Objective",objective[it+1])
