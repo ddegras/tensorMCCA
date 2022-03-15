@@ -13,14 +13,18 @@ for (i in 1:m) {
 	x[[i]] <- x[[i]][,sample(n)]
 	dim(x[[i]]) <- dimx[[i]]
 }
-mCCA.cor(x, r = r, c = obj$c, maxit = obj$maxit, tol = obj$tol, 
-	init.type = obj$init.type, init.value = obj$init.value, 
-	ortho = obj$ortho, verbose = FALSE)$objective
+
+input <- obj$input
+mCCA.fun <- switch(input$obj, cov = mCCA.cov, cor = mCCA.cor)	
+mCCA.fun(x, r = input$r, c = input$c, init.type = input$init.type, 
+	init.value = input$init.value, ortho = input$ortho, 
+	balance = input$balance, maxit = input$maxit, tol = input$tol, 
+	sweep = input$sweep, verbose = FALSE)$objective
 }
 
-if (is.null(ncores)) 
+if (is.null(ncores))
 	ncores <- getOption("mc.cores", 2L)
-r <- length(obj$objective)
+r <- length(input$r)
 
 perm.objective <- if (parallel.flag) {
 	mclapply(1:nperm, f, x = x, obj = obj, mc.cores = ncores)

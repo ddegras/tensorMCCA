@@ -2,3 +2,4 @@ export("check.arguments", "deflate.v", "deflate.x", "image.scores", "init.v.ones
 importFrom("MASS", "ginv")
 importFrom("parallel", "mclapply")
 importFrom("RSpectra", "svds", "eigs_sym")
+importFrom("geigen", "geigen")
