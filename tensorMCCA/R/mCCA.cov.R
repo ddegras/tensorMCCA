@@ -100,8 +100,15 @@ for (k in 1:r) {
 		objective[k] <- sum(c * crossprod(block.score[,,k])) / n
 	}
 	
-	global.score[,k] <- block.score[,,k] %*% csum
+	## Calculate global scores
+	nrmv <- numeric(m)
+	for (i in 1:m) 
+		nrmv[i] <- prod(sapply(vk[[i]], function(x) sum(x^2)))	
+	global.score[,k] <- rowSums(block.score[,,k]) / sum(nrmv)
 	
+	## Rescale block scores
+	block.score[,,k] <- block.score[,,k] %*% diag(1/nrmv)
+
 	## Add new canonical vectors to output	
 	for (i in 1:m) 
 		for (dd in 1:ndim.img[i]) 

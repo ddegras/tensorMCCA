@@ -147,7 +147,12 @@ if (ortho == "global.score") {
 		stop(paste("At least one of 'v' or 'y' must be specified",
 			"if 'ortho' is set to 'global.score'"))
 	if (is.null(y)) y <- image.scores(x, v)
-	y <- rowSums(y) # global score (unscaled)
+	## Calculate norms of canonical tensors
+	nrmv <- numeric(m)
+	for (i in 1:m) 
+		nrmv[i] <- prod(sapply(v[[i]], function(x) sum(x^2)))
+	## Global scores
+	y <- rowSums(y) 
 	y <- y / sqrt(sum(y^2))
 	for (i in 1:m) {
 		dim(x[[i]]) <- c(length(x[[i]]) / n, n)

@@ -235,8 +235,8 @@ for (i in 1:m) {
 			if (k < d[i]) {
 				dim(xi) <- c(pi[k], length(xi) / pi[k])
 				svdx <- svdfun(xi)
-				v[[i]][[k]][, l] <- svdx$u
-				xi <- svdx$v
+				v[[i]][[k]][, l] <- svdx$u[,1]
+				xi <- svdx$v[,1]
 			} else {
 				v[[i]][[k]][, l] <- xi 
 			}

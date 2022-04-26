@@ -1,4 +1,4 @@
-mCCA.cor <- function(x, r, c = 1, init.type = c("svd", "ones", "random"), 
+mCCA.cor <- function(x, r, c = 1, init.type = c("svd", "cca", "random"), 
 	init.value = NULL, ortho = c("block.score", "global.score", "canon.t.1",
 	"canon.t.all"), balance = TRUE, maxit = 1000, tol = 1e-6, 
 	sweep = c("cyclical", "random"), verbose = FALSE)
@@ -24,11 +24,11 @@ if (length(c) == 1) {
 } else {
 	c <- (c + t(c)) / (2 * sum(c))
 }
-csum <- colSums(c)
 
 ## Match arguments
 init.type <- match.arg(init.type)
 ortho <- match.arg(ortho)
+sweep <- match.arg(sweep)
 
 ## Data centering
 for(i in 1:m) {
@@ -50,8 +50,8 @@ if (verbose && r != r0)
 v <- vector("list", m) # canonical vectors
 for (i in 1:m) 
 	v[[i]] <- lapply(dim.img[[i]], function(dd) matrix(0, dd, r))
-block.score <- array(, dim = c(n, m, r)) 
-global.score <- matrix(, n, r) 
+block.score <- array(dim = c(n, m, r)) 
+global.score <- matrix(nrow = n, ncol = r) 
 input <- list(obj = "cor", r = r, c = c, init.type = init.type, 
 	init.value = init.value, ortho = ortho, balance = balance, 
 	maxit = maxit, tol = tol, sweep = sweep) 
@@ -73,9 +73,9 @@ for (k in 1:r) {
 		} 
 	} else {
 		v0 <- switch(init.type, 
-			svd = init.v.svd(x, type = "var", balance = balance),
-			ones = init.v.ones(x, type = "var", balance = balance),
-			random = init.v.random(x, type = "var", balance = balance))
+			svd = init.mcca.svd(x, type = "var", balance = balance),
+			cca = init.mcca.cca(x, type = "var", balance = balance),
+			random = init.mcca.random(x, type = "var", balance = balance))
 	}
 	
 	## Run MCCA and store results
@@ -94,7 +94,14 @@ for (k in 1:r) {
 		objective[k] <- sum(c * crossprod(block.score[,,k])) / n
 	}
 	
-	global.score[,k] <- block.score[,,k] %*% csum
+	## Calculate global scores
+	nrmv <- numeric(m)
+	for (i in 1:m) 
+		nrmv[i] <- prod(sapply(vk[[i]], function(x) sum(x^2)))	
+	global.score[,k] <- rowSums(block.score[,,k]) / sum(nrmv)
+	
+	## Rescale block scores
+	block.score[,,k] <- block.score[,,k] %*% diag(1/nrmv)
 	
 	## Add new canonical vectors to output	
 	for (i in 1:m) 
