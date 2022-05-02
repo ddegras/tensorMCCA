@@ -1,115 +1,5 @@
 
 
-
-########################
-# Random initialization 
-# of canonical vectors 
-########################
-
-
-init.mcca.random <- function(x, type = c("norm", "var"), 
-	cnstr = c("block", "global"), balance = TRUE)
-{
-## Check argument x if required
-test <- check.arguments(x)
-
-## Data dimensions
-m <- length(x) # number of datasets 
-dimx <- lapply(x, dim) # full data dimensions
-dim.img <- lapply(dimx, function(idx) idx[-length(idx)]) 
-# image dimensions (ignore last dimension of datasets = replications)
-ndim.img <- sapply(dim.img, length)
-
-## Scaling constraints
-type <- match.arg(type)   # norm or variance constraints
-cnstr <- match.arg(cnstr) # block or global constraints
-
-## Initialize canonical vectors randomly
-v <- vector("list",m)
-for (i in 1:m)
-	v[[i]] <- lapply(dim.img[[i]], function(len) runif(len))
-
-## Scale canonical vectors
-v <- scale.v(v, x, type, cnstr, balance)
-return(v)
-}
-
-
-
-
-
-###########################
-# SVD-based initialization
-# of canonical vectors 
-# (Quick Rank 1)
-###########################
-
-
-init.mcca.svd <- function(x, objective = c("cov", "cor"), 
-	cnstr = c("block", "global"), center = TRUE, balance = TRUE)
-{
-## Check argument x if required
-test <- check.arguments(x)
-tol <- 1e-14
-
-## Data dimensions
-m <- length(x) # number of datasets 
-dimx <- lapply(x, dim) # full data dimensions
-p <- lapply(dimx, function(idx) idx[-length(idx)]) 
-# image dimensions (ignore last dimension of datasets = replications)
-d <- sapply(p, length)
-n <- tail(dimx[[1]], 1)
-
-## Scaling constraints
-objective <- match.arg(objective) # norm or variance constraints
-type <- switch(type, cov = "norm", cor = "var")
-cnstr <- match.arg(cnstr) # block or global constraints
-# ortho <- match.arg(ortho)
-
-## Initialize canonical vectors 
-v <- vector("list", m)
-
-## Unfold data along last mode (individuals/objects) and concatenate
-for (i in 1:m) 
-	dim(x[[i]]) <- c(prod(p[[i]]), n)
-x <- do.call(rbind, x)
-
-## Data centering
-if (center) 
-	x <- x - rowMeans(x)
-
-## Initial SVD
-svdfun <- if (max(dim(x)) > 2) {
-	function(x) svds(x, k = 1) } else {
-	function(x) svd(x, nu = 1, nv = 1) } 
-x <- svdfun(x)$u
-
-## Iteratively unfold singular vectors and recalculate SVD
-lenx <- sapply(p, prod)
-start <- c(0, cumsum(lenx[-m])) + 1
-end <- cumsum(lenx)
-for (i in 1:m) {
-	pi <- p[[i]]
-	xi <- x[start[i]:end[i]]
-	for (k in 1:d[i]) {	
-		if (k < d[i]) {
-			dim(xi) <- c(pi[k], length(xi) / pi[k])
-			svdx <- svdfun(xi)
-			v[[i]][[k]] <- svdx$u
-			xi <- svdx$v
-		} else {
-			v[[i]][[k]] <- xi 
-		}	
-	}
-}
-
-## Scale initial canonical vectors as required	
-v <- scale.v(v, x, type, cnstr, balance)
-
-return(v)	
-}
-
-
 ############################################
 # Initialize MCCA by solving pairwise CCA's
 ############################################
@@ -165,6 +55,7 @@ for (i in 1:m) {
 	rankx[i] <- if (center) {
 		qr(matrix(x[[i]], pp[i], n) - xbar[[i]])$rank	
 	} else { qr(matrix(x[[i]], pp[i], n) - xbar[[i]])$rank }
+}
 
 ## Effective rank of SVD 	
 k <- pmin(rankx, k)
@@ -197,7 +88,7 @@ if (objective.type == "cov" && cnstr == "global") {
 	const <- all(c == c[1])
 	if (const) { 
 		rankc <- 1
-	 else {
+	 } else {
 		eigc <- eigen(c, TRUE)
 		rankc <- sum(eigc$values > tol)
 		if (rankc == 1) 
@@ -310,20 +201,19 @@ if (cnstr == "block") {
 		v[[i]] <- v[[i]][, idxj[i]]
 }
 
-## Approximate long canonical vectors by rank 1 tensors 
+## Approximate long canonical vectors by rank-1 tensors 
 for (i in 1:m) {
 	pi <- p[[i]]
 	vi <- v[[i]]
-	s <- sqrt(sum(vi^2)^d[i]) # scaling factor
 	v[[i]] <- vector("list", d[i])
 	for (k in 1:d[i]) {
 		if (k < d[i]) {
 			dim(vi) <- c(pi[k], length(vi) / pi[k])
-			svdi <- svd(vi)
-			v[[i]][[k]] <- s * svdi$u
+			svdi <- if (min(dim(vi)) > 2) svds(vi, 1) else svd(vi, 1, 1)
+			v[[i]][[k]] <- svdi$u
 			vi <- svdi$v
 		} else {
-			v[[i]][[k]] <- vi * (s/sqrt(sum(vi^2)))
+			v[[i]][[k]] <- vi 
 		}
 	}
 }

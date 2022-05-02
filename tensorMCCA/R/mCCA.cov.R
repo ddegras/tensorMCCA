@@ -1,4 +1,4 @@
-mCCA.cov <- function(x, r, c = 1, init.type = c("svd", "ones", "random"), 
+mCCA.cov <- function(x, r, c = 1, init.type = c("svd", "cca", "random"), 
 	init.value = NULL, cnstr = c("block", "global"), ortho = c("block.score", 
 	"global.score", "canon.t.1", "canon.t.all"), balance = TRUE, maxit = 1000, 
 	tol = 1e-6, sweep = c("cyclical", "random"), verbose = FALSE)
@@ -79,9 +79,9 @@ for (k in 1:r) {
 		} 
 	} else {
 		v0 <- switch(init.type, 
-			svd = init.v.svd(x, type = "norm", cnstr = cnstr),
-			ones = init.v.ones(x, type = "norm", cnstr = cnstr),
-			random = init.v.random(x, type = "norm", cnstr = cnstr))
+			svd = init.mcca.svd(x, objective = "cov", cnstr = cnstr),
+			svd = init.mcca.cca(x, objective = "cov", cnstr = cnstr),
+			random = init.mcca.random(x, objective = "cov", cnstr = cnstr))
 	}
 	
 	## Run MCCA and store results

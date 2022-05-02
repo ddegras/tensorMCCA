@@ -73,9 +73,9 @@ for (k in 1:r) {
 		} 
 	} else {
 		v0 <- switch(init.type, 
-			svd = init.mcca.svd(x, type = "var", balance = balance),
-			cca = init.mcca.cca(x, type = "var", balance = balance),
-			random = init.mcca.random(x, type = "var", balance = balance))
+			svd = init.mcca.svd(x, objective = "cor"),
+			cca = init.mcca.cca(x, objective = "cor"),
+			random = init.mcca.random(x, objective = "cor"))
 	}
 	
 	## Run MCCA and store results
