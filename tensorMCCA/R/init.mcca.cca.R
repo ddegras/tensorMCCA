@@ -221,7 +221,7 @@ for (i in 1:m) {
 ## Scale the canonical tensors as needed
 ## (norm constraints are already enforced)
 if (objective.type == "cor")
-	v <- scale.v(v, x, type = "var", balance = TRUE)
+	v <- scale.v(v, x, type = "var")
 
 v
 

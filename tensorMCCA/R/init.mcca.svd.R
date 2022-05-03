@@ -11,7 +11,7 @@
 
 
 init.mcca.svd <- function(x, objective = c("cov", "cor"), 
-	cnstr = c("block", "global"), center = TRUE, balance = TRUE)
+	cnstr = c("block", "global"), center = TRUE)
 {
 ## Check argument x if required
 test <- check.arguments(x)
@@ -25,11 +25,8 @@ p <- lapply(dimx, function(idx) idx[-length(idx)])
 d <- sapply(p, length)
 n <- tail(dimx[[1]], 1)
 
-## Scaling constraints
 objective <- match.arg(objective) # norm or variance constraints
-type <- switch(type, cov = "norm", cor = "var")
 cnstr <- match.arg(cnstr) # block or global constraints
-# ortho <- match.arg(ortho)
 
 ## Initialize canonical vectors 
 v <- vector("list", m)
@@ -69,8 +66,9 @@ for (i in 1:m) {
 }
 
 ## Scale initial canonical vectors as required	
-v <- scale.v(v, x, type, cnstr, balance)
+if (objective == "cor")
+	v <- scale.v(v, x,"var", cnstr)
 
-return(v)	
+v
 }
 

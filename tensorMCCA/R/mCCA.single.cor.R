@@ -9,7 +9,7 @@
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-mCCA.single.cor <- function(x, v, c, sweep, maxit, tol, balance, verbose)
+mCCA.single.cor <- function(x, v, c, sweep, maxit, tol, verbose)
 {
 	
 ## Data dimensions
@@ -76,17 +76,15 @@ for (it in 1:maxit) {
 	if (verbose) 
 		cat("\nIteration",it,"Objective",objective[it+1])
 
-	## Optionally balance the canonical vectors of each dataset
+	## Balance the canonical vectors of each dataset
 	## so they have equal norm
-	if (balance) {
-		for (i in 1:m) {
-			nrmv <- sapply(v[[i]], function(x) sqrt(sum(x^2)))
-			nrmt <- prod(nrmv)
-			s <- if (nrmt < 1e-15) { 
-				numeric(d[i]) } else nrmt^(1/d[i]) / nrmv
-			for (k in 1:d[i])
-				v[[i]][[k]] <- s[k] * v[[i]][[k]]			
-		}
+	for (i in 1:m) {
+		nrmv <- sapply(v[[i]], function(x) sqrt(sum(x^2)))
+		nrmt <- prod(nrmv)
+		s <- if (nrmt < 1e-15) { 
+			numeric(d[i]) } else nrmt^(1/d[i]) / nrmv
+		for (k in 1:d[i])
+			v[[i]][[k]] <- s[k] * v[[i]][[k]]			
 	}
 	
 	## Check convergence 

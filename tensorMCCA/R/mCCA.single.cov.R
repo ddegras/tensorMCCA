@@ -10,7 +10,7 @@
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-mCCA.single.block.cov <- function(x, v, c, balance, sweep, maxit, 
+mCCA.single.block.cov <- function(x, v, c, sweep, maxit, 
 	tol, verbose)
 {
 	
@@ -117,7 +117,7 @@ list(v = v, y = image.scores(x, v), objective = objective[it+1],
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-mCCA.single.global.cov <- function(x, v, c, balance, sweep, 
+mCCA.single.global.cov <- function(x, v, c, sweep, 
 	maxit, tol, verbose)
 {
 	
@@ -267,9 +267,8 @@ for (it in 1:maxit) {
 					
 	}								
 	
-	## Balance canonical vectors if required 
-	if (balance) v <- scale.v(v, type = "norm", cnstr = "global", 
-		balance = TRUE)
+	## Balance canonical vectors  
+	v <- scale.v(v, type = "norm", cnstr = "global")
 	
 	## Debugging: Compare objective value calculated in loop 
 	## to full calculation

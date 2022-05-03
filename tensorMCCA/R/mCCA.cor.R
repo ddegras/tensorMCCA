@@ -1,6 +1,6 @@
 mCCA.cor <- function(x, r, c = 1, init.type = c("svd", "cca", "random"), 
 	init.value = NULL, ortho = c("block.score", "global.score", "canon.t.1",
-	"canon.t.all"), balance = TRUE, maxit = 1000, tol = 1e-6, 
+	"canon.t.all"), maxit = 1000, tol = 1e-6, 
 	sweep = c("cyclical", "random"), verbose = FALSE)
 {
 
@@ -53,8 +53,8 @@ for (i in 1:m)
 block.score <- array(dim = c(n, m, r)) 
 global.score <- matrix(nrow = n, ncol = r) 
 input <- list(obj = "cor", r = r, c = c, init.type = init.type, 
-	init.value = init.value, ortho = ortho, balance = balance, 
-	maxit = maxit, tol = tol, sweep = sweep) 
+	init.value = init.value, ortho = ortho, maxit = maxit, 
+	tol = tol, sweep = sweep) 
 
 
 
@@ -80,7 +80,7 @@ for (k in 1:r) {
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component",k,"\n")
-	out <- mCCA.single.cor(x, v0, c, sweep, maxit, tol, balance, verbose)
+	out <- mCCA.single.cor(x, v0, c, sweep, maxit, tol, verbose)
 	objective[k] <- out$objective
 	block.score[,,k] <- out$y # canonical scores
 	iters[k] <- out$iters
@@ -89,7 +89,7 @@ for (k in 1:r) {
 	vk <- out$v 
 	if (k > 1 && ortho %in% c("canon.t.1", "canon.t.all")) {
 		vk <- deflate.v(out$v, v, ortho)	
-		vk <- scale.v(vk, x, type = "var", balance = balance)
+		vk <- scale.v(vk, x, type = "var")
 		block.score[,,k] <- image.scores(x, vk) 
 		objective[k] <- sum(c * crossprod(block.score[,,k])) / n
 	}

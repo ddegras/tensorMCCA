@@ -32,8 +32,8 @@ for (i in 1:m)
 	v[[i]] <- lapply(dim.img[[i]], function(len) runif(len))
 
 ## Scale canonical vectors
-v <- scale.v(v, x, type, cnstr, balance)
-return(v)
+scale.v(v, x, type, cnstr)
+
 }
 
 

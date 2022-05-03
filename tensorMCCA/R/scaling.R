@@ -6,7 +6,7 @@
 #########################################
 
 scale.v <- function(v, x = NULL, type = c("norm", "var"), 
-	cnstr = c("block", "global"), balance = TRUE)
+	cnstr = c("block", "global"))
 {
 type <- match.arg(type)   # norm or variance constraints
 cnstr <- match.arg(cnstr) # block or global constraints
@@ -23,7 +23,6 @@ if (type == "var") {
 		for (k in 1:d[i]) 
 			v[[i]][[k]] <- v[[i]][[k]] / sdy[i]^(1/d[i])
 	}
-	if (!balance) return(v)	
 }
 
 ## Calculate Frobenius norms of canonical tensors
@@ -53,8 +52,7 @@ if (type == "var") {
 if (type == "norm" && cnstr == "block") {
 	for (i in 1:m) {
 		s <- if (nrmt[i] < eps) { numeric(d[i]) 
-			} else if (balance) { 1 / nrmv[[i]]
-			} else { rep(1 / nrmt[i]^(1/d[i]), d[i]) } 
+			} else { 1 / nrmv[[i]] }  
 		for (k in 1:d[i]) 
 			v[[i]][[k]] <- s[k] * v[[i]][[k]]	
 	}
@@ -67,9 +65,7 @@ if (type == "norm" && cnstr == "global") {
 	global.s <- mean(nrmt^2)
 	global.s <- if (global.s < eps) 0 else (1/sqrt(global.s))
 	for (i in 1:m) {
-		s <- if (balance) {
-			(global.s * nrmt[i])^(1/d[i]) / nrmv[[i]]
-		} else { rep(global.s^(1/d[i]), d[i]) }
+		s <- (global.s * nrmt[i])^(1/d[i]) / nrmv[[i]]
 		s[is.nan(s)] <- 0
 	for (k in 1:d[i]) 
 		v[[i]][[k]] <- s[k] * v[[i]][[k]]	
