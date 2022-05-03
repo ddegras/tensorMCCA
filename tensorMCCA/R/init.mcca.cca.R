@@ -25,8 +25,8 @@ if (!all(n == n[1]))
 	stop(paste("The last modes of the components of 'x'",
 		"must have the same dimension"))
 n <- n[[1]]
-if (is.null(k)) k <- n else k <- min(k, n) 
-	
+if (is.null(k)) { k <- n } else { k <- min(k, n) }
+
 ## Scaling constraints
 objective.type <- match.arg(objective)   # norm or variance constraints
 # type <- switch(objective.type, cov = "norm", cor = "var")
@@ -124,8 +124,8 @@ if (objective.type == "cov" && cnstr == "global") {
 		for (j in 1:m)
 			xmat[block[[i]], block[[j]]] <- c[i,j] * x[block[[i]], block[[j]]]
 		v <- if (ncol(xmat) > 2) {
-			eigs_sym(x, k = 1)$vectors
-		} else { eigen(x, TRUE)$vectors[,1] }
+			eigs_sym(xmat, k = 1)$vectors
+		} else { eigen(xmat, TRUE)$vectors[,1] }
 	}
 	
 	## Recover (long) block canonical vectors
@@ -140,7 +140,7 @@ if (objective.type == "cov" && cnstr == "global") {
 ## CASE: mCCA with block constraints
 
 	## Calculate CCA for each pair of datasets 	 
-	v <- lapply(pp, function(nr) matrix(nrow = nr, ncol = n)) # canonical vectors
+	v <- lapply(pp, function(nr) matrix(nrow = nr, ncol = m)) # canonical vectors
 	objective <- matrix(0, m, m)
 	for (i in 1:m) {
 		xi <- if (reducex[i]) { 
