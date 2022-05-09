@@ -39,15 +39,22 @@ for(i in 1:m) {
 r0 <- as.integer(r)
 r <- switch(ortho, 
 	block.score = min(r0, n-1), global.score = min(r0, n-1),
-	canon.t.1 = min(r0, unlist(lapply(p, "[[", 1))),
-	canon.t.all = min(r0, unlist(p)))
+	# The minimum rank possibly/likely depends on p & d
+	# If so fix the line above
+	canon.tnsr = min(r0, sapply(p, prod)))
 if (verbose && r != r0)
 	warning(paste("Argument 'r' set to", r,
 		"to satisfy orthogonality constraints"))
-				
+
+## Set up sequence of constraints if orthogonality 
+## constraints are on canonical tensors
+if (ortho == "canon.tnsr") {
+	
+}
+
 ## Create output objects 
 v <- vector("list", m * r) # canonical vectors
-if (r > 1) dim(v) <- c(m, r)
+dim(v) <- c(m, r)
 # for (i in 1:m) 
 	# v[[i]] <- lapply(p[[i]], function(dd) matrix(0, dd, r))
 block.score <- array(dim = c(n, m, r)) 
@@ -104,7 +111,7 @@ for (l in 1:r) {
 	nrmv <- numeric(m)
 	for (i in 1:m) 
 		nrmv[i] <- prod(sapply(vl[[i]], function(x) sum(x^2)))	
-	global.score[,l] <- rowSums(blocl.score[,,l]) / sum(nrmv)
+	global.score[,l] <- rowSums(block.score[,,l]) / sum(nrmv)
 	
 	## Rescale block scores
 	block.score[,,l] <- block.score[,,l] %*% diag(1/nrmv)
