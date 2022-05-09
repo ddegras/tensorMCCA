@@ -7,9 +7,9 @@
 
 
 init.mcca.cca <- function(x, k = NULL, c = 1, objective = c("cov", "cor"), 
-	cnstr = c("block", "global"), center = TRUE)
+	cnstr = c("block", "global"), center = TRUE, search = c("exhaust", "approx"))
 {
-## Check argument x if required
+## Check argument x
 test <- check.arguments(x)
 tol <- 1e-14
 
@@ -29,9 +29,14 @@ if (is.null(k)) { k <- n } else { k <- min(k, n) }
 
 ## Scaling constraints
 objective.type <- match.arg(objective)   # norm or variance constraints
-# type <- switch(objective.type, cov = "norm", cor = "var")
-if (objective.type == "cor") cnstr <- "block"
+if (objective.type == "cor" && cnstr == "global")
+	stop("Argument values 'objective = cor' and 'cnstr = global' are incompatible.")
 cnstr <- match.arg(cnstr) # block or global constraints
+
+## Search method in optimization
+search <- if (identical(search, c("exhaust", "approx")) {
+	ifelse(m <= 5, "exhaust", "approx")
+} else { match.arg(search) }
 
 ## Objective weights
 stopifnot(length(c) == 1 || (is.matrix(c) && all(dim(c) == length(x))))
@@ -141,7 +146,7 @@ if (objective.type == "cov" && cnstr == "global") {
 
 	## Calculate CCA for each pair of datasets 	 
 	v <- lapply(pp, function(nr) matrix(nrow = nr, ncol = m)) # canonical vectors
-	objective <- matrix(0, m, m)
+	# objective <- matrix(0, m, m)
 	for (i in 1:m) {
 		xi <- if (reducex[i]) { 
 			xred[[i]]
@@ -151,6 +156,11 @@ if (objective.type == "cov" && cnstr == "global") {
 			matrix(x[[i]], pp[i], n)
 		}		
 		for (j in 1:i) {
+			if (i == j && objective.type == "cor") {
+				# objective[i,j] <- 0
+				v[[i]][,i] <- u[[i]]
+				next
+			}
 			xj <- if (i == j) { xi 
 			} else if (reducex[j]) { 
 				xred[[j]]
@@ -169,8 +179,8 @@ if (objective.type == "cov" && cnstr == "global") {
 			} else {
 				svd(tcrossprod(xi, xj), nu = 1, nv = 1)
 			} 
-			objective[i,j] <- c[i,j] * ifelse(i == j, 
-				svdij$d[1]^2, svdij$d[1])			
+			# objective[i,j] <- c[i,j] * ifelse(i == j, 
+				# svdij$d[1]^2, svdij$d[1])			
 			v[[i]][,j] <- if (objective.type == "cor") {
 				u[[i]] %*% (svdij$u / dd[[i]])
 			} else if (reducex[i]) {
@@ -179,7 +189,7 @@ if (objective.type == "cov" && cnstr == "global") {
 				svdij$u		
 			}				
 			if (j < i) {
-				objective[j,i] <- objective[i,j]
+				# objective[j,i] <- objective[i,j]
 				v[[j]][, i] <- if (objective.type == "cor") {
 					u[[j]] %*% (svdij$v / dd[[j]])
 				} else if (reducex[i]) { 
@@ -191,32 +201,49 @@ if (objective.type == "cov" && cnstr == "global") {
 		}
 	}	
 }
- 
-
-## Find best overall assignment in pairwise CCA		
-## (Linear Sum Assignment Problem)
-if (cnstr == "block") {
-	idxj <- solve_LSAP(objective, maximum = TRUE)
-	for (i in 1:m) 
-		v[[i]] <- v[[i]][, idxj[i]]
-}
 
 ## Approximate long canonical vectors by rank-1 tensors 
 for (i in 1:m) {
 	pi <- p[[i]]
 	vi <- v[[i]]
-	v[[i]] <- vector("list", d[i])
-	for (k in 1:d[i]) {
-		if (k < d[i]) {
-			dim(vi) <- c(pi[k], length(vi) / pi[k])
-			svdi <- if (min(dim(vi)) > 2) svds(vi, 1) else svd(vi, 1, 1)
-			v[[i]][[k]] <- svdi$u
-			vi <- svdi$v
-		} else {
-			v[[i]][[k]] <- vi 
+	v[[i]] <- vector("list", m)
+	for (j in 1:i) {
+		vij <- vi[, j]
+		vijlist <- vector("list", d[i])
+		for (k in 1:d[i]) {
+			if (k < d[i]) {
+				dim(vij) <- c(pi[k], length(vij) / pi[k])
+				svdij <- if (min(dim(vij)) > 2) {
+					svds(vij, 1) } else svd(vij, 1, 1)
+				vijlist[[k]] <- svdi$u
+				vij <- svdi$v
+			} else {
+				vijlist[[k]] <- vij 
+			}
 		}
+		v[[i]][[j]] <- vijlist
 	}
 }
+
+
+## In case of exhaustive search for best m-assignment of
+## canonical vectors, determine all associated objective components 
+if (cnstr == "block" && search == "exhaust") {
+	
+	
+}
+
+
+
+## In case of approximate search, find best overall assignment 
+## in pairwise CCA (Linear Sum Assignment Problem)
+if (cnstr == "block" && search == "approx") {
+	idxj <- solve_LSAP(objective, maximum = TRUE)
+	for (i in 1:m) 
+		v[[i]] <- v[[i]][, idxj[i]]
+}
+
+
 
 ## Scale the canonical tensors as needed
 ## (norm constraints are already enforced)
