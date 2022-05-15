@@ -5,25 +5,25 @@
 # Function for scaling canonical vectors
 #########################################
 
-scale.v <- function(v, x = NULL, type = c("norm", "var"), 
+scale.v <- function(v, x = NULL, # type = c("norm", "var"), 
 	cnstr = c("block", "global"))
 {
-type <- match.arg(type)   # norm or variance constraints
+# type <- match.arg(type)   # norm or variance constraints
 cnstr <- match.arg(cnstr) # block or global constraints
 m <- length(v)
 d <- sapply(v, length)
 eps <- 1e-15 # numerical tolerance for zero
 
 ## If variance constraints, calculate variances and rescale
-if (type == "var") {
-	y <- image.scores(x, v)
-	sdy <- sqrt(colMeans(y^2))
-	for (i in 1:m) {
-		if (sdy[i] < eps) next
-		for (k in 1:d[i]) 
-			v[[i]][[k]] <- v[[i]][[k]] / sdy[i]^(1/d[i])
-	}
-}
+# if (type == "var") {
+	# y <- image.scores(x, v)
+	# sdy <- sqrt(colMeans(y^2))
+	# for (i in 1:m) {
+		# if (sdy[i] < eps) next
+		# for (k in 1:d[i]) 
+			# v[[i]][[k]] <- v[[i]][[k]] / sdy[i]^(1/d[i])
+	# }
+# }
 
 ## Calculate Frobenius norms of canonical tensors
 ## (= products of Euclidean norms of canonical vectors)
@@ -38,18 +38,18 @@ for (i in 1:m) {
 ## If variance constraints and balancing requirement,
 ## make norms of canonical vectors equal in each block
 ## without changing their product  
-if (type == "var") {
-	for (i in 1:m) {
-		s <- if (nrmt[i] < eps) { numeric(d[i])
-		} else { nrmt[i]^(1/d[i]) / nrmv[[i]] }
-		for (k in 1:d[i]) 
-			v[[i]][[k]] <- s[k] * v[[i]][[k]] 
-	}
-}
+# if (type == "var") {
+	# for (i in 1:m) {
+		# s <- if (nrmt[i] < eps) { numeric(d[i])
+		# } else { nrmt[i]^(1/d[i]) / nrmv[[i]] }
+		# for (k in 1:d[i]) 
+			# v[[i]][[k]] <- s[k] * v[[i]][[k]] 
+	# }
+# }
 
 ## If tensor norm constraints at the block level,
 ## rescale each canonical vector by its norm
-if (type == "norm" && cnstr == "block") {
+if (cnstr == "block") {
 	for (i in 1:m) {
 		s <- if (nrmt[i] < eps) { numeric(d[i]) 
 			} else { 1 / nrmv[[i]] }  
@@ -61,11 +61,11 @@ if (type == "norm" && cnstr == "block") {
 ## If tensor norm constraints at the global level,
 ## rescale each canonical vector in a given mode/dimension
 ## by the global norm of all canonical vectors in this mode
-if (type == "norm" && cnstr == "global") {
-	global.s <- mean(nrmt^2)
-	global.s <- if (global.s < eps) 0 else (1/sqrt(global.s))
+if (cnstr == "global") {
+	ss <- mean(nrmt^2)
+	ss <- if (ss < eps) 0 else (1/sqrt(ss))
 	for (i in 1:m) {
-		s <- (global.s * nrmt[i])^(1/d[i]) / nrmv[[i]]
+		s <- (ss * nrmt[i])^(1/d[i]) / nrmv[[i]]
 		s[is.nan(s)] <- 0
 	for (k in 1:d[i]) 
 		v[[i]][[k]] <- s[k] * v[[i]][[k]]	
