@@ -38,10 +38,9 @@ for(i in 1:m) {
 ## Adjust number of canonical components as needed
 r0 <- as.integer(r)
 r <- switch(ortho, 
-	block.score = min(r0, n-1), global.score = min(r0, n-1),
-	# The minimum rank possibly/likely depends on p & d
-	# If so fix the line above
-	canon.tnsr = min(r0, sapply(p, prod)))
+	block.score = min(n-1, sapply(p, prod), r0), 
+	global.score = min(n-1, sum(sapply(p, prod)), r0),
+	canon.tnsr = min(sapply(p, prod), r0))
 if (verbose && r != r0)
 	warning(paste("Argument 'r' set to", r,
 		"to satisfy orthogonality constraints"))
@@ -49,20 +48,35 @@ if (verbose && r != r0)
 ## Set up sequence of constraints if orthogonality 
 ## constraints are on canonical tensors
 if (ortho == "canon.tnsr") {
+	ortho.mode <- array(0L, c(r, r, m))
+	
+	# , i=1:m, l=1:r, 
+	
 	
 }
 
 ## Create output objects 
 v <- vector("list", m * r) # canonical vectors
 dim(v) <- c(m, r)
-# for (i in 1:m) 
-	# v[[i]] <- lapply(p[[i]], function(dd) matrix(0, dd, r))
 block.score <- array(dim = c(n, m, r)) 
 global.score <- matrix(nrow = n, ncol = r) 
 input <- list(obj = "cor", r = r, c = c, init.type = init.type, 
 	init.value = init.value, ortho = ortho, maxit = maxit, 
 	tol = tol, sweep = sweep) 
 
+## Trivial case: constant datasets  
+test <- sapply(x, function(a) all(abs(a) <= 1e-15))
+test <- outer(test, test, "&")
+if (all(test | c == 0)) {
+	r <- 1
+	input$r <- r
+	v <- vector("list", m)
+	for (i in 1:m) 
+		v[[i]] <- lapply(p[[i]], function(len) matrix(0, len, r))
+	return(list(v = v, block.score = array(0, c(n, m, r)), 
+		global.score = matrix(0, n, r), objective = 0, 
+		iters = 0, input = input))
+}
 
 
 
@@ -70,14 +84,8 @@ input <- list(obj = "cor", r = r, c = c, init.type = init.type,
 objective <- iters <- numeric(r)
 for (l in 1:r) {	
 	## Initialize canonical vectors
-	if (!is.null(init.value)) {
-		v0 <- init.value
-		test <- NCOL(v0[[1]][[1]]) == r
-		if (test && l > 1) {
-			for (i in 1:m)
-				for (k in 1:d[i])
-					v0[[i]][[k]] <- v0[[i]][[k]][, l, drop = FALSE] 
-		} 
+	if (!is.null(init.value) && NCOL(init.value) >= l) {
+		v0 <- init.value[,l] 
 	} else {
 		v0 <- switch(init.type, 
 			svd = init.mcca.svd(x, objective = "cor"),
@@ -87,25 +95,19 @@ for (l in 1:r) {
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component",l,"\n")
-	# Insert here code to identify orthogonality constraints 
-	# w.r.t. previous canonical vectors ONLY needed if ortho == "canon.tnsr"
-	if (ortho == "canon.tnsr") {
-		# ... 
-	} else vprev <- NULL
-	out <- mCCA.single.cor(x, v0, c, sweep, maxit, tol, verbose) # ortho = vprev
+	out <- mCCA.single.cor(x, v0, c, sweep, maxit, tol, verbose) 
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y # canonical scores
 	iters[l] <- out$iters
 	
-	## Deflate canonical vectors (necessary?)
-	# Not anymore: this will be done (if needed) inside the optimization
-	# vl <- out$v 
-	# if (l > 1 && ortho %in% c("canon.t.1", "canon.t.all")) {
-		# vl <- deflate.v(out$v, v, ortho)	
-		# vl <- scale.v(vl, x, type = "var")
-		# block.score[,,l] <- image.scores(x, vl) 
-		# objective[l] <- sum(c * crossprod(block.score[,,l])) / n
-	# }
+	## Deflate canonical vectors 
+	vl <- out$v 
+	if (l > 1 && ortho  == "canon.tnsr") {
+		vl <- deflate.v(out$v, v, ortho)	
+		vl <- scale.v(vl, x, type = "var")
+		block.score[,,l] <- image.scores(x, vl) 
+		objective[l] <- sum(c * crossprod(block.score[,,l])) / n
+	}
 	
 	## Calculate global scores
 	nrmv <- numeric(m)
@@ -122,7 +124,7 @@ for (l in 1:r) {
 			v[i,l][[k]] <- vl[[i]][[k]] 
 	
 	## Deflate data matrix
-	if (l < r && ortho %in% c("block.score", "global.score")) 	
+	if (l < r) 	
 		x <- deflate.x(x, vl, block.score[,,l], ortho, check.args = FALSE)	
 	
 } 
