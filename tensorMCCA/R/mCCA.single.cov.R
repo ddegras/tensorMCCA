@@ -268,7 +268,7 @@ for (it in 1:maxit) {
 	}								
 	
 	## Balance canonical vectors  
-	v <- scale.v(v, type = "norm", cnstr = "global")
+	v <- scale.v(v, cnstr = "global")
 	
 	## Debugging: Compare objective value calculated in loop 
 	## to full calculation
