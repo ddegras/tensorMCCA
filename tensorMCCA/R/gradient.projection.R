@@ -12,9 +12,9 @@ objective.gradient <- function(x, v, c)
 ## Data dimensions
 m <- length(x) # number of datasets
 dimx <- lapply(x, dim) # tensor dimensions for each dataset
-dim.img <- lapply(dimx, function(x) x[-length(x)]) 
+p <- lapply(dimx, function(x) x[-length(x)]) 
 # tensor dimensions for each dataset, last mode (instances) omitted
-ndim.img <- sapply(dim.img, length) 
+d <- sapply(p, length) 
 # numbers of image dimensions for each dataset
 n <- tail(dimx[[1]], 1) # numbers of instances per dataset
 
@@ -25,42 +25,42 @@ n <- tail(dimx[[1]], 1) # numbers of instances per dataset
 g <- vector("list",m)
 scores <- matrix(,n,m)
 for (i in 1:m) {
-	d <- dim.img[[i]]
-	if (ndim.img[i] == 1) { # 1D case
+	pi <- p[[i]]
+	if (d[i] == 1) { # 1D case
 		g[[i]][[1]] <- x[[i]]
 		scores[,i] <- crossprod(x[[i]],v[[i]][[1]])
-	} else if (ndim.img[i] == 2) { # 2D case
+	} else if (d[i] == 2) { # 2D case
 		xmat <- aperm(x[[i]], c(1,3,2))
-		dim(xmat) <- c(d[1] * n, d[2])
+		dim(xmat) <- c(pi[1] * n, pi[2])
 		xv <- xmat %*% v[[i]][[2]]
-		dim(xv) <- c(d[1], n)
+		dim(xv) <- c(pi[1], n)
 		g[[i]][[1]] <- xv
 		xmat <- x[[i]]
-		dim(xmat) <- c(d[1], d[2] * n)
+		dim(xmat) <- c(pi[1], pi[2] * n)
 		xv <- crossprod(xmat, v[[i]][[1]])
-		dim(xv) <- c(d[2], n)
+		dim(xv) <- c(pi[2], n)
 		g[[i]][[2]] <- xv
 		scores[,i] <- crossprod(xv, v[[i]][[2]])
 	} else { # 3D case
 		xmat <- x[[i]]
-		dim(xmat) <- c(d[1], prod(d[2:3], n))
+		dim(xmat) <- c(pi[1], prod(pi[2:3], n))
 		xv <- crossprod(v[[i]][[1]], xmat) # v_i1 x X_i
-		dim(xv) <- c(d[2], d[3] * n)
+		dim(xv) <- c(pi[2], pi[3] * n)
 		xvv <- crossprod(v[[i]][[2]], xv) # v_i1 x v_i2 x X_i
-		dim(xvv) <- c(d[3], n) 
+		dim(xvv) <- c(pi[3], n) 
 		g[[i]][[3]] <- xvv
-		dim(xv) <- c(d[2:3], n)
+		dim(xv) <- c(pi[2:3], n)
 		xv <- aperm(xv, c(2,1,3))
-		dim(xv) <- c(d[3], d[2] * n)
+		dim(xv) <- c(pi[3], pi[2] * n)
 		xvv <- crossprod(v[[i]][[3]], xv) # v_i1 x v_i3 x X_i
-		dim(xvv) <- c(d[2], n)
+		dim(xvv) <- c(pi[2], n)
 		g[[i]][[2]] <- xvv
 		xmat <- aperm(x[[i]], c(2,3,1,4))
-		dim(xmat) <- c(d[2], d[1] * d[3] * n)
+		dim(xmat) <- c(pi[2], pi[1] * pi[3] * n)
 		xv <- crossprod(v[[i]][[2]], xmat)
-		dim(xv) <- c(d[3], d[1] * n)
+		dim(xv) <- c(pi[3], pi[1] * n)
 		xvv <- crossprod(v[[i]][[3]], xv)
-		dim(xvv) <- c(d[1], n)
+		dim(xvv) <- c(pi[1], n)
 		g[[i]][[1]] <- xvv		
 		scores[,i] <- crossprod(xvv, v[[i]][[1]])
 	}	
@@ -68,9 +68,9 @@ for (i in 1:m) {
 
 ## Combine the components to form gradient
 grad <- vector("list",m)
-w <- tcrossprod(scores,c/n) # w_ti = sum_j c_ij < v_j, X_jt > / n
+w <- tcrossprod(scores, c/n) # w_ti = sum_j c_ij < v_j, X_jt > / n
 for (i in 1:m) {
-	for (k in 1:ndim.img[i]) {
+	for (k in 1:d[i]) {
 		grad[[i]][[k]] <- g[[i]][[k]] %*% w[,i]
 	}
 }
@@ -92,7 +92,7 @@ list(grad = grad, scores = scores)
 # ## Data dimensions
 # dimx <- lapply(x, dim)
 # ndimx <- sapply(dimx, length)
-# ndim.img <- ndimx - 1
+# d <- ndimx - 1
 # m <- length(x)
 # n <- dimx[[1]][ndimx[1]]
 # type <- match.arg(type)   
@@ -115,9 +115,9 @@ list(grad = grad, scores = scores)
 	# gx <- matrix(, n, m) 
 	# for (i in 1:m) {
 		# dims <- dimx[[i]]
-		# if (ndim.img[i] == 1) {
+		# if (d[i] == 1) {
 			# gx[,i] <- crossprod(x[[i]], grad[[i]][[1]])
-		# } else if (ndim.img[i] == 2) {
+		# } else if (d[i] == 2) {
 			# xmat <- x[[i]]
 			# dim(xmat) <- c(dims[1], dims[2] * n)
 			# xmat <- crossprod(grad[[i]][[1]], xmat)
@@ -140,19 +140,19 @@ list(grad = grad, scores = scores)
 	# if (type == "var") {
 			# alpha <- vector("list",m)
 			# for (i in 1:m) {
-				# if (ndim.img[i] == 1) {
+				# if (d[i] == 1) {
 					# alpha[[i]] <- max(0, -2 * sum(y[,i]) / sum(gx[,i]^2))
-				# } else if (ndim.img[i] == 2) {
+				# } else if (d[i] == 2) {
 				# cubic.coef <- 
 			# }
 			# vv <- v # candidate new solutions
 			# for (i in 1:m)
-			# for (k in 1:ndim.img[i])
+			# for (k in 1:d[i])
 				# vv[[i]][[k]] <- vv[[i]][[k]] + alpha[i] * grad[[i]][[k]]
 		# } else if (type == "norm" && scope == "global") {
-			# alpha <- numeric(max(ndim.img))
+			# alpha <- numeric(max(d))
 			# for (k in seq_along(alpha)) {
-				# idx <- which(ndim.img >= k)		
+				# idx <- which(d >= k)		
 				# vk <- unlist(lapply(v[idx], "[[", k))
 				# gradk <- unlist(lapply(grad[idx], "[[", k))
 				# alpha[k] <- -2 * sum(vk * gradk) / sum(vk^2)
