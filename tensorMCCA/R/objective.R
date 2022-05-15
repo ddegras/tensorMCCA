@@ -40,7 +40,7 @@ return(y)
 
 # This function calculates the -weighted- sum of covariances.
 # For speed, it does not check the dimensions of arguments. 
-# To calculate the sum of correlations with this funtion, 
+# To calculate the sum of correlations with this function, 
 # the canonical vectors should be scaled beforehand to have 
 # unit variance, e.g., with function 'scale.v'.
 
@@ -63,39 +63,37 @@ objective.cor <- function(x, v, c = 1)
 # Check arguments
 test <- check.arguments(x, v)
 
+## Data dimensions 
+m <- length(x)
+n <- tail(dim(x[[1]]), 1)
+
+## Number of canonical components 
+r <- NCOL(v)
+
 ## Objective weights
-m <- length(v)
 if (length(c) == 1) {
 	c <- matrix(1/m^2, m, m)
 } else { 
 	c <- (c + t(c)) / (2 * sum(c))
 }
 
-## Center the data
-for(i in 1:m) {
-    mu <- rowMeans(x[[i]], dims = ndim.img[i])
-    x[[i]] <- x[[i]] - as.vector(mu)
-}
-
-## Number of canonical components 
-r <- NCOL(v[[1]][[1]])
-
 ## Scale canonical vectors so components have unit variance
 if (r == 1) {
 	y <- image.scores(x, v)
-	sdy <- sqrt(colMeans(y^2))
-	sdy[sdy < 1e-15] <- 1 
-	out <- sum(c * crossprod(y) / tcrossprod(sdy)) / n
+	y <- y - rowMeans(y)
+	nrm <- sqrt(colMeans(y^2))
+	nrm[nrm < 1e-15] <- 1 
+	y <- scale(y, center = FALSE, scale = nrm)
+	out <- sum(c * crossprod(y)) / n
 } else {
 	out <- numeric(r)
 	for (k in 1:r) {
-		vk <- vector("list", m)
-		for (i in 1:m)
-			vk[[i]] <- lapply(v[[i]], function(mat) mat[,k])
-		y <- image.scores(x, vk)
-		sdy <- sqrt(colMeans(y^2))
-		sdy[sdy < 1e-15] <- 1 
-		out[k] <- sum(c * crossprod(y) / tcrossprod(sdy)) / n
+		y <- image.scores(x, v[,k])
+		y <- y - rowMeans(y)
+		nrm <- sqrt(colMeans(y^2))
+		nrm[nrm < 1e-15] <- 1
+		y <- scale(y, center = FALSE, scale = nrm)
+		out[k] <- sum(c * crossprod(y)) / n
 	}
 }
 sum(out)
@@ -111,36 +109,33 @@ sum(out)
 
 objective.cov <- function(x, v, c = 1)
 {
-# Check arguments
+## Check arguments
 test <- check.arguments(x, v)
 
+## Data dimensions 
+m <- length(x)
+n <- tail(dim(x[[1]]), 1)
+
+## Number of canonical components 
+r <- NCOL(v)
+
 ## Objective weights
-m <- length(v)
 if (length(c) == 1) {
 	c <- matrix(1/m^2, m, m)
 } else { 
 	c <- (c + t(c)) / (2 * sum(c))
 }
 
-## Center the data
-for(i in 1:m) {
-    mu <- rowMeans(x[[i]], dims = ndim.img[i])
-    x[[i]] <- x[[i]] - as.vector(mu)
-}
-
-## Number of canonical components 
-r <- NCOL(v[[1]][[1]])
-
+## Calculate canonical scores and objective
 if (r == 1) {
 	y <- image.scores(x, v)
+	y <- y - rowMeans(y)
 	out <- sum(c * crossprod(y)) / n
 } else {
 	out <- numeric(r)
 	for (k in 1:r) {
-		vk <- vector("list", m)
-		for (i in 1:m)
-			vk[[i]] <- lapply(v[[i]], function(mat) mat[,k])
-		y <- image.scores(x, vk)
+		y <- image.scores(x, v[,k])
+		y <- y - rowMeans(y)
 		out[k] <- sum(c * crossprod(y)) / n
 	}
 }
