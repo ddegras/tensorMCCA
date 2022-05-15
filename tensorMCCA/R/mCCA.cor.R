@@ -37,22 +37,31 @@ for(i in 1:m) {
 		
 ## Adjust number of canonical components as needed
 r0 <- as.integer(r)
+pp <- sapply(p, prod)
 r <- switch(ortho, 
-	block.score = min(n-1, sapply(p, prod), r0), 
-	global.score = min(n-1, sum(sapply(p, prod)), r0),
-	canon.tnsr = min(sapply(p, prod), r0))
+	block.score = min(n-1, max(pp), r0), 
+	global.score = min(n-1, sum(pp), r0),
+	canon.tnsr = min(max(pp), r0))
 if (verbose && r != r0)
 	warning(paste("Argument 'r' set to", r,
 		"to satisfy orthogonality constraints"))
 
-## Set up sequence of constraints if orthogonality 
+## Prepare optimization if orthogonality 
 ## constraints are on canonical tensors
-if (ortho == "canon.tnsr") {
-	ortho.mode <- array(0L, c(r, r, m))
-	
-	# , i=1:m, l=1:r, 
-	
-	
+if (ortho == "canon.tnsr" && r > 1) {
+	## Set tensor modes on which constraints apply
+	ortho.mode <- array(dim = c(r, r, m))	
+	for (i in 1:m) {
+		mat <- matrix(0L, r, r)
+		mod <- unlist(lapply((r-1):1, 
+			function(len) rep_len(1:d[i], len)))
+		if (sweep == "random") mod <- sample(mod)
+		mat[lower.tri(mat)] <- mod
+		ortho.mode[,,i] <- mat + t(mat)	
+	}
+	## Auxiliary quantities
+	vprev <- vector("list", m) 
+	nrmfun <- function(x) sqrt(sum(x^2))
 }
 
 ## Create output objects 
@@ -79,7 +88,6 @@ if (all(test | c == 0)) {
 }
 
 
-
 ## Main loop
 objective <- iters <- numeric(r)
 for (l in 1:r) {	
@@ -95,28 +103,49 @@ for (l in 1:r) {
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component",l,"\n")
-	out <- mCCA.single.cor(x, v0, c, sweep, maxit, tol, verbose) 
+	out <- mCCA.single.cor(x, v0, c, sweep, maxit, tol, verbose)
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y # canonical scores
 	iters[l] <- out$iters
 	
-	## Deflate canonical vectors 
+	## Deflate canonical vectors if required
 	vl <- out$v 
-	if (l > 1 && ortho  == "canon.tnsr") {
-		vl <- deflate.v(out$v, v, ortho)	
-		vl <- scale.v(vl, x, type = "var")
-		block.score[,,l] <- image.scores(x, vl) 
-		objective[l] <- sum(c * crossprod(block.score[,,l])) / n
+	if (ortho  == "canon.tnsr") {
+		if (l > 1) {
+			vl <- deflate.v(out$v, vprev)	
+			for (i in 1:m) {
+				nrmv <- sapply(vl[[i]], nrmfun)
+				if (any(nrmv <= 1e-14)) {
+					vl[[i]] <- lapply(p[[i]], function(nr) matrix(0, nr, 1))
+					block.score[, i, l] <- 0
+				} else {
+					vl[[i]] <- lapply(1:d[i], function(k) vl[[k]] / nrmv[k])
+					block.score[, i, l] <- block.score[, i, l] / (prod(nrmv))^2
+				}
+			}
+		}
+		## Add new canonical vector to orthogonality constraints
+		if (l < r) {
+			for (i in 1:m) {
+				k <- ortho.mode[l, l+1, i]
+				vprev[[i]][[k]] <- cbind(vprev[[i]][[k]], vl[[i]][[k]])
+			} 
+		}
+		# vl <- scale.v(vl, cnstr = "block")
+		# block.score[,,l] <- image.scores(x, vl) 
+		objective[l] <- sum(c * crossprod(block.score[,,l])) / n 
+		# this should not change
 	}
 	
 	## Calculate global scores
-	nrmv <- numeric(m)
-	for (i in 1:m) 
-		nrmv[i] <- prod(sapply(vl[[i]], function(x) sum(x^2)))	
-	global.score[,l] <- rowSums(block.score[,,l]) / sum(nrmv)
+	# nrmv <- numeric(m)
+	# for (i in 1:m) 
+		# nrmv[i] <- prod(sapply(vl[[i]], function(x) sum(x^2)))	
+	# global.score[,l] <- rowSums(block.score[,,l]) / sum(nrmv)
+	global.score[,l] <- rowMeans(block.score[,,l])
 	
 	## Rescale block scores
-	block.score[,,l] <- block.score[,,l] %*% diag(1/nrmv)
+	# block.score[,,l] <- block.score[,,l] %*% diag(1/nrmv)
 	
 	## Add new canonical vectors to output	
 	for (i in 1:m) 
@@ -126,6 +155,8 @@ for (l in 1:r) {
 	## Deflate data matrix
 	if (l < r) 	
 		x <- deflate.x(x, vl, block.score[,,l], ortho, check.args = FALSE)	
+
+	if (out$objective <= 1e-14) break 
 	
 } 
 
