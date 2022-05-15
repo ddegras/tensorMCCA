@@ -34,7 +34,7 @@ if (objective.type == "cor" && cnstr == "global")
 cnstr <- match.arg(cnstr) # block or global constraints
 
 ## Search method in optimization
-search <- if (identical(search, c("exhaust", "approx")) {
+search <- if (identical(search, c("exhaust", "approx"))) {
 	ifelse(m <= 5, "exhaust", "approx")
 } else { match.arg(search) }
 
@@ -247,8 +247,8 @@ if (cnstr == "block" && search == "approx") {
 
 ## Scale the canonical tensors as needed
 ## (norm constraints are already enforced)
-if (objective.type == "cor")
-	v <- scale.v(v, x, type = "var")
+# if (objective.type == "cor")
+	# v <- scale.v(v, x, type = "var")
 
 v
 
