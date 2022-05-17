@@ -6,6 +6,7 @@ mCCA.cov <- function(x, r, c = 1, cnstr = c("block", "global"), ortho = c("block
 
 ## Check arguments
 test <- check.arguments(x, init.value)
+eps <- 1e-14
 
 ## Data dimensions
 m <- length(x) # number of datasets
@@ -68,14 +69,15 @@ if (ortho == "canon.tnsr" && r > 1) {
 ## Create output objects 
 v <- vector("list", m * r) # canonical vectors
 dim(v) <- c(m, r)
-block.score <- array(dim = c(n, m, r)) 
+block.score <- array(dim = c(n, m, r)) # canonical scores
 global.score <- matrix(nrow = n, ncol = r) 
+objective <- iters <- numeric(r)
 input <- list(obj = "cov", r = r, c = c, init.type = init.type, 
 	init.value = init.value, ortho = ortho, maxit = maxit, 
 	tol = tol, sweep = sweep) 
 
 ## Trivial case: constant datasets  
-test <- sapply(x, function(a) all(abs(a) <= 1e-15))
+test <- sapply(x, function(a) all(abs(a) <= eps))
 test <- outer(test, test, "&")
 if (all(test | c == 0)) {
 	r <- 1
@@ -90,8 +92,8 @@ if (all(test | c == 0)) {
 
 
 ## MAIN LOOP
-objective <- iters <- numeric(r)
 vprev <- NULL
+
 for (l in 1:r) {	
 	## Initialize canonical vectors
 	v0 <- if (!is.null(init.value) && NCOL(init.value) == 1) {
@@ -109,48 +111,32 @@ for (l in 1:r) {
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
 	out <- mCCA.single.cov(x, v0, c, sweep, maxit, tol, verbose)
 	objective[l] <- out$objective
-	block.score[,,l] <- out$y # canonical scores
+	block.score[,,l] <- out$y 
 	iters[l] <- out$iters
 	v[,l] <- out$v
 
-	## Enforce orthogonality constraints on canonical vectors if required
-	if (ortho == "canon.tnsr") {
-		#@@@@@ MAYBE: by design of ALS, the solution canonical vectors are 
-		# in the range of the unfolded data tensors which by construction 
-		# are orthogonal to selected previous canonical vectors. As a result, 
-		# the orthogonality constraints would already be enforced on the 
-		# new solutions and no further deflation would be necessary  
-		# if (l > 1) {
-			# ## Deflate and rescale canonical vectors
-			# # vl <- deflate.v(vl, vprev)	
-			# # vl <- scale.v(vl, cnstr = cnstr)						
-			# # ## Recalculate block scores
-			# # block.score[,,l] <- image.scores(x, vl)
-		# }
-		## Add new canonical vector to orthogonality constraints
-		if (l < r) {
-			vprev <- lapply(d, function(len) vector("list", len))
-			for (i in 1:m) {
-				k <- ortho.mode[l, l+1, i]
-				vprev[[i]][[k]] <- v[[i,l]][[k]]
-			} 
-		}
-		# objective[l] <- sum(c * crossprod(block.score[,,l])) / n 
-		# if (abs(objective[l] - out$objective) >= 1e-10) 
-			# browser("Change in objective score after deflation")
-		#@@@@ this line may not be necessary as the objective should not change	
+	## Add new canonical vector to orthogonality constraints
+	if (ortho == "canon.tnsr" && l < r) {
+		vprev <- lapply(d, function(len) vector("list", len))
+		for (i in 1:m) {
+			k <- ortho.mode[l, l+1, i]
+			vprev[[i]][[k]] <- v[[i,l]][[k]]
+		} 
 	}
 	
 	## Calculate global scores
 	global.score[,l] <- rowMeans(block.score[,,l]) 
 	
 	## Deflate data matrix
-	if (l < r) 	
-		x <- deflate.x(x, v = vprev, block.score = block.score[,,l], 
-			global.score = global.score[,l], ortho = ortho, check.args = FALSE)	
-
+	if (l < r) { 	
+		x <- switch(ortho, 
+			block.score = deflate.x(x, score = block.score[,,l], check.args = FALSE),
+			global.score = deflate.x(x, score = global.score[,l], check.args = FALSE),  
+			canon.tnsr = deflate.x(x, v = vprev, check.args = FALSE))	
+	}
+	
 	## Monitor objective value
-	if (objective[l] <= 1e-14) break 
+	if (objective[l] <= eps) break 
 		
 } 
 
