@@ -112,10 +112,11 @@ for (l in 1:r) {
 	out <- mCCA.single.cov(x, v0, c, sweep, maxit, tol, verbose)
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y 
+	global.score[,l] <- rowMeans(block.score[,,l]) 
 	iters[l] <- out$iters
 	v[,l] <- out$v
 
-	## Add new canonical vector to orthogonality constraints
+	## Prepare orthogonality constraints for next stage
 	if (ortho == "canon.tnsr" && l < r) {
 		vprev <- lapply(d, function(len) vector("list", len))
 		for (i in 1:m) {
@@ -123,15 +124,14 @@ for (l in 1:r) {
 			vprev[[i]][[k]] <- v[[i,l]][[k]]
 		} 
 	}
-	
-	## Calculate global scores
-	global.score[,l] <- rowMeans(block.score[,,l]) 
-	
+		
 	## Deflate data matrix
 	if (l < r) { 	
 		x <- switch(ortho, 
-			block.score = deflate.x(x, score = block.score[,,l], check.args = FALSE),
-			global.score = deflate.x(x, score = global.score[,l], check.args = FALSE),  
+			block.score = deflate.x(x, score = block.score[,,l], 
+				check.args = FALSE),
+			global.score = deflate.x(x, score = global.score[,l], 
+				check.args = FALSE),  
 			canon.tnsr = deflate.x(x, v = vprev, check.args = FALSE))	
 	}
 	
