@@ -34,63 +34,55 @@ v
 # General function to deflate data tensors
 ###########################################
 
-deflate.x <- function(x, v = NULL, block.score = NULL, global.score = NULL,
-	ortho = c("block.score", "global.score", "canon.tnsr"), check.args = TRUE)
+deflate.x <- function(x, v = NULL, score = NULL, check.args = TRUE)
 {
-ortho <- match.arg(ortho)
-if (check.args) {
-	test <- if (ortho == "canon.tnsr") { 
-		check.arguments(x) } else check.arguments(x, v)	
-}
-
+if (check.args) test <- check.arguments(x) 
+stopifnot(is.null(v) || is.null(score))
+	
 ## Data dimensions
 m <- length(x)
 dimx <- lapply(x, dim)
 d <- sapply(dimx, length) - 1
 p <- lapply(1:m, function(i) dimx[[i]][1:d[i]])
 n <- tail(dimx[[1]], 1)
+eps <- 1e-14
 
-if (ortho == "block.score") {
-	if(is.null(v) && is.null(block.score))
-		stop(paste("At least one of 'v' or 'block.score' must be specified",
-			"if 'ortho' is set to 'block.score'"))
-	## Block scores
-	y <- if (!is.null(block.score)) {
-		block.score } else image.scores(x, v)
-	nrmy <- sqrt(colSums(y^2))
-	zero <- (abs(nrmy) <= 1e-14) 
+
+if (!is.null(score)) {
+	stopifnot(is.vector(score) || is.matrix(score))
+	test1 <- (is.vector(score) && length(score) == n)
+	test2 <- (is.matrix(score) && identical(dim(score), c(n,m)))
+	if (!(test1 || test2))
+		stop(paste("If specified, 'score' should be either a vector of length n",
+			"or a matrix of dimensions (n,m)\n where m is the number of data tensors",
+			"(length of 'x') and n is the number of dimensions in the last mode",
+			"of the data tensors."))
+	nrm <- if (test1) sqrt(sum(score^2)) else sqrt(colSums(score^2))	
+	zero <- rep_len(nrm <= eps, m) 	
+	if (all(zero)) return(x)
+	if (test1) score <- score / nrm
+
 	## Deflation
 	for (i in 1:m) {
 		if (zero[i]) next
-		y[,i] <- y[,i] / nrmy[i]
 		dim(x[[i]]) <- c(prod(p[[i]]), n)
-		x[[i]] <- x[[i]] - tcrossprod(x[[i]] %*% y[,i], y[,i])
+		if (test1) {
+			x[[i]] <- x[[i]] - tcrossprod(x[[i]] %*% score, score)	
+		} else {
+			score[,i] <- score[,i] / nrm[i]
+			x[[i]] <- x[[i]] - tcrossprod(x[[i]] %*% score[,i], score[,i])
+		}
 		dim(x[[i]]) <- dimx[[i]]
 	}
 }
 
-if (ortho == "global.score") {
-	if(is.null(v) && is.null(block.score)  && is.null(global.score))
-		stop(paste("At least one of 'v', 'block.score', or 'global.score'",
-		"must be specified if 'ortho' is set to 'global.score'"))
-	## Global scores
-	y <- if (!is.null(global.score)) {
-		global.score
-	} else if (!is.null(block.score)) {
-		rowMeans(block.score)
-	} else rowMeans(image.scores(x, v))
-	## Deflation
-	for (i in 1:m) {
-		dim(x[[i]]) <- c(prod(p[[i]]), n)
-		x[[i]] <- x[[i]] - tcrossprod(x[[i]] %*% y, y)
-		dim(x[[i]]) <- dimx[[i]]
-	}	
-}
 
-if (ortho == "canon.tnsr") {
-	if (is.null(v)) 
-		stop(paste("Argument 'v' must be specified",
-			"if 'ortho' is set to 'canon.tnsr'"))
+if (!is.null(v)) {
+	test1 <- (is.list(v) && length(v) == m)
+	test2 <- identical(sapply(v, len), d)
+	if (!(test1 && test2))
+		stop("If specified, 'v' should be a list of vectors with dimensions",
+			"compatible with those of 'x'")
 	for (i in 1:m) {
 		for (k in 1:d[i]) {
 			if (is.null(v[[i]][[k]])) next
@@ -114,6 +106,7 @@ if (ortho == "canon.tnsr") {
 		}
 	}
 }
+
 x
 }
 
