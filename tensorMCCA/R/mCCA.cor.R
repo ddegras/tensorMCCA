@@ -6,6 +6,7 @@ mCCA.cor <- function(x, r, c = 1, ortho = c("block.score", "global.score", "cano
 
 ## Check arguments
 test <- check.arguments(x, init.value)
+eps <- 1e-14
 
 ## Data dimensions
 m <- length(x) # number of datasets
@@ -67,6 +68,7 @@ global.score <- matrix(nrow = n, ncol = r)
 input <- list(obj = "cor", r = r, c = c, init.type = init.type, 
 	init.value = init.value, ortho = ortho, maxit = maxit, 
 	tol = tol, sweep = sweep) 
+objective <- iters <- numeric(r)
 
 ## Trivial case: constant datasets  
 test <- sapply(x, function(a) all(abs(a) <= 1e-15))
@@ -84,7 +86,6 @@ if (all(test | c == 0)) {
 
 
 ## MAIN LOOP
-objective <- iters <- numeric(r)
 vprev <- NULL
 for (l in 1:r) {	
 	## Initialize canonical vectors
@@ -104,12 +105,10 @@ for (l in 1:r) {
 	out <- mCCA.single.cor(x, v0, c, sweep, maxit, tol, verbose)
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y # canonical scores
+	global.score[,l] <- rowMeans(block.score[,,l])	
 	iters[l] <- out$iters	
 	v[,l] <- out$v 
-	
-	## Calculate global scores
-	global.score[,l] <- rowMeans(block.score[,,l])	
-	
+		
 	## Prepare orthogonality constraints for next stage
 	if (ortho  == "canon.tnsr" && l < r) {
 		for (i in 1:m) {
@@ -119,8 +118,14 @@ for (l in 1:r) {
 	}
 
 	## Deflate data matrix
-	if (l < r) 	
-		x <- deflate.x(x, vprev, block.score[,,l], ortho, check.args = FALSE)	
+	if (l < r) { 	
+		x <- switch(ortho, 
+			block.score = deflate.x(x, score = block.score[,,l], 
+				check.args = FALSE),
+			global.score = deflate.x(x, score = global.score[,l], 
+				check.args = FALSE),  
+			canon.tnsr = deflate.x(x, v = vprev, check.args = FALSE))	
+	}
 
 	## Monitor objective value
 	if (objective[l] <= 1e-14) break 
