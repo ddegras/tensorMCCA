@@ -21,7 +21,7 @@ dim(b) <- NULL
 ## Trivial case: A = 0
 if (all(a == 0)) {
 	nrm <- sqrt(sum(b^2))
-	if (nrm > eps) return(b/nrm) else return(numeric(p))
+	if (nrm > eps) return(list(b/nrm)) else return(list(numeric(p)))
 }
 
 ## SVD of A
@@ -29,17 +29,22 @@ svdA <- svd(a, nu = p, nv = 0)
 P <- svdA$u
 delta <- (svdA$d)^2 
 if (n < p) delta[(n+1):p] <- 0
+
+## Trivial case: no linear term in objective
+if (all(abs(b) <= eps)) return(list(P[,1]))
+
+## Trivial case: AA' proportional to identity matrix
+if (abs(delta[p]-delta[1]) <= eps) return(list(b/sqrt(sum(b^2))))
+
+## Change of coordinates
 b <- as.vector(crossprod(P, b))
 bzero <- (abs(b) <= eps)
 b[bzero] <- 0
 
-## Trivial case: no linear term in objective
-if (all(bzero)) return(P[1,])
-
 objective.best <- -Inf
 
-## Find stationary points of the Lagrange function when
-## the Lagrange multipliers are among the eigenvalues of AA'
+## Find stationary points of the Lagrange function in the case
+## where the Lagrange multiplier is an eigenvalue of AA'
 if (any(bzero)) {	
 	diff.delta <- outer(-delta, delta[bzero], "+")
 	equal.delta <- abs(diff.delta) <= eps
@@ -59,7 +64,7 @@ if (any(bzero)) {
 			}
 			nreplace <- colSums(equal.delta)
 			vals <- sqrt((1 - nrmz2) / nreplace)
-			z[equal.delta] <- rep(vals, each = nreplace)
+			z[equal.delta] <- rep.int(vals, nreplace)
 			objective <- colSums(delta * z^2) + 2 * colSums(b * z)
 			idx <- which.max(objective)
 			v <- P %*% z[,idx]
@@ -95,7 +100,7 @@ if (length(lambda) == 1)
 colSums((bplus / outer(-dplus, lambda, "+"))^2) - 1
 }
 lambda <- rep(NA, pplus + 1)
-h <- sqrt(sum(bplus^2))
+h <- 1.01 * sqrt(sum(bplus^2))
 lb <- c(dplus[1] - h, dplus + 1e-3)
 ub <- c(dplus - 1e-3, dplus[pplus] + h)
 grid.size <- 21
@@ -119,6 +124,7 @@ objective <- colSums(delta * z^2) + 2 * colSums(b * z)
 idx <- which.max(objective)
 if (objective[idx] > objective.best) 
 	v <- P %*% z[,idx]
+dim(v) <- NULL
 v <- v / sqrt(sum(v^2))
 
 list(v)
@@ -160,13 +166,13 @@ for (it in 1:maxit) {
 	aa <- matrix(0, p[1], n)
 	for (t in 1:n) aa[,t] <- a[,,t] %*% v[[2]]
 	bb <- b %*% v[[2]]
-	v[[1]] <- unlist(optim1D.cov(aa, bb))
+	v[1] <- optim1D.cov(aa, bb)
 		
 	## Update canonical vector in dimension 2
 	aa <- matrix(0, p[2], n)
 	for (t in 1:n) aa[,t] <- crossprod(a[,,t], v[[1]])
 	bb <- crossprod(b, v[[1]])
-	v[[2]] <- unlist(optim1D.cov(aa, bb))
+	v[2] <- optim1D.cov(aa, bb)
 	
 	## Calculate objective
 	objective[it] <- mean(crossprod(v[[2]], aa)^2) + 

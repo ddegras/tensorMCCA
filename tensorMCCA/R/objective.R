@@ -8,28 +8,28 @@ image.scores <- function(x, v)
 m <- length(x) # number of datasets
 dimx <- lapply(x, dim)
 n <- tail(dimx[[1]], 1) # number of instances per dataset
-ndim.img <- sapply(dimx, length) - 1 # number of dimensions in images/features 
+d <- sapply(dimx, length) - 1 # number of dimensions in images/features 
 y <- matrix(0, n, m) # image/individual scores on canonical components
 for (i in 1:m) { 		
 	iprod <- x[[i]]
 	pi <- dimx[[i]]
-	if (ndim.img[i] == 1) { # 1D case
+	if (d[i] == 1) { # 1D case
 		y[,i] <- crossprod(iprod, v[[i]][[1]]) 
-	} else if (ndim.img[i] == 2) { # 2D case
+	} else if (d[i] == 2) { # 2D case
 		dim(iprod) <- c(pi[1], pi[2] * n)
 		iprod <- crossprod(v[[i]][[1]], iprod)
 		dim(iprod) <- c(pi[2], n) 
 		y[,i] <- crossprod(iprod, v[[i]][[2]]) 
-	} else { # 3D case
+	} else if (d[i] == 3) { # 3D case
 		dim(iprod) <- c(pi[1], prod(pi[2:4]))
 		iprod <- crossprod(v[[i]][[1]], iprod)
 		dim(iprod) <- c(pi[2], pi[3] * n)
 		iprod <- crossprod(v[[i]][[2]], iprod)
 		dim(iprod) <- c(pi[3], n) 
 		y[,i] <- crossprod(iprod, v[[i]][[3]])
-	}
+	} else warning("Function not yet supported for tensors of order 4+")
 }
-return(y)
+y
 }
 
 

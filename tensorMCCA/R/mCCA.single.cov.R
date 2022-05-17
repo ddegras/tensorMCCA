@@ -31,9 +31,20 @@ ciizero <- diag(c) == 0
 s <- ifelse(ciizero, rep(1,m), diag(c)) # scaling term 
 if (sweep == "cyclical") idxi <- 1:m
 
+## Check if some datasets are zero
+eps <- 1e-14
+xzero <- logical(m)
+for (i in 1:m) {
+	xzero[i] <- all(abs(range(x[[i]])) <= eps)
+	if (xzero[i])
+		v[[i]] <- lapply(dimx[[i]][1:d[i]], numeric)
+}
+
+## Alternating Least Squares / Block Coordinate Ascent 
 for (it in 1:maxit) {
 	if (sweep == "random") idxi <- sample(m)
 	for (i in 1:m) { 		
+		if (xzero[i]) next
 		## Calculate the inner products <X_jt, v_j> 
 		## After the first algorithm iteration (it = 1), in each 
 		## iteration of the i loop, only the inner products associated 
@@ -82,8 +93,10 @@ for (it in 1:maxit) {
 		if (d[i] > 1) dim(b) <- dimx[[i]][-ndimx[i]]
 		
 		## Update canonical vectors
+		# vprev <- v #@@ debugging
 		v[[i]] <- optim.block.cov(v[[i]], a, b, maxit, tol) 	
-					
+		# test <- c(objective.internal(x, vprev, c), objective.internal(x, v, c)) #@@@
+		# if (test[1] > test[2]) browser("Decrease in objective") #@@@
 	}								
 	
 	## Calculate objective value (sum of correlations)

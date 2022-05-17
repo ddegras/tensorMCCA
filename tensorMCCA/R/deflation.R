@@ -18,6 +18,7 @@ for (i in 1:m) {
 	stopifnot(length(v[[i]]) == length(vprev[[i]]))	
 	d <- length(v[[i]])
 	for (k in 1:d) {
+		if (length(vprev[[i]][[k]]) == 0) next
 		qrx <- qr(vprev[[i]][[k]])
 		if (qrx$rank == 0) next
 		v[[i]][[k]] <- lsfit(x = qr.Q(qrx)[,1:qrx$rank], 
@@ -33,44 +34,54 @@ v
 # General function to deflate data tensors
 ###########################################
 
-deflate.x <- function(x, v = NULL, y = NULL, ortho = c("block.score", 
-	"global.score", "canon.tnsr"), check.args = TRUE)
+deflate.x <- function(x, v = NULL, block.score = NULL, global.score = NULL,
+	ortho = c("block.score", "global.score", "canon.tnsr"), check.args = TRUE)
 {
-if (check.args) test <- check.arguments(x, v)
+ortho <- match.arg(ortho)
+if (check.args) {
+	test <- if (ortho == "canon.tnsr") { 
+		check.arguments(x) } else check.arguments(x, v)	
+}
+
+## Data dimensions
 m <- length(x)
 dimx <- lapply(x, dim)
+d <- sapply(dimx, length) - 1
+p <- lapply(1:m, function(i) dimx[[i]][1:d[i]])
 n <- tail(dimx[[1]], 1)
-ortho <- match.arg(ortho)
 
 if (ortho == "block.score") {
-	if(is.null(v) && is.null(y))
-		stop(paste("At least one of 'v' or 'y' must be specified",
+	if(is.null(v) && is.null(block.score))
+		stop(paste("At least one of 'v' or 'block.score' must be specified",
 			"if 'ortho' is set to 'block.score'"))
-	if (is.null(y)) y <- image.scores(x, v)
+	## Block scores
+	y <- if (!is.null(block.score)) {
+		block.score } else image.scores(x, v)
 	nrmy <- sqrt(colSums(y^2))
-	nrmy[nrmy == 0] <- 1
+	zero <- (abs(nrmy) <= 1e-14) 
+	## Deflation
 	for (i in 1:m) {
+		if (zero[i]) next
 		y[,i] <- y[,i] / nrmy[i]
-		dim(x[[i]]) <- c(length(x[[i]]) / n, n)
+		dim(x[[i]]) <- c(prod(p[[i]]), n)
 		x[[i]] <- x[[i]] - tcrossprod(x[[i]] %*% y[,i], y[,i])
 		dim(x[[i]]) <- dimx[[i]]
 	}
 }
 
 if (ortho == "global.score") {
-	if(is.null(v) && is.null(y))
-		stop(paste("At least one of 'v' or 'y' must be specified",
-			"if 'ortho' is set to 'global.score'"))
-	if (is.null(y)) y <- image.scores(x, v)
-	## Calculate norms of canonical tensors
-	nrmv <- numeric(m)
-	for (i in 1:m) 
-		nrmv[i] <- prod(sapply(v[[i]], function(x) sum(x^2)))
+	if(is.null(v) && is.null(block.score)  && is.null(global.score))
+		stop(paste("At least one of 'v', 'block.score', or 'global.score'",
+		"must be specified if 'ortho' is set to 'global.score'"))
 	## Global scores
-	y <- rowSums(y) 
-	y <- y / sqrt(sum(y^2))
+	y <- if (!is.null(global.score)) {
+		global.score
+	} else if (!is.null(block.score)) {
+		rowMeans(block.score)
+	} else rowMeans(image.scores(x, v))
+	## Deflation
 	for (i in 1:m) {
-		dim(x[[i]]) <- c(length(x[[i]]) / n, n)
+		dim(x[[i]]) <- c(prod(p[[i]]), n)
 		x[[i]] <- x[[i]] - tcrossprod(x[[i]] %*% y, y)
 		dim(x[[i]]) <- dimx[[i]]
 	}	
@@ -79,53 +90,31 @@ if (ortho == "global.score") {
 if (ortho == "canon.tnsr") {
 	if (is.null(v)) 
 		stop(paste("Argument 'v' must be specified",
-			"if 'ortho' is set to 'canon.t.1'"))
-	for (i in 1:m) {		
-		vi1 <- v[[i]][[1]] # mode 1 canonical vector for i-th dataset
-		vi1 <- vi1  / sqrt(sum(vi1^2)) # rescale to unit norm 
-		## Matricize x(i) according to mode 1
-		dim(x[[i]]) <- c(dimx[[i]][1], prod(dimx[[i]][-1])) 
-		## Orthogonal projection
-		x[[i]] <- x[[i]] - vi1 %*% crossprod(vi1, x[[i]]) 
-		## Reshape x(i) to tensor
-		dim(x[[i]]) <- dimx[[i]] 
-	}
-}
-
-if (ortho == "canon.t.all") {
-	if (is.null(v)) 
-		stop(paste("Argument 'v' must be specified", 
-			"if 'ortho' is set to 'canon.t.all'"))
+			"if 'ortho' is set to 'canon.tnsr'"))
 	for (i in 1:m) {
-		ndimxi <- length(dimx[[i]])
-		nvi <- length(v[[i]]) 
-		for (k in 1:nvi) {
-			vik <- v[[i]][[k]]
-			vik <- vik  / sqrt(sum(vik^2))
-			if (k == 1) {
-				# For orthogonal projection in mode 1, 
-				# no need to permute array dimensions
-				## Matricize x(i) along mode k
-				dim(x[[i]]) <- c(dimx[[i]][1], prod(dimx[[i]][-1]))
-				x[[i]] <- x[[i]] - vik %*% crossprod(vik, x[[i]]) 
-				dim(x[[i]]) <- dimx[[i]]	 
-			} else {
-				## Permute modes 1 and k in x(i) to enable multiplication
-				perm <- 1:(nvi+1)
-				perm[c(1,k)] <- c(k,1) 
+		for (k in 1:d[i]) {
+			if (is.null(v[[i]][[k]])) next
+			## Basis of orthogonal space
+			Q <- qr.Q(qr(v[[i]][[k]])) 
+			## Permute data tensor (exchange modes 1 and k)
+			if (k > 1) {
+				perm <- 1:(d[i]+1)
+				perm[c(1,k)] <- perm[c(k,1)]
 				x[[i]] <- aperm(x[[i]], perm)
-				## Matricize x(i) along mode k
-				dim(x[[i]]) <- c(dimx[[i]][k], prod(dimx[[i]][-k]))
-				x[[i]] <- x[[i]] - vik %*% crossprod(vik, x[[i]]) 
-				dim(x[[i]]) <- dimx[[i]]	
-				## Permute dimensions back to original
-				x[[i]] <- aperm(x[[i]], perm) 
-			}				
-		}	
+			}
+			## Unfold permuted tensor along mode 1 (original along mode k)
+			dim(x[[i]]) <- c(dimx[[i]][k], prod(dimx[[i]][-k])) 
+			## Orthogonal projection
+			x[[i]] <- x[[i]] - Q %*% crossprod(Q, x[[i]]) 
+			## Reshape x(i) to tensor
+			dim(x[[i]]) <- dimx[[i]] 
+			## Permute modes back
+			if (k > 1) 
+				x[[i]] <- aperm(x[[i]], perm)
+		}
 	}
 }
-
-return(x)
+x
 }
 
 
@@ -206,7 +195,6 @@ return(x)
 	# y <- y / prod(s)
 	# dim(y) <- c(1,n)
 # }
-# # browser()
 # ## Return deflated data
 # x <- x - kronv %*% y  
 # dim(x) <- dimx

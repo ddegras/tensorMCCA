@@ -1,6 +1,7 @@
-mCCA.cor <- function(x, r, c = 1, init.type = c("svd", "cca", "random"), 
-	init.value = NULL, ortho = c("block.score", "global.score", "canon.tnsr"), 
-	maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), verbose = FALSE)
+
+mCCA.cor <- function(x, r, c = 1, ortho = c("block.score", "global.score", "canon.tnsr"), 
+	init.type = c("svd", "cca", "random"), init.value = NULL, maxit = 1000, tol = 1e-6,
+	sweep = c("cyclical", "random"), verbose = FALSE)
 {
 
 ## Check arguments
@@ -18,11 +19,8 @@ n <- tail(dimx[[1]], 1) # numbers of instances per dataset
 ## Objective weights
 stopifnot(length(c) == 1 || (is.matrix(c) && all(dim(c) == length(x))))
 stopifnot(all(c >= 0) && any(c > 0))
-if (length(c) == 1) {
-	c <- matrix(1/m^2, m, m)
-} else {
-	c <- (c + t(c)) / (2 * sum(c))
-}
+c <- if (length(c) == 1) { 	matrix(1/m^2, m, m) 
+	} else { (c + t(c)) / (2 * sum(c)) }
 
 ## Match arguments
 init.type <- match.arg(init.type)
@@ -59,9 +57,6 @@ if (ortho == "canon.tnsr" && r > 1) {
 		mat[lower.tri(mat)] <- mod
 		ortho.mode[,,i] <- mat + t(mat)	
 	}
-	## Auxiliary quantities
-	vprev <- vector("list", m) 
-	nrmfun <- function(x) sqrt(sum(x^2))
 }
 
 ## Create output objects 
@@ -88,17 +83,20 @@ if (all(test | c == 0)) {
 }
 
 
-## Main loop
+## MAIN LOOP
 objective <- iters <- numeric(r)
+vprev <- NULL
 for (l in 1:r) {	
 	## Initialize canonical vectors
-	if (!is.null(init.value) && NCOL(init.value) >= l) {
-		v0 <- init.value[,l] 
+	v0 <- if (!is.null(init.value) && NCOL(init.value) == 1) {
+		init.value 
+	} else if (!is.null(init.value) && NCOL(init.value) >= l) {
+		init.value[, l]	
 	} else {
-		v0 <- switch(init.type, 
-			svd = init.mcca.svd(x, objective = "cor"),
-			cca = init.mcca.cca(x, objective = "cor"),
-			random = init.mcca.random(x, objective = "cor"))
+		switch(init.type, 
+			svd = init.mcca.svd(x, objective = "cor", center = FALSE),
+			cca = init.mcca.cca(x, objective = "cor", center = FALSE),
+			random = init.mcca.random(x, objective = "cor", center = FALSE))
 	}
 	
 	## Run MCCA and store results
@@ -106,67 +104,34 @@ for (l in 1:r) {
 	out <- mCCA.single.cor(x, v0, c, sweep, maxit, tol, verbose)
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y # canonical scores
-	iters[l] <- out$iters
-	
-	## Deflate canonical vectors if required
-	vl <- out$v 
-	if (ortho  == "canon.tnsr") {
-		if (l > 1) {
-			vl <- deflate.v(out$v, vprev)	
-			for (i in 1:m) {
-				nrmv <- sapply(vl[[i]], nrmfun)
-				if (any(nrmv <= 1e-14)) {
-					vl[[i]] <- lapply(p[[i]], function(nr) matrix(0, nr, 1))
-					block.score[, i, l] <- 0
-				} else {
-					vl[[i]] <- lapply(1:d[i], function(k) vl[[k]] / nrmv[k])
-					block.score[, i, l] <- block.score[, i, l] / (prod(nrmv))^2
-				}
-			}
-		}
-		## Add new canonical vector to orthogonality constraints
-		if (l < r) {
-			for (i in 1:m) {
-				k <- ortho.mode[l, l+1, i]
-				vprev[[i]][[k]] <- cbind(vprev[[i]][[k]], vl[[i]][[k]])
-			} 
-		}
-		# vl <- scale.v(vl, cnstr = "block")
-		# block.score[,,l] <- image.scores(x, vl) 
-		objective[l] <- sum(c * crossprod(block.score[,,l])) / n 
-		# this should not change
-	}
+	iters[l] <- out$iters	
+	v[,l] <- out$v 
 	
 	## Calculate global scores
-	# nrmv <- numeric(m)
-	# for (i in 1:m) 
-		# nrmv[i] <- prod(sapply(vl[[i]], function(x) sum(x^2)))	
-	# global.score[,l] <- rowSums(block.score[,,l]) / sum(nrmv)
-	global.score[,l] <- rowMeans(block.score[,,l])
+	global.score[,l] <- rowMeans(block.score[,,l])	
 	
-	## Rescale block scores
-	# block.score[,,l] <- block.score[,,l] %*% diag(1/nrmv)
-	
-	## Add new canonical vectors to output	
-	for (i in 1:m) 
-		for (k in 1:d[i]) 
-			v[i,l][[k]] <- vl[[i]][[k]] 
-	
+	## Prepare orthogonality constraints for next stage
+	if (ortho  == "canon.tnsr" && l < r) {
+		for (i in 1:m) {
+			k <- ortho.mode[l, l+1, i]
+			vprev[[i]][[k]] <- v[[i,l]][[k]]
+		}
+	}
+
 	## Deflate data matrix
 	if (l < r) 	
-		x <- deflate.x(x, vl, block.score[,,l], ortho, check.args = FALSE)	
+		x <- deflate.x(x, vprev, block.score[,,l], ortho, check.args = FALSE)	
 
-	if (out$objective <= 1e-14) break 
+	## Monitor objective value
+	if (objective[l] <= 1e-14) break 
 	
 } 
 
 ## Re-order results according to objective values if needed
+objective <- objective[objective > 0]
 o <- order(objective, decreasing = TRUE)
 if (!identical(o,1:r)) {
 	v <- v[,o]
-	# for (i in 1:m)
-		# for (l in seq_along(v[[i]]))
-			# v[[i]][[l]] <- v[[i]][[l]][,o] 
 	block.score <- block.score[,,o]
 	global.score <- global.score[,o]
 	objective <- objective[o]

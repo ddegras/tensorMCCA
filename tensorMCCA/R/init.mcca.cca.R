@@ -59,7 +59,7 @@ rankx <- numeric(m)
 for (i in 1:m) {
 	rankx[i] <- if (center) {
 		qr(matrix(x[[i]], pp[i], n) - xbar[[i]])$rank	
-	} else { qr(matrix(x[[i]], pp[i], n) - xbar[[i]])$rank }
+	} else { qr(matrix(x[[i]], pp[i], n))$rank }
 }
 
 ## Effective rank of SVD 	
