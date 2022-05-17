@@ -34,7 +34,8 @@ v
 # General function to deflate data tensors
 ###########################################
 
-deflate.x <- function(x, v = NULL, score = NULL, check.args = TRUE)
+deflate.x <- function(x, v = NULL, score = NULL, 
+	check.args = TRUE)
 {
 if (check.args) test <- check.arguments(x) 
 stopifnot(is.null(v) || is.null(score))
@@ -51,12 +52,13 @@ eps <- 1e-14
 if (!is.null(score)) {
 	stopifnot(is.vector(score) || is.matrix(score))
 	test1 <- (is.vector(score) && length(score) == n)
-	test2 <- (is.matrix(score) && identical(dim(score), c(n,m)))
+	test2 <- (is.matrix(score) && all(dim(score) == c(n,m)))
 	if (!(test1 || test2))
-		stop(paste("If specified, 'score' should be either a vector of length n",
-			"or a matrix of dimensions (n,m)\n where m is the number of data tensors",
-			"(length of 'x') and n is the number of dimensions in the last mode",
-			"of the data tensors."))
+		stop(paste("If specified, 'score' should be either", 
+			"a vector of length n or a matrix of dimensions",
+			"(n,m)\nwhere m is the number of data tensors",
+			"(length of 'x') and n is the number of dimensions",
+			"in the last mode of the data tensors."))
 	nrm <- if (test1) sqrt(sum(score^2)) else sqrt(colSums(score^2))	
 	zero <- rep_len(nrm <= eps, m) 	
 	if (all(zero)) return(x)
@@ -70,7 +72,8 @@ if (!is.null(score)) {
 			x[[i]] <- x[[i]] - tcrossprod(x[[i]] %*% score, score)	
 		} else {
 			score[,i] <- score[,i] / nrm[i]
-			x[[i]] <- x[[i]] - tcrossprod(x[[i]] %*% score[,i], score[,i])
+			x[[i]] <- x[[i]] - tcrossprod(x[[i]] %*% score[,i],
+				score[,i])
 		}
 		dim(x[[i]]) <- dimx[[i]]
 	}
@@ -81,8 +84,8 @@ if (!is.null(v)) {
 	test1 <- (is.list(v) && length(v) == m)
 	test2 <- identical(sapply(v, len), d)
 	if (!(test1 && test2))
-		stop("If specified, 'v' should be a list of vectors with dimensions",
-			"compatible with those of 'x'")
+		stop("If specified, 'v' should be a list of vectors",
+			"with dimensions compatible with 'x'")
 	for (i in 1:m) {
 		for (k in 1:d[i]) {
 			if (is.null(v[[i]][[k]])) next
@@ -94,7 +97,8 @@ if (!is.null(v)) {
 				perm[c(1,k)] <- perm[c(k,1)]
 				x[[i]] <- aperm(x[[i]], perm)
 			}
-			## Unfold permuted tensor along mode 1 (original along mode k)
+			## Unfold permuted tensor along mode 1 
+			## (original along mode k)
 			dim(x[[i]]) <- c(dimx[[i]][k], prod(dimx[[i]][-k])) 
 			## Orthogonal projection
 			x[[i]] <- x[[i]] - Q %*% crossprod(Q, x[[i]]) 
