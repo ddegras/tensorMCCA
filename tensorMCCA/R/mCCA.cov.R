@@ -141,7 +141,7 @@ for (l in 1:r) {
 } 
 
 ## Re-order results according to objective values if needed
-objective <- objective[objective > 0]
+objective <- objective[objective > eps]
 o <- order(objective, decreasing = TRUE)
 if (!identical(o, 1:r)) {
 	v <- v[,o]

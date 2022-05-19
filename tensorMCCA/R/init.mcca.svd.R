@@ -15,7 +15,6 @@ init.mcca.svd <- function(x, objective = c("cov", "cor"),
 {
 ## Check argument x if required
 test <- check.arguments(x)
-tol <- 1e-14
 
 ## Data dimensions
 m <- length(x) # number of datasets 
@@ -32,19 +31,20 @@ cnstr <- match.arg(cnstr) # block or global constraints
 v <- vector("list", m)
 
 ## Unfold data along last mode (individuals/objects) and concatenate
+xmat <- x
 for (i in 1:m) 
-	dim(x[[i]]) <- c(prod(p[[i]]), n)
-x <- do.call(rbind, x)
+	dim(xmat[[i]]) <- c(prod(p[[i]]), n)
+xmat <- do.call(rbind, xmat)
 
 ## Data centering
 if (center) 
-	x <- x - rowMeans(x)
+	xmat <- xmat - rowMeans(xmat)
 
 ## Initial SVD
-svdfun <- if (max(dim(x)) > 2) {
+svdfun <- if (max(dim(xmat)) > 2) {
 	function(x) svds(x, k = 1) } else {
 	function(x) svd(x, nu = 1, nv = 1) } 
-x <- svdfun(x)$u
+xmat <- svdfun(xmat)$u
 
 ## Iteratively unfold singular vectors and recalculate SVD
 lenx <- sapply(p, prod)
@@ -52,7 +52,7 @@ start <- c(0, cumsum(lenx[-m])) + 1
 end <- cumsum(lenx)
 for (i in 1:m) {
 	pi <- p[[i]]
-	xi <- x[start[i]:end[i]]
+	xi <- xmat[start[i]:end[i]]
 	for (k in 1:d[i]) {	
 		if (k < d[i]) {
 			dim(xi) <- c(pi[k], length(xi) / pi[k])
@@ -66,8 +66,14 @@ for (i in 1:m) {
 }
 
 ## Scale initial canonical vectors as required	
-if (objective == "cor")
-	v <- scale.v(v, x,"var", cnstr)
+eps <- 1e-14
+if (objective == "cor") {
+	scores <- image.scores(x, v)
+	s <- sqrt(colMeans(scores^2))
+	for (i in 1:m) 
+	for (k in 1:d[i]) 
+		v[[i]][[k]] <- if (s[i] <= eps) numeric(p[[i]][k]) else v[[i]][[k]] / s[i]^(1/d[i])
+}
 
 v
 }

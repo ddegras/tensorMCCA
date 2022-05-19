@@ -71,7 +71,7 @@ input <- list(obj = "cor", r = r, c = c, init.type = init.type,
 objective <- iters <- numeric(r)
 
 ## Trivial case: constant datasets  
-test <- sapply(x, function(a) all(abs(a) <= 1e-15))
+test <- sapply(x, function(a) all(abs(a) <= eps))
 test <- outer(test, test, "&")
 if (all(test | c == 0)) {
 	r <- 1
@@ -86,7 +86,7 @@ if (all(test | c == 0)) {
 
 
 ## MAIN LOOP
-vprev <- NULL
+vprev <- vector("list", m)
 for (l in 1:r) {	
 	## Initialize canonical vectors
 	v0 <- if (!is.null(init.value) && NCOL(init.value) == 1) {
@@ -111,6 +111,7 @@ for (l in 1:r) {
 		
 	## Prepare orthogonality constraints for next stage
 	if (ortho  == "canon.tnsr" && l < r) {
+		vprev <- lapply(d, function(len) vector("list", len))
 		for (i in 1:m) {
 			k <- ortho.mode[l, l+1, i]
 			vprev[[i]][[k]] <- v[[i,l]][[k]]
@@ -128,7 +129,7 @@ for (l in 1:r) {
 	}
 
 	## Monitor objective value
-	if (objective[l] <= 1e-14) break 
+	if (objective[l] <= eps) break 
 	
 } 
 

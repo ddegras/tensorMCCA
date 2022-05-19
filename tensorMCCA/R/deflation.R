@@ -1,41 +1,10 @@
 
-################################################
-# General function to deflate canonical vectors
-# with respect to other canonical vectors
-################################################
-
-
-# Inputs
-# v:	 list of lists of vectors or matrices (length m)
-# vprev: list of lists of vectors or matrices (length m)
-
-deflate.v <- function(v, vprev)
-{
-stopifnot(is.list(v) && is.list(vprev))
-stopifnot(length(v) == length(vprev))
-m <- length(v)
-for (i in 1:m) {
-	stopifnot(length(v[[i]]) == length(vprev[[i]]))	
-	d <- length(v[[i]])
-	for (k in 1:d) {
-		if (length(vprev[[i]][[k]]) == 0) next
-		qrx <- qr(vprev[[i]][[k]])
-		if (qrx$rank == 0) next
-		v[[i]][[k]] <- lsfit(x = qr.Q(qrx)[,1:qrx$rank], 
-			y = v[[i]][[k]], intercept = FALSE)$residuals
-	}
-}	
-v
-}
-
-
 
 ###########################################
 # General function to deflate data tensors
 ###########################################
 
-deflate.x <- function(x, v = NULL, score = NULL, 
-	check.args = TRUE)
+deflate.x <- function(x, v = NULL, score = NULL, check.args = TRUE)
 {
 if (check.args) test <- check.arguments(x) 
 stopifnot(is.null(v) || is.null(score))
@@ -43,7 +12,7 @@ stopifnot(is.null(v) || is.null(score))
 ## Data dimensions
 m <- length(x)
 dimx <- lapply(x, dim)
-d <- sapply(dimx, length) - 1
+d <- sapply(dimx, length) - 1L
 p <- lapply(1:m, function(i) dimx[[i]][1:d[i]])
 n <- tail(dimx[[1]], 1)
 eps <- 1e-14
@@ -82,10 +51,10 @@ if (!is.null(score)) {
 
 if (!is.null(v)) {
 	test1 <- (is.list(v) && length(v) == m)
-	test2 <- identical(sapply(v, len), d)
+	test2 <- identical(sapply(v, length), d)
 	if (!(test1 && test2))
-		stop("If specified, 'v' should be a list of vectors",
-			"with dimensions compatible with 'x'")
+		stop(paste("If specified, 'v' should be a list of vectors",
+			"with dimensions compatible with 'x'"))
 	for (i in 1:m) {
 		for (k in 1:d[i]) {
 			if (is.null(v[[i]][[k]])) next
@@ -103,7 +72,7 @@ if (!is.null(v)) {
 			## Orthogonal projection
 			x[[i]] <- x[[i]] - Q %*% crossprod(Q, x[[i]]) 
 			## Reshape x(i) to tensor
-			dim(x[[i]]) <- dimx[[i]] 
+			dim(x[[i]]) <- if (k == 1) dimx[[i]] else dimx[[i]][perm]
 			## Permute modes back
 			if (k > 1) 
 				x[[i]] <- aperm(x[[i]], perm)
@@ -113,6 +82,39 @@ if (!is.null(v)) {
 
 x
 }
+
+
+
+
+
+################################################
+# General function to deflate canonical vectors
+# with respect to other canonical vectors
+################################################
+
+
+# Inputs
+# v:	 list of lists of vectors or matrices (length m)
+# vprev: list of lists of vectors or matrices (length m)
+
+# deflate.v <- function(v, vprev)
+# {
+# stopifnot(is.list(v) && is.list(vprev))
+# stopifnot(length(v) == length(vprev))
+# m <- length(v)
+# for (i in 1:m) {
+	# stopifnot(length(v[[i]]) == length(vprev[[i]]))	
+	# d <- length(v[[i]])
+	# for (k in 1:d) {
+		# if (length(vprev[[i]][[k]]) == 0) next
+		# qrx <- qr(vprev[[i]][[k]])
+		# if (qrx$rank == 0) next
+		# v[[i]][[k]] <- lsfit(x = qr.Q(qrx)[,1:qrx$rank], 
+			# y = v[[i]][[k]], intercept = FALSE)$residuals
+	# }
+# }	
+# v
+# }
 
 
 
