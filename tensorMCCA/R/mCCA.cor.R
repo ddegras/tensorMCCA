@@ -1,30 +1,60 @@
 
-mCCA.cor <- function(x, r, c = 1, ortho = c("block.score", "global.score", "canon.tnsr"), 
-	init.type = c("svd", "cca", "random"), init.value = NULL, maxit = 1000, tol = 1e-6,
-	sweep = c("cyclical", "random"), verbose = FALSE)
+mCCA.cor <- function(x, r, c = 1, ortho = c("block.score",
+	"global.score", "canon.tnsr"), init = list(), maxit = 1000, 
+	tol = 1e-6, sweep = c("cyclical", "random"), verbose = FALSE)
 {
 
 ## Check arguments
-test <- check.arguments(x, init.value)
+stopifnot(is.list(init))
+test <- check.arguments(x, init$value)
 eps <- 1e-14
 
 ## Data dimensions
 m <- length(x) # number of datasets
 dimx <- lapply(x, dim) # tensor dimensions for each dataset
 p <- lapply(dimx, function(x) x[-length(x)]) 
-# tensor dimensions for each dataset, last mode (instances) omitted
+# dimensions of each dataset, last mode (instances) omitted
 d <- sapply(p, length) 
 # numbers of image dimensions for each dataset
 n <- tail(dimx[[1]], 1) # numbers of instances per dataset
 
 ## Objective weights
-stopifnot(length(c) == 1 || (is.matrix(c) && all(dim(c) == length(x))))
+stopifnot(length(c) == 1 || 
+	(is.matrix(c) && all(dim(c) == length(x))))
 stopifnot(all(c >= 0) && any(c > 0))
 c <- if (length(c) == 1) { 	matrix(1/m^2, m, m) 
 	} else { (c + t(c)) / (2 * sum(c)) }
 
-## Match arguments
-init.type <- match.arg(init.type)
+## Initialization parameters
+if (is.null(init$value)) {	
+	if (is.null(init$method)) { 
+		init.method <- "cca" 
+	} else {
+		opts <- c("cca", "svd", "random")
+		idx <- na.omit(pmatch(init$method, opts))
+		if (length(idx) > 0) {
+			init.method <- opts[idx[1]]
+		} else stop(paste("The possible values of the field",
+			"'method' in argument 'init' are 'cca', 'svd',",
+			"and 'random'."))	
+	}
+}
+if (is.null(init$value) && init.method == "cca") {
+	tab <- c("exhaustive", "approximate")
+	if (is.null(init$search)) { 
+		init.search <- tab
+	} else {
+		idx <- na.omit(pmatch(init$search, tab)) 
+		if (length(idx) > 0) {
+			init.search <- tab[idx[1]]
+		} else stop(
+			paste("The possible values of the field",
+			"'search' in argument 'init' are 'exhaustive'",
+			"and 'approximate'."))
+	}
+}
+
+## Match other arguments
 ortho <- match.arg(ortho)
 sweep <- match.arg(sweep)
 
@@ -46,7 +76,7 @@ if (verbose && r != r0)
 		"to satisfy orthogonality constraints"))
 
 ## Prepare optimization if orthogonality 
-## constraints are on canonical tensors
+## constraints pertain to canonical tensors
 if (ortho == "canon.tnsr" && r > 1) {
 	## Set tensor modes on which constraints apply
 	ortho.mode <- array(dim = c(r, r, m))	
@@ -63,11 +93,11 @@ if (ortho == "canon.tnsr" && r > 1) {
 ## Create output objects 
 v <- vector("list", m * r) # canonical vectors
 dim(v) <- c(m, r)
-block.score <- array(dim = c(n, m, r)) 
-global.score <- matrix(nrow = n, ncol = r) 
-input <- list(obj = "cor", r = r, c = c, init.type = init.type, 
-	init.value = init.value, ortho = ortho, maxit = maxit, 
-	tol = tol, sweep = sweep) 
+block.score <- array(0, c(n, m, r)) 
+global.score <- matrix(0, n, r) 
+input <- list(objective = "correlation", r = r, c = c, 
+	init = init, ortho = ortho, maxit = maxit, tol = tol, 
+	sweep = sweep) 
 objective <- iters <- numeric(r)
 
 ## Trivial case: constant datasets  
@@ -89,17 +119,21 @@ if (all(test | c == 0)) {
 vprev <- vector("list", m)
 for (l in 1:r) {	
 	## Initialize canonical vectors
-	v0 <- if (!is.null(init.value) && NCOL(init.value) == 1) {
-		init.value 
-	} else if (!is.null(init.value) && NCOL(init.value) >= l) {
-		init.value[, l]	
+	v0 <- if (!is.null(init$value) && NCOL(init$value) == 1) {
+		init$value 
+	} else if (!is.null(init$value) && NCOL(init$value) >= l) {
+		init$value[, l]	
 	} else {
-		switch(init.type, 
-			svd = init.mcca.svd(x, objective = "cor", center = FALSE),
-			cca = init.mcca.cca(x, objective = "cor", center = FALSE),
-			random = init.mcca.random(x, objective = "cor", center = FALSE))
+		switch(init.method, 
+			svd = init.mcca.svd(x, objective = "correlation", 
+				cnstr = "block", center = FALSE),
+			cca = init.mcca.cca(x, k = init$k, c = c, 
+				objective = "correlation", cnstr = "block",
+				search = init.search, center = FALSE),
+			random = init.mcca.random(x, objective = "correlation", 
+				center = FALSE))
 	}
-	
+
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component",l,"\n")
 	out <- mCCA.single.cor(x, v0, c, sweep, maxit, tol, verbose)
