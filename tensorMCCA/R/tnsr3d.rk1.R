@@ -82,11 +82,28 @@ if (is.null(r)) {
 	stopifnot(all(r >= 0))
 	r <- rep_len(as.integer(r), d)
 	r <- pmin(r, p)
-	if (any(r == 0L)) 		
-		return(list(u = lapply(p, numeric), core = numeric(d)))
-	if (is.vector(x))
-		return(list(u = x, core = 1))				
 }
+
+## Trivial cases 
+if (any(r == 0L)) 		
+	return(list(u = lapply(p, numeric), core = array(0, d)))				
+if (d == 1) {
+	nrm <- sqrt(sum(x^2))
+	if (nrm == 0) {
+		return(list(u = numeric(p), core = 0))
+	} else {
+		return(list(u = x/nrm, core = nrm))
+	}
+}
+if (d == 2) {
+	RSpectra.flag <- all(p >= 3)
+	svdx <- if (RSpectra.flag) {
+		svds(x, max(r), r[1], r[2])	
+	} else svd(x, r[1], r[2])
+	return(list(u = list(svdx$u, svdx$v), 
+		core = diag(svdx$d, r[1], r[2])))
+}
+
 
 ## Outputs
 core <- x
