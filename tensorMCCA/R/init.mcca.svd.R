@@ -3,18 +3,19 @@
 
 
 
-###########################
-# SVD-based initialization
+#############################
+# HOSVD-based initialization
 # of canonical vectors 
 # (Quick Rank 1)
-###########################
+#############################
 
 
-init.mcca.svd <- function(x, objective = c("cov", "cor"), 
+init.mcca.svd <- function(x, objective = c("covariance", "correlation"), 
 	cnstr = c("block", "global"), center = TRUE)
 {
 ## Check argument x if required
 test <- check.arguments(x)
+eps <- 1e-14
 
 ## Data dimensions
 m <- length(x) # number of datasets 
@@ -66,13 +67,14 @@ for (i in 1:m) {
 }
 
 ## Scale initial canonical vectors as required	
-eps <- 1e-14
-if (objective == "cor") {
+if (objective == "correlation") {
 	scores <- image.scores(x, v)
 	s <- sqrt(colMeans(scores^2))
 	for (i in 1:m) 
 	for (k in 1:d[i]) 
-		v[[i]][[k]] <- if (s[i] <= eps) numeric(p[[i]][k]) else v[[i]][[k]] / s[i]^(1/d[i])
+		v[[i]][[k]] <- if (s[i] <= eps) {
+			numeric(p[[i]][k]) } else {
+				v[[i]][[k]] / s[i]^(1/d[i]) }
 }
 
 v

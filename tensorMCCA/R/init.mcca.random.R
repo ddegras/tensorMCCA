@@ -7,7 +7,7 @@
 ########################
 
 
-init.mcca.random <- function(x, objective = c("cov", "cor"))
+init.mcca.random <- function(x, objective = c("covariance", "correlation"))
 {
 ## Check argument x if required
 test <- check.arguments(x)
@@ -26,18 +26,18 @@ objective <- match.arg(objective) # objective function to maximize
 v <- vector("list",m)
 for (i in 1:m)
 for (k in 1:d[i])
-	v[[i]][[k]] <- runif(p[[i]][[k]], -1, 1)
+	v[[i]][[k]] <- runif(p[[i]][k], -1, 1)
 
 ## Scale canonical vectors
 v <- scale.v(v, cnstr = "block")
-if (objective == "cor") {
+if (objective == "correlation") {
 	y <- image.scores(x, v)
 	y <- y - rowMeans(y)
 	nrm <- sqrt(colMeans(y^2))
 	nrm[nrm <= 1e-14] <- 1
 	for (i in 1:m)
 	for (k in 1:d[i])
-		v[[i]][[k]] <- v[[i]][[k]] / nrm^(1/d[i])	
+		v[[i]][[k]] <- v[[i]][[k]] / nrm[k]^(1/d[i])	
 }
 
 v
