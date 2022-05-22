@@ -38,12 +38,12 @@ The optional list \code{init} can take as arguments:
 \item{\code{value}}{List of starting values for the MCCA. If \code{value} is provided, the argument \code{method} will be ignored. \code{value} can either have the same length as \code{x}, say \eqn{m}, or have dimensions \eqn{m}-by-\code{r}. In the first case, the same starting point is used for all \code{r} stages of the MCCA. In the second, each column of \code{value} will be used as separate starting point. The \eqn{i}-th field of \code{value} (or all fields of its \eqn{i}-th row) must match the dimensions of the \eqn{i}-th field of \code{x}. More precisely, the \eqn{i}-th field of \code{value} must be a list of length equal to that of \code{x[[i]]} minus 1. If for example \code{x[[i]]} is a 4D array of 3D images of dimensions 10-by-15-by-20, then \code{value[[i]]} must be a list of length 3 with each component a single vector of length 10, 15, and 20, respectively.}
 
 \item{\code{k}}{Only used for \code{method = cca}. Number of singular values used to approximate each dataset. It can be useful to set \code{k} to a small-to-moderate value if one or several datasets are very big.}
-}
 
 \item{\code{search}}{Only used for \code{method = cca}. 
 Type of search in the space of possible solutions (size \eqn{m^m} where \eqn{m} is the number of datasets): \code{exhaustive} or \code{approximate}. By default, \code{search} is set to \code{exhaustive} if \eqn{m \le 5} and to 
 \code{approximate} otherwise.} 
 
+}
 }
 
 \value{
