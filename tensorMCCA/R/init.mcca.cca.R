@@ -312,13 +312,14 @@ if (objective.type == "correlation") {
 # other canonical tensors fixed
  
 if (cnstr == "block" && search == "approximate") {
-	## Initialization 
+	## Initialization @@@@ does not do what it's supposed to do. FIX IT
 	objective <- 0
 	part <- matrix(0, m, m) # partial objective values
 	for (i in 1:m)
 	for (j in 1:i)
 		part[i,j] <- part[j,i] <- 
 			c[i,j] * mean(score[,i,j] * score[,j,i])
+	diag(part) <- -Inf
 	assignment <- integer(m)
 	for (i in 1:m) {
 		idx <- arrayInd(which.max(part), c(m,m))
