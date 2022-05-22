@@ -130,8 +130,7 @@ for (l in 1:r) {
 			cca = init.mcca.cca(x, k = init$k, c = c, 
 				objective = "correlation", cnstr = "block",
 				search = init.search, center = FALSE),
-			random = init.mcca.random(x, objective = "correlation", 
-				center = FALSE))
+			random = init.mcca.random(x, objective = "correlation"))
 	}
 
 	## Run MCCA and store results
