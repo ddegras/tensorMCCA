@@ -137,8 +137,7 @@ for (l in 1:r) {
 			cca = init.mcca.cca(x, k = init$k, c = c,
 				objective = "covariance", cnstr = cnstr, 
 				search = init.search, center = FALSE),
-			random = init.mcca.random(x, objective = "covariance", 
-				center = FALSE))
+			random = init.mcca.random(x, objective = "covariance"))
 	}
 	
 	## Run MCCA and store results
