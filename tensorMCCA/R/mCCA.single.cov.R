@@ -66,21 +66,6 @@ for (it in 1:maxit) {
 					iprod[j,] <- crossprod(vj[[k]], tvprod)
 				}				
 			}
-			# if (d[j] == 1) { # 1D case
-				# iprod[j,] <- crossprod(vj[[1]], tvprod) 
-			# } else if (d[j] == 2) { # 2D case
-				# dim(tvprod) <- c(pj[1], prod(pj[-1], n))
-				# tvprod <- crossprod(vj[[1]], tvprod)
-				# dim(tvprod) <- c(pj[2], n) 
-				# iprod[j,] <- crossprod(vj[[2]], tvprod) 
-			# } else { # 3D case
-				# dim(tvprod) <- c(pj[1], prod(pj[-1], n))
-				# tvprod <- crossprod(vj[[1]], tvprod)
-				# dim(tvprod) <- c(pj[2], pj[3] * n)
-				# tvprod <- crossprod(vj[[2]], tvprod)
-				# dim(tvprod) <- c(pj[3], n) 
-				# iprod[j,] <- crossprod(vj[[3]], tvprod)
-			# }
 		}
 		lastidx <- idxi[m]
 		
@@ -93,10 +78,7 @@ for (it in 1:maxit) {
 		if (d[i] > 1) dim(b) <- dimx[[i]][-ndimx[i]]
 		
 		## Update canonical vectors
-		# vprev <- v #@@ debugging
 		v[[i]] <- optim.block.cov(v[[i]], a, b, maxit, tol) 	
-		# test <- c(objective.internal(x, vprev, c), objective.internal(x, v, c)) #@@@
-		# if (test[1] > test[2]) browser("Decrease in objective") #@@@
 	}								
 	
 	## Calculate objective value (sum of correlations)
