@@ -1,4 +1,4 @@
-mCCA.cov <- function(x, r, c = 1, cnstr = c("block", "global"), 
+mCCA.cov <- function(x, r, c = NULL, cnstr = c("block", "global"), 
 	ortho = c("block.score", "global.score", "canon.tnsr"), 
 	init = list(),  maxit = 1000, tol = 1e-6, sweep = c("cyclical", 
 	"random"), verbose = FALSE)
@@ -19,11 +19,16 @@ d <- sapply(p, length)
 n <- tail(dimx[[1]], 1) # numbers of instances per dataset
 
 ## Objective weights
-stopifnot(length(c) == 1 || 
-	(is.matrix(c) && all(dim(c) == length(x))))
-stopifnot(all(c >= 0) && any(c > 0))
-c <- if (length(c) == 1) { matrix(1/m^2, m, m) 
-	} else { (c + t(c)) / (2 * sum(c)) }
+if (is.null(c)) {
+	c <- matrix(1/(m*(m-1)), m, m)
+	diag(c) <- 0
+} else {
+	stopifnot(length(c) == 1 || 
+		(is.matrix(c) && all(dim(c) == length(x))))
+	stopifnot(all(c >= 0) && any(c > 0))
+	c <- if (length(c) == 1) { matrix(1/m^2, m, m) 
+		} else { (c + t(c)) / (2 * sum(c)) }
+}
 
 ## Initialization parameters
 if (is.null(init$value)) {	
