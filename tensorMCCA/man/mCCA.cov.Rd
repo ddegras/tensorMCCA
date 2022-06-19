@@ -1,12 +1,12 @@
-\name{mCCA.cov}
-\alias{mCCA.cov}
+\name{MCCA.cov}
+\alias{MCCA.cov}
 
 \title{Multiple CCA: Maximize Sum of Covariances}
 
 \description{Perform multiple CCA by maximizing sum of covariances between canonical scores.}
 
 \usage{
-mCCA.cov(x, r, c = 1, cnstr = c("block", "global"), ortho = c("block.score", "global.score", "canon.tnsr"), 
+MCCA.cov(x, r, c = 1, cnstr = c("block", "global"), ortho = c("block.score", "global.score", "canon.tnsr"), 
 	init = list(),  maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), verbose = FALSE)
 }
 
@@ -42,7 +42,7 @@ The optional list \code{init} can take as arguments:
 Type of search in the space of possible solutions (size \eqn{m^m} where \eqn{m} is the number of datasets): \code{exhaustive} or \code{approximate}. By default, \code{search} is set to \code{exhaustive} if \eqn{m \le 5} and to 
 \code{approximate} otherwise.} 
 
-\item{\code{k}}{Only used for \code{method = cca}. Number of singular values used to approximate each dataset . It can be useful to set \code{k} to a small-to-moderate value if one or several datasets are very big.}
+\item{\code{k}}{Only used for \code{method = cca}. Number of singular values used to approximate each dataset. It can be useful to set \code{k} to a small-to-moderate value if one or several datasets are very big.}
 }
 }
 
@@ -61,7 +61,7 @@ A LIST with components
 
 
 \seealso{
-\code{\link{mCCA.cor}}
+\code{\link{MCCA.cor}}
 }
 
 % \examples{

@@ -6,7 +6,7 @@
 
 
 
-init.mcca.cca <- function(x, k = NULL, c = 1, 
+MCCA.init.cca <- function(x, k = NULL, c = 1, 
 	objective = c("covariance", "correlation"), 
 	cnstr = c("block", "global"), center = TRUE, 
 	search = c("exhaustive", "approximate"))

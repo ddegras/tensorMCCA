@@ -16,7 +16,7 @@ permutation.test(x, obj, nperm = 100, parallel = TRUE, ncores = NULL)
 \arguments{
 \item{x}{Data: list of arrays. All arrays must have the same number of dimensions in their last mode (= individual or object).}
 
-\item{obj}{The result of a call to \code{\link{mCCA.cor}} or \code{mCCA.cov}.}
+\item{obj}{The result of a call to \code{\link{MCCA.cor}} or \code{\link{MCCA.cov}}.}
 
 \item{nperm}{Number of random permutations to use for the test.}
 
@@ -35,7 +35,7 @@ A vector of p-values, one for each canonical component.
 
 
 \seealso{
-\code{\link{mCCA.cor}}
+\code{\link{MCCA.cov}}, \code{\link{MCCA.cor}}
 }
 
 \examples{

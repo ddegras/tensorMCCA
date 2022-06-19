@@ -7,7 +7,7 @@
 ########################
 
 
-init.mcca.random <- function(x, objective = c("covariance", "correlation"))
+MCCA.init.random <- function(x, objective = c("covariance", "correlation"))
 {
 ## Check argument x if required
 test <- check.arguments(x)

@@ -1,5 +1,5 @@
-\name{init.mcca.svd}
-\alias{init.mcca.svd}
+\name{MCCA.init.svd}
+\alias{MCCA.init.svd}
 
 \title{Initialize Canonical Tensors by SVD (Quick Rank 1)}
 
@@ -8,7 +8,7 @@
 }
 
 \usage{
-init.mcca.svd(x, objective = c("cov", "cor"), cnstr = c("block", "global"), 
+MCCA.init.svd(x, objective = c("cov", "cor"), cnstr = c("block", "global"), 
 	center = TRUE, balance = TRUE)
 }
 
@@ -27,7 +27,7 @@ This initialization consists in first flattening the data tensors along their co
 A list of \eqn{m} sublists of canonical vectors, where \eqn{m} is the length of \code{x}. The number of vectors in each sublist equals the number of modes in the corresponding data array minus 1 (not counting the last mode which corresponds to individuals or objects). The lengths of these vectors are equal to the numbers of dimensions in the modes of the corresponding data array.}
 
 \seealso{
-\code{\link{init.mcca.cca}}, \code{\link{init.v.random}}
+\code{\link{MCCA.init.cca}}, \code{\link{init.v.random}}
 }
 
 \examples{

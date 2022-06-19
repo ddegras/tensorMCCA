@@ -1,5 +1,5 @@
-\name{init.mcca.cca}
-\alias{init.mcca.cca}
+\name{MCCA.init.cca}
+\alias{MCCA.init.cca}
 
 \title{Initialize Multiple CCA With Standard CCA}
 
@@ -12,7 +12,7 @@ and (iv) solving exactly or approximately a multidimensional assignment problem 
 }
 
 \usage{
-init.mcca.cca(x, k = NULL, c = 1, objective = c("covariance", "correlation"), cnstr = c("block", "global"), 
+MCCA.init.cca(x, k = NULL, c = 1, objective = c("covariance", "correlation"), cnstr = c("block", "global"), 
 center = TRUE, search = c("exhaustive", "approximate"))
 }
 
@@ -50,7 +50,7 @@ Degras, Shen, and Chu (2022). Tensor Multiple Canonical Correlation Analysis.
 
 
 \seealso{
-\code{\link{init.mcca.random}}, \code{\link{init.mcca.svd}}
+\code{\link{MCCA.init.random}}, \code{\link{MCCA.init.svd}}
 }
 
 \examples{

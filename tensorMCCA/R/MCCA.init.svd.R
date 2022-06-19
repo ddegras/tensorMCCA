@@ -10,7 +10,7 @@
 #############################
 
 
-init.mcca.svd <- function(x, objective = c("covariance", "correlation"), 
+MCCA.init.svd <- function(x, objective = c("covariance", "correlation"), 
 	cnstr = c("block", "global"), center = TRUE)
 {
 ## Check argument x if required

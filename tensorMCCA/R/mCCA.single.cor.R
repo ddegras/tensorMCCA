@@ -1,7 +1,7 @@
 
 
 ###################################################
-# Internal function for mCCA with mixed 2D/3D data
+# Internal function for MCCA with mixed 2D/3D data
 # (maximize sum of correlations one block at a time)
 ###################################################
 
@@ -9,7 +9,7 @@
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-mCCA.single.cor <- function(x, v, c, sweep, maxit, tol, verbose)
+MCCA.single.cor <- function(x, v, c, sweep, maxit, tol, verbose)
 {
 	
 ## Data dimensions

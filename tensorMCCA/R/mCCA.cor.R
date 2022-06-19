@@ -1,5 +1,5 @@
 
-mCCA.cor <- function(x, r, c = 1, ortho = c("block.score",
+MCCA.cor <- function(x, r, c = 1, ortho = c("block.score",
 	"global.score", "canon.tnsr"), init = list(), maxit = 1000, 
 	tol = 1e-6, sweep = c("cyclical", "random"), verbose = FALSE)
 {
@@ -125,17 +125,17 @@ for (l in 1:r) {
 		init$value[, l]	
 	} else {
 		switch(init.method, 
-			svd = init.mcca.svd(x, objective = "correlation", 
+			svd = MCCA.init.svd(x, objective = "correlation", 
 				cnstr = "block", center = FALSE),
-			cca = init.mcca.cca(x, k = init$k, c = c, 
+			cca = MCCA.init.cca(x, k = init$k, c = c, 
 				objective = "correlation", cnstr = "block",
 				search = init.search, center = FALSE),
-			random = init.mcca.random(x, objective = "correlation"))
+			random = MCCA.init.random(x, objective = "correlation"))
 	}
 
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component",l,"\n")
-	out <- mCCA.single.cor(x, v0, c, sweep, maxit, tol, verbose)
+	out <- MCCA.single.cor(x, v0, c, sweep, maxit, tol, verbose)
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y # canonical scores
 	global.score[,l] <- rowMeans(block.score[,,l])	

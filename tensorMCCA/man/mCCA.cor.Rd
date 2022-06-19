@@ -1,12 +1,12 @@
-\name{mCCA.cor}
-\alias{mCCA.cor}
+\name{MCCA.cor}
+\alias{MCCA.cor}
 
 \title{Multiple CCA: Maximize Sum of Correlations}
 
 \description{Perform multiple CCA by maximizing sum of correlations between canonical scores.}
 
 \usage{
-mCCA.cor(x, r, c = 1, ortho = c("block.score", "global.score", "canon.tnsr"),
+MCCA.cor(x, r, c = 1, ortho = c("block.score", "global.score", "canon.tnsr"),
 	init = list(), maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"),
 	verbose = FALSE)
 }
@@ -61,7 +61,7 @@ A LIST with components
 
 
 \seealso{
-\code{\link{mCCA.cov}}, \code{\link{init.mcca.cca}}, \code{\link{init.mcca.random}}, \code{\link{init.mcca.svd}}
+\code{\link{MCCA.cov}}, \code{\link{MCCA.init.cca}}, \code{\link{MCCA.init.random}}, \code{\link{MCCA.init.svd}}
 }
 
 % \examples{

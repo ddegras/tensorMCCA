@@ -1,4 +1,4 @@
-mCCA.cov <- function(x, r, c = NULL, cnstr = c("block", "global"), 
+MCCA.cov <- function(x, r, c = NULL, cnstr = c("block", "global"), 
 	ortho = c("block.score", "global.score", "canon.tnsr"), 
 	init = list(),  maxit = 1000, tol = 1e-6, sweep = c("cyclical", 
 	"random"), verbose = FALSE)
@@ -65,9 +65,9 @@ cnstr <- match.arg(cnstr)
 sweep <- match.arg(sweep)
 
 ## Optimization method
-mCCA.single.cov <- if (cnstr == "block") {
-	mCCA.single.block.cov } else {
-	mCCA.single.global.cov }
+MCCA.single.cov <- if (cnstr == "block") {
+	MCCA.single.block.cov } else {
+	MCCA.single.global.cov }
 
 ## Data centering
 for(i in 1:m) {
@@ -137,17 +137,17 @@ for (l in 1:r) {
 		init$value[, l]
 	} else {
 		switch(init.method, 
-			svd = init.mcca.svd(x, objective = "covariance", 
+			svd = MCCA.init.svd(x, objective = "covariance", 
 				cnstr = cnstr, center = FALSE),
-			cca = init.mcca.cca(x, k = init$k, c = c,
+			cca = MCCA.init.cca(x, k = init$k, c = c,
 				objective = "covariance", cnstr = cnstr, 
 				search = init.search, center = FALSE),
-			random = init.mcca.random(x, objective = "covariance"))
+			random = MCCA.init.random(x, objective = "covariance"))
 	}
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
-	out <- mCCA.single.cov(x, v0, c, sweep, maxit, tol, verbose)
+	out <- MCCA.single.cov(x, v0, c, sweep, maxit, tol, verbose)
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y 
 	global.score[,l] <- rowMeans(block.score[,,l]) 

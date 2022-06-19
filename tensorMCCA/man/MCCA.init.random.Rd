@@ -1,5 +1,5 @@
-\name{init.mcca.random}
-\alias{init.mcca.random}
+\name{MCCA.init.random}
+\alias{MCCA.init.random}
 
 \title{
 Initialize Canonical Tensors Randomly
@@ -10,7 +10,7 @@ Initialize Canonical Tensors Randomly
 }
 
 \usage{
-init.mcca.random(x, objective = c("cov", "cor"), cnstr = c("block", "global"), 
+MCCA.init.random(x, objective = c("cov", "cor"), cnstr = c("block", "global"), 
 	center = TRUE, balance = TRUE)
 }
 
@@ -30,7 +30,7 @@ init.mcca.random(x, objective = c("cov", "cor"), cnstr = c("block", "global"),
 A list representing canonical tensors. Each sublist contains as many canonical vectors as there are modes in the corresponding dataset (not counting the last mode which corresponds to individuals or objects). The vectors of a sublist have length equal to the numbers of dimensions in the modes of the corresponding dataset.}
 
 \seealso{
-\code{\link{init.mcca.cca}}, \code{\link{init.mcca.svd}}
+\code{\link{MCCA.init.cca}}, \code{\link{MCCA.init.svd}}
 }
 
 \examples{
