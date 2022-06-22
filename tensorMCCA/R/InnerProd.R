@@ -190,3 +190,73 @@ tvec.prod <- function(tnsr, vecs, modes = NULL)
 	# dim(out) <- if (nmodes >= tnsr.order - 1) NULL else dim.tnsr[-modes]
 	# out
 # }
+
+
+
+tmat.prod <- function(tnsr, mats, modes = NULL)
+{
+## Check argument types
+stopifnot(is.array(tnsr))
+stopifnot(is.numeric(mats) || is.list(mats))
+stopifnot(is.null(modes) || is.numeric(modes))
+modes <- as.integer(modes)
+if (is.numeric(mats)) mats <- list(mats)
+isvec <- sapply(mats, is.vector)
+ismat <- sapply(mats, is.matrix)
+if (!all(isvec | ismat))
+	stop(paste("'mats' must be a list of numerical", 
+	"vectors or matrices"))
+if (any(isvec)) mats[isvec] <- lapply(mats[isvec], t)
+
+## Argument dimensions
+dim.tnsr <- dim(tnsr) 
+tnsr.order <- length(dim.tnsr)
+nmats <- length(mats)
+nmodes <- length(modes)
+nr <- sapply(mats, nrow)
+nc <- sapply(mats, ncol)
+
+## Check compatibility of arguments
+if (nmodes == 0) {
+	if (nmats == tnsr.order) {
+		modes <- 1:tnsr.order
+	} else {
+		stop(paste("Please specify the modes in which", 
+		"to perform the multiplications"))
+	}
+} else {
+	if (nmodes != nmats)
+		stop("'mats' and 'modes' must be of equal length")
+	if (any(modes <= 0 | modes > tnsr.order)) 
+		stop(paste("'modes' must only contain integers",
+		"between 1 and the number of modes",
+		"(i.e., dimensions) of 'tnsr'"))
+	if (nmodes > length(unique(modes)))
+		stop("The values in 'modes' must be unique")
+	if (any(nc != dim.tnsr[modes]))
+		stop(paste("The numbers of columns in 'mats'", 
+		"do not match the corresponding dimensions in 'tnsr'"))
+}
+		
+## Calculate tensor-matrix products
+ord <- order(modes)
+if (any(diff(ord) < 0)) {
+	mats <- mats[ord]
+	modes <- modes[ord]
+}
+out <- tnsr	
+for (kk in 1:nmodes) {
+	dim.out <- dim(out)
+	k <- modes[kk]
+	if (k > 1) {
+		perm <- 1:tnsr.order
+		perm[c(1,k)] <- c(k,1)
+		out <- aperm(out, perm)
+	}
+	dim(out) <- c(dim.tnsr[k], prod(dim.out) / dim.tnsr[k])
+	out <- mats[[kk]] %*% out
+	dim(out) <- c(nr[kk], dim.out[perm[-1]])
+	out <- aperm(out, perm)
+}
+out
+}
