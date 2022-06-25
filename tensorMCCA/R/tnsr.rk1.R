@@ -16,11 +16,13 @@ v <- svdx$vectors
 v[[d]] <- v[[d]] * nrmv
 kronv <- Reduce(kronecker, v)
 for (it in 1:maxit) {
+	nrmv.old <- nrmv
 	kronv.old <- kronv
 	for (k in 1:d) {
 		v[[k]] <- tvec.prod(x, v[-k], (1:d)[-k])
 		if (k < d) v[[k]] <- v[[k]] / sqrt(sum(v[[k]]^2))
-	}	
+	}
+	nrmv <- sqrt(sum(v[[d]]^2))
 	kronv <- Reduce(kronecker, v)
 	e <- sqrt(sum((kronv - kronv.old)^2))
 	if (e <= tol * max(nrmv, nrmv.old, 1)) break

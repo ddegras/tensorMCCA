@@ -56,80 +56,81 @@ InnerProd <- function(x, v)
 # }
 
 
-## Product of tensor with vectors in multiple modes
-tvec.prod <- function(tnsr, vecs, modes = NULL)
-{
-	## Check argument types
-	stopifnot(is.array(tnsr))
-	stopifnot(is.numeric(vecs) || is.list(vecs))
-	stopifnot(is.null(modes) || is.numeric(modes))
-	modes <- as.integer(modes)
-	if (is.numeric(vecs)) vecs <- list(vecs)
-	
-	## Argument dimensions
-	dim.tnsr <- dim(tnsr) 
-	tnsr.order <- length(dim.tnsr)
-	nvecs <- length(vecs)
-	nmodes <- length(modes)
-	
-	## Check compatibility of arguments
-	if (nmodes == 0) {
-		if (nvecs == tnsr.order) {
-			modes <- 1:tnsr.order
-		} else {
-			stop(paste("Please specify the modes in which", 
-			"to perform the multiplications"))
-		}
-	} else {
-		if (nmodes != nvecs)
-			stop("'modes' and 'vecs' must have equal lengths")
-		if (any(modes <= 0 | modes > tnsr.order)) 
-			stop(paste("'modes' must only contain integers",
-			"between 1 and the number of dimensions of 'tnsr'"))
-		if (nmodes > length(unique(modes)))
-			stop("The values in 'modes' must be unique")
-	}
-			
-	## Calculate tensor-vector products
-	ord <- order(modes)
-	if (any(diff(ord) < 0)) {
-		vecs <- vecs[ord]
-		modes <- modes[ord]
-	}
-	first.modes <- identical(modes, 1:nmodes)
-	last.modes <- identical(modes, tail(1:tnsr.order, nmodes))
-	if (first.modes) {
-		out <- tnsr
-		for (kk in 1:nmodes) {
-			k <- modes[kk]
-			nc <- if (k < tnsr.order) prod(dim.tnsr[-(1:k)]) else 1L
-			dim(out) <- c(dim.tnsr[k], nc)
-			out <- crossprod(vecs[[kk]], out)
-		}		
-	} else if (last.modes) {
-		out <- tnsr
-		for (kk in 1:nmodes) {
-			k <- modes[nmodes - kk + 1L]
-			dim(out) <- c(prod(dim.tnsr[1:(k - 1L)]), dim.tnsr[k])
-			out <- out %*% vecs[[nmodes - kk + 1L]]
-		}
-	} else {
-		perm <- c((1:tnsr.order)[-modes], modes)
-		out <- aperm(tnsr, perm)
-		dim.out <- dim.tnsr[perm]
-		for (kk in 1:nmodes) {
-			k <- modes[nmodes - kk + 1L]
-			dim(out) <- c(prod(dim.out[1:(tnsr.order - kk)]), 
-				dim.tnsr[k])
-			out <- out %*% vecs[[nmodes - kk + 1L]]
-		}
-	}
-	dim(out) <- if (nmodes == tnsr.order) {
-		NULL } else if (nmodes == tnsr.order - 1L) {
-		c(length(out), 1L) } else { 
-		dim.tnsr[-modes] }
-	out
-}
+# ## Product of tensor with vectors in multiple modes
+# tvec.prod <- function(tnsr, vecs, modes = NULL)
+# {	
+# ## Check argument types
+# stopifnot(is.array(tnsr))
+# stopifnot(is.numeric(vecs) || is.list(vecs))
+# stopifnot(is.null(modes) || is.numeric(modes))
+# modes <- as.integer(modes)
+# if (is.numeric(vecs)) vecs <- list(vecs)
+
+# ## Argument dimensions
+# dim.tnsr <- dim(tnsr) 
+# tnsr.order <- length(dim.tnsr)
+# nvecs <- length(vecs)
+# nmodes <- length(modes)
+
+# ## Check compatibility of arguments
+# if (nmodes == 0) {
+	# if (nvecs == tnsr.order) {
+		# modes <- 1:tnsr.order
+	# } else {
+		# stop(paste("Please specify the modes in which", 
+		# "to perform the multiplications"))
+	# }
+# } else {
+	# if (nmodes != nvecs)
+		# stop("'modes' and 'vecs' must have equal lengths")
+	# if (any(modes <= 0 | modes > tnsr.order)) 
+		# stop(paste("'modes' must only contain integers",
+		# "between 1 and the number of dimensions of 'tnsr'"))
+	# if (nmodes > length(unique(modes)))
+		# stop("The values in 'modes' must be unique")
+# }
+		
+# ## Calculate tensor-vector products
+# ord <- order(modes)
+# if (any(diff(ord) < 0)) {
+	# vecs <- vecs[ord]
+	# modes <- modes[ord]
+# }
+# first.modes <- identical(modes, 1:nmodes)
+# last.modes <- identical(modes, tail(1:tnsr.order, nmodes))
+# if (first.modes) {
+	# out <- tnsr
+	# for (kk in 1:nmodes) {
+		# k <- modes[kk]
+		# dim(out) <- if (k < tnsr.order) {
+			# c(dim.tnsr[k], prod(dim.tnsr[-(1:k)]))
+		# } else NULL
+		# out <- crossprod(vecs[[kk]], out)
+	# }		
+# } else if (last.modes) {
+	# out <- tnsr
+	# for (kk in 1:nmodes) {
+		# k <- modes[nmodes - kk + 1L]
+		# dim(out) <- c(prod(dim.tnsr[1:(k - 1L)]), dim.tnsr[k])
+		# out <- out %*% vecs[[nmodes - kk + 1L]]
+	# }
+# } else {
+	# perm <- c((1:tnsr.order)[-modes], modes)
+	# out <- aperm(tnsr, perm)
+	# dim.out <- dim.tnsr[perm]
+	# for (kk in 1:nmodes) {
+		# k <- modes[nmodes - kk + 1L]
+		# dim(out) <- c(prod(dim.out[1:(tnsr.order - kk)]), 
+			# dim.tnsr[k])
+		# out <- out %*% vecs[[nmodes - kk + 1L]]
+	# }
+# }
+# dim(out) <- if (nmodes == tnsr.order) {
+	# NULL } else if (nmodes == tnsr.order - 1L) {
+	# c(length(out), 1L) } else { 
+	# dim.tnsr[-modes] }
+# out
+# }
 
 # tvec.prod2 <- function(tnsr, vecs, modes = NULL)
 # {
