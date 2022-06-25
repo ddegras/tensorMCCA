@@ -4,15 +4,20 @@
 ##############################
 
 
-tnsr3d.rk1 <- function(x, maxit = 100, tol = 1e-6, verbose = FALSE)
+tnsr3d.rk1 <- function(x, maxit = 100, tol = 1e-6)
 {
 stopifnot(is.array(x) && length(dim(x)) == 3)
+<<<<<<< Updated upstream
 d <- dim(x)
+=======
+p <- dim(x)
+if (all(x == 0)) return(lapply(p, numeric))
+>>>>>>> Stashed changes
 v <- vector("list",3)
-test <- all(d >= 3)
 maxit <- as.integer(maxit)
 stopifnot(maxit >= 0)
 
+<<<<<<< Updated upstream
 ## Quick Rank 1 initialization
 ## A.k.a. interlaced computation of rank-1 HOSVD
 dim(x) <- c(d[1], d[2] * d[3])
@@ -26,12 +31,36 @@ v[[3]] <- svd2$v * s
 
 iters <- if (maxit > 0) {1:maxit} else NULL
 for (it in iters) {
+=======
+## Rank-1 HOSVD
+dim(x) <- c(p[1], p[2] * p[3]) 
+svdx <- if (all(dim(x) > 2)) {
+	svds(x, k = 1) 
+} else { 
+	svd(x, nu = 1, nv = 1)
+} 
+v[[1]] <- svdx$u
+s1 <- svdx$d
+svdx <- if (all(p[2:3] > 2)) {
+	svds(matrix(svdx$v, p[2], p[3]), k = 1) 
+} else {
+	svd(matrix(svdx$v, p[2], p[3]), nu = 1, nv = 1)
+}
+s2 <- svdx$d
+s <- (s1 * s2)^(1/3)
+v[[1]] <- v[[1]] * s
+v[[2]] <- svdx$u * s
+v[[3]] <- svdx$v * s
+
+if (maxit == 0) return(v)
+for (it in 1:maxit) {
+>>>>>>> Stashed changes
 	v.old <- v
 	
 	## Update v1
-	dim(x) <- c(d[1] * d[2], d[3])
+	dim(x) <- c(p[1] * p[2], p[3])
 	xv <- x %*% v[[3]]
-	dim(xv) <- c(d[1], d[2])
+	dim(xv) <- c(p[1], p[2])
 	v[[1]] <- xv %*% v[[2]] 
 	v[[1]] <- v[[1]] / sqrt(sum(v[[1]]^2))
 
@@ -40,13 +69,13 @@ for (it in iters) {
 	v[[2]] <- v[[2]] / sqrt(sum(v[[2]]^2))
 	 	
 	## Update v3
-	dim(x) <- c(d[1], d[2] * d[3])
+	dim(x) <- c(p[1], p[2] * p[3])
 	xv <- crossprod(x, v[[1]])
-	dim(xv) <- d[2:3]
+	dim(xv) <- p[2:3]
 	v[[3]] <- crossprod(xv, v[[2]]) 
 	nrm <- sqrt(sum(v[[3]]^2))
 			
-	## Check progress
+	## Check progress	
 	e <- kronecker(v[[3]], kronecker(v[[2]], v[[1]])) - 
 		kronecker(v.old[[3]], kronecker(v.old[[2]], v.old[[1]]))
 	if (sqrt(sum(e^2)) <= tol * nrm) break
@@ -54,12 +83,13 @@ for (it in iters) {
 
 ## Balance norms 
 s <- nrm^(c(1/3, 1/3, -2/3))
-for (i in 1:3) v[[i]] <- v[[i]] * s[i] 
+for (k in 1:3) v[[k]] <- v[[k]] * s[k] 
 
 v	
 	
 }
 
+<<<<<<< Updated upstream
 
 
 
@@ -201,3 +231,5 @@ list(u = u, core = core)
 # }
 
 
+=======
+>>>>>>> Stashed changes
