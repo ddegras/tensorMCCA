@@ -15,17 +15,14 @@ if (d == 2L || maxit == 0) {
 v <- svdx$vectors
 v[[d]] <- v[[d]] * nrmv
 kronv <- Reduce(kronecker, v)
-
 for (it in 1:maxit) {
 	kronv.old <- kronv
-	nrmv.old <- nrmv
 	for (k in 1:d) {
 		v[[k]] <- tvec.prod(x, v[-k], (1:d)[-k])
 		if (k < d) v[[k]] <- v[[k]] / sqrt(sum(v[[k]]^2))
 	}	
 	kronv <- Reduce(kronecker, v)
-	nrmv <- sqrt(sum(v[[d]]^2))
-	e <- sqrt(nrmv^2 + nrmv.old^2 - 2 * sum(kronv * kronv.old))
+	e <- sqrt(sum((kronv - kronv.old)^2))
 	if (e <= tol * max(nrmv, nrmv.old, 1)) break
 }
 

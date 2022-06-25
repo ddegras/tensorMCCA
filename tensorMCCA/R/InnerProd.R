@@ -96,30 +96,38 @@ tvec.prod <- function(tnsr, vecs, modes = NULL)
 		vecs <- vecs[ord]
 		modes <- modes[ord]
 	}
-	if (identical(modes, 1:nmodes)) {
+	first.modes <- identical(modes, 1:nmodes)
+	last.modes <- identical(modes, tail(1:tnsr.order, nmodes))
+	if (first.modes) {
 		out <- tnsr
-		for (k in modes) {
+		for (kk in 1:nmodes) {
+			k <- modes[kk]
 			nc <- if (k < tnsr.order) prod(dim.tnsr[-(1:k)]) else 1L
 			dim(out) <- c(dim.tnsr[k], nc)
-			out <- crossprod(vecs[[k]], out)
+			out <- crossprod(vecs[[kk]], out)
 		}		
-	} else if (identical(modes, (tnsr.order-nmodes+1):tnsr.order)) {
+	} else if (last.modes) {
 		out <- tnsr
-		for (k in rev(modes)) {
-			dim(out) <- c(prod(dim.tnsr[1:(k-1)]), dim.tnsr[k])
-			out <- out %*% vecs[[k]]
+		for (kk in 1:nmodes) {
+			k <- modes[nmodes - kk + 1L]
+			dim(out) <- c(prod(dim.tnsr[1:(k - 1L)]), dim.tnsr[k])
+			out <- out %*% vecs[[nmodes - kk + 1L]]
 		}
 	} else {
 		perm <- c((1:tnsr.order)[-modes], modes)
 		out <- aperm(tnsr, perm)
 		dim.out <- dim.tnsr[perm]
 		for (kk in 1:nmodes) {
-			k <- modes[nmodes - kk + 1]
-			dim(out) <- c(prod(dim.out[1:(tnsr.order-kk)]), dim.tnsr[k])
-			out <- out %*% vecs[[k]]
+			k <- modes[nmodes - kk + 1L]
+			dim(out) <- c(prod(dim.out[1:(tnsr.order - kk)]), 
+				dim.tnsr[k])
+			out <- out %*% vecs[[nmodes - kk + 1L]]
 		}
 	}
-	dim(out) <- if (nmodes >= tnsr.order - 1) NULL else dim.tnsr[-modes]
+	dim(out) <- if (nmodes == tnsr.order) {
+		NULL } else if (nmodes == tnsr.order - 1L) {
+		c(length(out), 1L) } else { 
+		dim.tnsr[-modes] }
 	out
 }
 
