@@ -15,14 +15,15 @@ stopifnot(maxit >= 0)
 
 ## Quick Rank 1 initialization
 ## A.k.a. interlaced computation of rank-1 HOSVD
-dim(x) <- c(d[1], d[2] * d[3])
-svd1 <- if (test) svds(x, k = 1) else svd(x, nu = 1, nv = 1)
-mat <- matrix(svd1$v, d[2], d[3])
-svd2 <- if (test) svds(mat, k = 1) else svd(mat, nu = 1, nv = 1)
-s <- (svd1$d[1] * svd2$d[1])^(1/3)
-v[[1]] <- svd1$u * s
-v[[2]] <- svd2$u * s
-v[[3]] <- svd2$v * s
+v <- hosvd(x, 1)$u
+# dim(x) <- c(d[1], d[2] * d[3])
+# svd1 <- if (test) svds(x, k = 1) else svd(x, nu = 1, nv = 1)
+# mat <- matrix(svd1$v, d[2], d[3])
+# svd2 <- if (test) svds(mat, k = 1) else svd(mat, nu = 1, nv = 1)
+# s <- (svd1$d[1] * svd2$d[1])^(1/3)
+# v[[1]] <- svd1$u * s
+# v[[2]] <- svd2$u * s
+# v[[3]] <- svd2$v * s
 
 iters <- if (maxit > 0) {1:maxit} else NULL
 for (it in iters) {
@@ -103,7 +104,7 @@ if (d == 2) {
 	svdx <- if (RSpectra.flag) {
 		svds(x, max(r), r[1], r[2])	
 	} else svd(x, r[1], r[2])
-	return(list(u = list(svdx$u, svdx$v), 
+	return(list(factors = list(svdx$u, svdx$v), 
 		core = diag(svdx$d, r[1], r[2])))
 }
 
@@ -134,7 +135,7 @@ for (k in 1:d) {
 	if (k > 1) core <- aperm(core, perm)	
 }	
 
-list(u = u, core = core)
+list(factors = u, core = core)
 	
 }
 
