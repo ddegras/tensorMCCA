@@ -7,7 +7,7 @@
 tnsr3d.rk1 <- function(x, maxit = 100, tol = 1e-6, verbose = FALSE)
 {
 stopifnot(is.array(x) && length(dim(x)) == 3)
-d <- dim(x)
+p <- dim(x)
 v <- vector("list",3)
 test <- all(d >= 3)
 maxit <- as.integer(maxit)
@@ -74,19 +74,22 @@ v
 hosvd <- function(x, r = NULL)
 {
 stopifnot(is.numeric(x))
-p <- if (is.vector(x)) length(x) else dim(x)
-d <- length(p) 
-if (is.null(r)) {
-	r <- p 
+if (is.vector(x)) {
+	d <- 1L
+	p <- length(x) 
 } else {
-	stopifnot(all(r >= 0))
+	d <- length(p) 
+	p <- dim(x)
+}
+if (is.null(r)) {
+	r <- if (is.vector(x)) 1L else p 
+} else {
+	stopifnot(all(r > 0))
 	r <- rep_len(as.integer(r), d)
 	r <- pmin(r, p)
 }
 
 ## Trivial cases 
-if (any(r == 0L)) 		
-	return(list(u = lapply(p, numeric), core = array(0, d)))				
 if (d == 1) {
 	nrm <- sqrt(sum(x^2))
 	if (nrm == 0) {
@@ -103,7 +106,6 @@ if (d == 2) {
 	return(list(u = list(svdx$u, svdx$v), 
 		core = diag(svdx$d, r[1], r[2])))
 }
-
 
 ## Outputs
 core <- x
