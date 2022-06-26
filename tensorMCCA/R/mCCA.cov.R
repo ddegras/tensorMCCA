@@ -1,4 +1,4 @@
-MCCA.cov <- function(x, r, c = NULL, cnstr = c("block", "global"), 
+mcca.cov <- function(x, r, w = 1, cnstr = c("block", "global"), 
 	ortho = c("block.score", "global.score", "canon.tnsr"), 
 	init = list(),  maxit = 1000, tol = 1e-6, sweep = c("cyclical", 
 	"random"), verbose = FALSE)
@@ -6,7 +6,7 @@ MCCA.cov <- function(x, r, c = NULL, cnstr = c("block", "global"),
 
 ## Check arguments
 stopifnot(is.list(init))
-test <- check.arguments(x, init$value)
+test <- check.arguments(x, init$value, w)
 eps <- 1e-14
 
 ## Data dimensions
@@ -19,15 +19,12 @@ d <- sapply(p, length)
 n <- tail(dimx[[1]], 1) # numbers of instances per dataset
 
 ## Objective weights
-if (is.null(c)) {
-	c <- matrix(1/(m*(m-1)), m, m)
-	diag(c) <- 0
+w <- if (length(w) == 1) {
+	matrix(1/(m^2), m, m)
+	# c <- matrix(1/(m*(m-1)), m, m)
+	# diag(c) <- 0
 } else {
-	stopifnot(length(c) == 1 || 
-		(is.matrix(c) && all(dim(c) == length(x))))
-	stopifnot(all(c >= 0) && any(c > 0))
-	c <- if (length(c) == 1) { matrix(1/m^2, m, m) 
-		} else { (c + t(c)) / (2 * sum(c)) }
+	(w + t(w)) / (2 * sum(w)) 
 }
 
 ## Initialization parameters
@@ -65,9 +62,9 @@ cnstr <- match.arg(cnstr)
 sweep <- match.arg(sweep)
 
 ## Optimization method
-MCCA.single.cov <- if (cnstr == "block") {
-	MCCA.single.block.cov } else {
-	MCCA.single.global.cov }
+mcca.single.cov <- if (cnstr == "block") {
+	mcca.single.block.cov } else {
+	mcca.single.global.cov }
 
 ## Data centering
 for(i in 1:m) {
@@ -107,14 +104,14 @@ dim(v) <- c(m, r)
 block.score <- array(dim = c(n, m, r)) # canonical scores
 global.score <- matrix(nrow = n, ncol = r) 
 objective <- iters <- numeric(r)
-input <- list(objective = "covariance", r = r, c = c, 
+input <- list(objective = "covariance", r = r, w = w, 
 	init = init, ortho = ortho, maxit = maxit, tol = tol, 
 	sweep = sweep) 
 
 ## Trivial case: constant datasets  
 test <- sapply(x, function(a) all(abs(a) <= eps))
 test <- outer(test, test, "&")
-if (all(test | c == 0)) {
+if (all(test | w == 0)) {
 	r <- 1
 	input$r <- r
 	v <- vector("list", m)
@@ -137,17 +134,17 @@ for (l in 1:r) {
 		init$value[, l]
 	} else {
 		switch(init.method, 
-			svd = MCCA.init.svd(x, objective = "covariance", 
+			svd = mcca.init.svd(x, objective = "covariance", 
 				cnstr = cnstr, center = FALSE),
-			cca = MCCA.init.cca(x, k = init$k, c = c,
+			cca = mcca.init.cca(x, k = init$k, w = w,
 				objective = "covariance", cnstr = cnstr, 
 				search = init.search, center = FALSE),
-			random = MCCA.init.random(x, objective = "covariance"))
+			random = mcca.init.random(x, objective = "covariance"))
 	}
 	
-	## Run MCCA and store results
-	if (verbose) cat("\n\nMCCA: Component", l, "\n")
-	out <- MCCA.single.cov(x, v0, c, sweep, maxit, tol, verbose)
+	## Run mcca and store results
+	if (verbose) cat("\n\nmcca: Component", l, "\n")
+	out <- mcca.single.cov(x, v0, w, sweep, maxit, tol, verbose)
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y 
 	global.score[,l] <- rowMeans(block.score[,,l]) 

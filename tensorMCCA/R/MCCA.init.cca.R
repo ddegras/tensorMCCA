@@ -6,7 +6,7 @@
 
 
 
-MCCA.init.cca <- function(x, k = NULL, c = 1, 
+mcca.init.cca <- function(x, k = NULL, w = 1, 
 	objective = c("covariance", "correlation"), 
 	cnstr = c("block", "global"), center = TRUE, 
 	search = c("exhaustive", "approximate"))
@@ -49,13 +49,13 @@ search <- if (identical(search,
 } else { match.arg(search) }
 
 ## Objective weights
-stopifnot(length(c) == 1 || 
-	(is.matrix(c) && all(dim(c) == length(x))))
-stopifnot(all(c >= 0) && any(c > 0))
-if (length(c) == 1) {
-	c <- matrix(1/m^2, m, m)
+stopifnot(length(w) == 1 || 
+	(is.matrix(w) && all(dim(w) == length(x))))
+stopifnot(all(w >= 0) && any(w > 0))
+if (length(w) == 1) {
+	w <- matrix(1/m^2, m, m)
 } else {
-	c <- (c + t(c)) / (2 * sum(c))
+	w <- (w + t(w)) / (2 * sum(w))
 }
 
 ## Data centering
@@ -114,11 +114,11 @@ if (any(reducex)) rm(xmat, svdx)
 
 if (objective.type == "covariance" && cnstr == "global") { 
 	## Calculate rank of objective weight matrix
-	const <- all(c == c[1])
+	const <- all(w == w[1])
 	if (const) { 
 		rankc <- 1
 	 } else {
-		eigc <- eigen(c, TRUE)
+		eigc <- eigen(w, TRUE)
 		rankc <- sum(eigc$values > eps)
 		if (rankc == 1) # scaling factors
 			s <- sqrt(eigc$values[1]) * eigv$vectors[,1] 			
@@ -151,7 +151,7 @@ if (objective.type == "covariance" && cnstr == "global") {
 		for (i in 1:m)
 		for (j in 1:m)
 			xmat[block[[i]], block[[j]]] <- 
-				c[i,j] * x[block[[i]], block[[j]]]
+				w[i,j] * x[block[[i]], block[[j]]]
 		v <- if (ncol(xmat) > 2) {
 			eigs_sym(xmat, k = 1)$vectors
 		} else { eigen(xmat, TRUE)$vectors[,1] }
@@ -239,7 +239,7 @@ if (cnstr == "block") {
 # by rank-1 tensors 
 #####################################
 
-
+#@@@@@@ REWRITE THIS PART WITH tnsr.rk1 @@@@@@@#
 vcopy <- v
 v <- vector("list", m^2)
 dim(v) <- c(m, m)
@@ -318,7 +318,7 @@ if (cnstr == "block" && search == "approximate") {
 	for (i in 1:m)
 	for (j in 1:i)
 		part[i,j] <- part[j,i] <- 
-			c[i,j] * mean(score[,i,j] * score[,j,i])
+			w[i,j] * mean(score[,i,j] * score[,j,i])
 	diag(part) <- -Inf
 	assignment <- integer(m)
 	for (i in 1:m) {
@@ -336,7 +336,7 @@ if (cnstr == "block" && search == "approximate") {
 			for (j in 1:m) { # candidate assignment
 				assignment[i] <- j
 				for (k in 1:m) # go through all datasets 
-					part[j,k] <- c[i,k] * 
+					part[j,k] <- w[i,k] * 
 					mean(score[,i,j] * score[,k,assignment[k]])	
 			}
 			assignment[i] <- which.max(colSums(part))
@@ -360,7 +360,7 @@ if (cnstr == "block" && search == "exhaustive") {
 	for (i in 1:m) 
 	for (j in 1:i) 
 	{			
-		part[i, j, , ] <- (c[i,j] / n) * 
+		part[i, j, , ] <- (w[i,j] / n) * 
 			crossprod(score[,i,], score[,j,])
 		part[j, i, , ] <- t(part[i, j, , ])
 	}
@@ -407,7 +407,7 @@ if (cnstr == "block" && search == "exhaustive") {
 for (i in 1:m)
 	v[[i]] <- lapply(v[[i]], drop)
 
-return(v)
+v
 
 }
 
