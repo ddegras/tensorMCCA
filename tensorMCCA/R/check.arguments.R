@@ -1,10 +1,10 @@
-check.arguments <- function(x, v = NULL)
+check.arguments <- function(x, v = NULL, w = NULL)
 {
 ## Check argument types
-if (!is.list(x))
-	stop("Argument 'x' must be a list.")
+stopifnot(is.list(x))
 if (!(is.null(v) || is.list(v)))
 	stop("Argument 'v' must be left unspecified (NULL) or be a list.")
+stopifnot(is.null(w) || is.numeric(w))
 	
 ## Data dimensions
 if (!(is.null(v) || length(x) == length(v)))
@@ -38,7 +38,7 @@ test <- sapply(x, function(xx) any(is.na(xx) | is.nan(xx)))
 if (any(test)) 
 	stop("The data arrays in 'x' must not contain NA or NaN values.")
 
-## Check argument v if provided
+## Check optional argument 'v'
 if (length(v) > 0) {
 	dimv <- lapply(v, function(l) sapply(l, NROW))
 	if (!identical(dim.img, dimv))
@@ -56,5 +56,16 @@ if (length(v) > 0) {
 			"NA or NaN values."))
 }
 
-return(0)
+## Check optional argument 'w'
+if (!is.null(w)) {
+	test1 <- (length(w) == 1)
+	test2 <- (is.matrix(w) && all(dim(w) == length(x))))
+	if (!(test1 || test2)) 
+		stop(paste("If specified, 'w' must either be:\n* A single number, or", 
+		"\n* A square matrix with dimensions equal", 
+		"to the length of 'x' (the number of datasets)"))
+	stopifnot(all(w >= 0) && any(w > 0))	
+}
+
+NULL
 }

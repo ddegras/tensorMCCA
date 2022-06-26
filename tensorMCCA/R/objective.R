@@ -3,34 +3,53 @@
 # y_it = <v_i, X_it> 
 #####################################
 
-image.scores <- function(x, v)
+# image.scores <- function(x, v)
+# {
+# m <- length(x) # number of datasets
+# dimx <- lapply(x, dim)
+# n <- tail(dimx[[1]], 1) # number of instances per dataset
+# d <- sapply(dimx, length) - 1 # number of dimensions in images/features 
+# y <- matrix(0, n, m) # image/individual scores on canonical components
+# for (i in 1:m) { 		
+	# iprod <- x[[i]]
+	# pi <- dimx[[i]]
+	# if (d[i] == 1) { # 1D case
+		# y[,i] <- crossprod(iprod, v[[i]][[1]]) 
+	# } else if (d[i] == 2) { # 2D case
+		# dim(iprod) <- c(pi[1], pi[2] * n)
+		# iprod <- crossprod(v[[i]][[1]], iprod)
+		# dim(iprod) <- c(pi[2], n) 
+		# y[,i] <- crossprod(iprod, v[[i]][[2]]) 
+	# } else if (d[i] == 3) { # 3D case
+		# dim(iprod) <- c(pi[1], prod(pi[2:4]))
+		# iprod <- crossprod(v[[i]][[1]], iprod)
+		# dim(iprod) <- c(pi[2], pi[3] * n)
+		# iprod <- crossprod(v[[i]][[2]], iprod)
+		# dim(iprod) <- c(pi[3], n) 
+		# y[,i] <- crossprod(iprod, v[[i]][[3]])
+	# } else warning("Function not yet supported for tensors of order 4+")
+# }
+# y
+# }
+
+
+canon.scores <- function(x, v)
 {
-m <- length(x) # number of datasets
+m <- length(x)
 dimx <- lapply(x, dim)
 n <- tail(dimx[[1]], 1) # number of instances per dataset
 d <- sapply(dimx, length) - 1 # number of dimensions in images/features 
-y <- matrix(0, n, m) # image/individual scores on canonical components
-for (i in 1:m) { 		
-	iprod <- x[[i]]
-	pi <- dimx[[i]]
-	if (d[i] == 1) { # 1D case
-		y[,i] <- crossprod(iprod, v[[i]][[1]]) 
-	} else if (d[i] == 2) { # 2D case
-		dim(iprod) <- c(pi[1], pi[2] * n)
-		iprod <- crossprod(v[[i]][[1]], iprod)
-		dim(iprod) <- c(pi[2], n) 
-		y[,i] <- crossprod(iprod, v[[i]][[2]]) 
-	} else if (d[i] == 3) { # 3D case
-		dim(iprod) <- c(pi[1], prod(pi[2:4]))
-		iprod <- crossprod(v[[i]][[1]], iprod)
-		dim(iprod) <- c(pi[2], pi[3] * n)
-		iprod <- crossprod(v[[i]][[2]], iprod)
-		dim(iprod) <- c(pi[3], n) 
-		y[,i] <- crossprod(iprod, v[[i]][[3]])
-	} else warning("Function not yet supported for tensors of order 4+")
+r <- NCOL(v)
+score <- array(dim = c(n, m, r))
+for (i in 1:m) {
+	for (l in 1:r) {
+		score[, i, l] <- tnsr.vec.prod(x, v[i,l], 1:d[i])
+	}
 }
-y
+if (r == 1) dim(score) <- c(n, m)
+score	
 }
+
 
 
 
@@ -44,12 +63,19 @@ y
 # the canonical vectors should be scaled beforehand to have 
 # unit variance, e.g., with function 'scale.v'.
 
-objective.internal <- function(x, v, c = 1)
+objective.internal <- function(x, v, w)
 {
 n <- tail(dim(x[[1]]), 1) 
-y <- image.scores(x, v)
-sum(c * crossprod(y)) / n
+score <- canon.scores(x, v)
+if (r == 1) {
+	return(sum(w * crossprod(score)) / n)	
 }
+out <- numeric(r)
+for (l in 1:r) 
+	out[l] <- sum(w * crossprod(score[, , l])) / n
+sum(out)
+}
+
 
 
 
@@ -58,44 +84,25 @@ sum(c * crossprod(y)) / n
 ############################################
 
 
-objective.cor <- function(x, v, c = 1)
+objective.cor <- function(x, v, w = 1)
 {
-# Check arguments
-test <- check.arguments(x, v)
-
-## Data dimensions 
+test <- check.arguments(x, v, w)
 m <- length(x)
 n <- tail(dim(x[[1]]), 1)
-
-## Number of canonical components 
 r <- NCOL(v)
-
-## Objective weights
-if (length(c) == 1) {
-	c <- matrix(1/m^2, m, m)
+if (length(w) == 1) {
+	w <- matrix(1/m^2, m, m)
 } else { 
-	c <- (c + t(c)) / (2 * sum(c))
+	w <- (w + t(w)) / (2 * sum(w))
 }
 
-## Scale canonical vectors so components have unit variance
+score <- canon.scores(x, v)
 if (r == 1) {
-	y <- image.scores(x, v)
-	y <- y - rowMeans(y)
-	nrm <- sqrt(colMeans(y^2))
-	nrm[nrm < 1e-15] <- 1 
-	y <- scale(y, center = FALSE, scale = nrm)
-	out <- sum(c * crossprod(y)) / n
-} else {
-	out <- numeric(r)
-	for (k in 1:r) {
-		y <- image.scores(x, v[,k])
-		y <- y - rowMeans(y)
-		nrm <- sqrt(colMeans(y^2))
-		nrm[nrm < 1e-15] <- 1
-		y <- scale(y, center = FALSE, scale = nrm)
-		out[k] <- sum(c * crossprod(y)) / n
-	}
+	return(sum(w * cor(score)) / n)
 }
+out <- numeric(r)
+for (l in 1:r) 
+	out[l] <- sum(w * cor(score[, , l])) / n
 sum(out)
 }
 
@@ -107,10 +114,10 @@ sum(out)
 ############################################
 
 
-objective.cov <- function(x, v, c = 1)
+objective.cov <- function(x, v, w = 1)
 {
 ## Check arguments
-test <- check.arguments(x, v)
+test <- check.arguments(x, v, w)
 
 ## Data dimensions 
 m <- length(x)

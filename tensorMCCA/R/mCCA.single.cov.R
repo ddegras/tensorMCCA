@@ -10,8 +10,7 @@
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-MCCA.single.block.cov <- function(x, v, c, sweep, maxit, 
-	tol, verbose)
+mcca.single.block.cov <- function(x, v, w, sweep, maxit, tol, verbose)
 {
 	
 ## Data dimensions
@@ -22,13 +21,13 @@ m <- length(x)
 n <- dimx[[1]][ndimx[1]]
 
 objective <- numeric(maxit+1)
-objective[1] <- objective.internal(x, v, c)
+objective[1] <- objective.internal(x, v, w)
 if (verbose) 
 	cat("\nIteration",0,"Objective",objective[1])
 
-iprod <- matrix(0, m, n) # inner tensor products <X_it, v_i>
-ciizero <- diag(c) == 0
-s <- ifelse(ciizero, rep(1,m), diag(c)) # scaling term 
+score <- matrix(0, n, m) # inner products <X_it, v_i>
+wiizero <- diag(w) == 0
+s <- ifelse(wiizero, rep(1,m), diag(w)) # scaling term 
 if (sweep == "cyclical") idxi <- 1:m
 
 ## Check if some datasets are zero
@@ -40,7 +39,7 @@ for (i in 1:m) {
 		v[[i]] <- lapply(dimx[[i]][1:d[i]], numeric)
 }
 
-## Alternating Least Squares / Block Coordinate Ascent 
+## Block Coordinate Ascent 
 for (it in 1:maxit) {
 	if (sweep == "random") idxi <- sample(m)
 	for (i in 1:m) { 		
@@ -54,35 +53,38 @@ for (it in 1:maxit) {
 		for (j in idxj) {
 			## Calculate tensor-vector products between X_j and 
 			## all vectors v_(jk) for k != i
-			tvprod <- x[[j]] 
-			pj <- head(dimx[[j]], d[j])
-			vj <- v[[j]]
-			for (k in 1:d[j]) {
-				if (k < d[j]) {
-					dim(tvprod) <- c(pj[k], prod(pj[(k+1):d[j]], n))
-					tvprod <- crossprod(vj[[k]], tvprod)
-					dim(tvprod) <- c(pj[k+1], length(tvprod) / pj[k+1])	
-				} else {
-					iprod[j,] <- crossprod(vj[[k]], tvprod)
-				}				
-			}
+			score[, j] <- tnsr.vec.prod(x[[j]], v[[j]], 1:d[j]) 
+			# tvprod <- x[[j]] 
+			# pj <- head(dimx[[j]], d[j])
+			# vj <- v[[j]]
+			# for (k in 1:d[j]) {
+				# if (k < d[j]) {
+					# dim(tvprod) <- c(pj[k], prod(pj[(k+1):d[j]], n))
+					# tvprod <- crossprod(vj[[k]], tvprod)
+					# dim(tvprod) <- c(pj[k+1], length(tvprod) / pj[k+1])	
+				# } else {
+					# iprod[j,] <- crossprod(vj[[k]], tvprod)
+				# }				
+			# }
 		}
 		lastidx <- idxi[m]
 		
 		## Set up quadratic program 
-		a <- if (ciizero[i]) 0 else x[[i]] # quadratic component
-		w <- crossprod(iprod[-i,, drop = FALSE], c[-i, i] / s[i])
-		b <- x[[i]]	# linear component
-		dim(b) <- c(prod(dimx[[i]][-ndimx[i]]), n)
-		b <- b %*% w
-		if (d[i] > 1) dim(b) <- dimx[[i]][-ndimx[i]]
+		a <- if (wiizero[i]) 0 else x[[i]] # quadratic component
+		b <- tnsr.vec.prod(x[[i]], 
+			score[, -i] %*% (w[-i, i] / s[i])) # linear component
+		# ww <- crossprod(iprod[-i,, drop = FALSE], c[-i, i] / s[i])
+		# b <- x[[i]]	# linear component
+		# dim(b) <- c(prod(dimx[[i]][-ndimx[i]]), n)
+		# b <- b %*% ww
+		# if (d[i] > 1) dim(b) <- dimx[[i]][-ndimx[i]]
 		
 		## Update canonical vectors
 		v[[i]] <- optim.block.cov(v[[i]], a, b, maxit, tol) 	
 	}								
 	
 	## Calculate objective value (sum of correlations)
-	objective[it+1] <- objective.internal(x, v, c)	
+	objective[it+1] <- objective.internal(x, v, w)	
 	if (verbose) 
 		cat("\nIteration",it,"Objective",objective[it+1])
 	
@@ -91,7 +93,7 @@ for (it in 1:maxit) {
 	    	tol * max(1,objective[it])) break
 }
 
-list(v = v, y = image.scores(x, v), objective = objective[it+1], 
+list(v = v, y = canon.scores(x, v), objective = objective[it+1], 
 	iters = it, trace = objective[1:(it+1)])
 
 }
@@ -103,7 +105,7 @@ list(v = v, y = image.scores(x, v), objective = objective[it+1],
 
 
 ################################
-# Internal function for MCCA 
+# Internal function for mcca 
 # Maximize sum of covariances 
 # under global norm constraints 
 ################################
@@ -112,8 +114,7 @@ list(v = v, y = image.scores(x, v), objective = objective[it+1],
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-MCCA.single.global.cov <- function(x, v, c, sweep, 
-	maxit, tol, verbose)
+mcca.single.global.cov <- function(x, v, cc, sweep, maxit, tol, verbose)
 {
 	
 ## Data dimensions
@@ -124,7 +125,7 @@ m <- length(x) # number of datasets
 n <- dimx[[1]][ndimx[1]] # number of individuals/objects
 
 objective <- numeric(maxit+1)
-objective[1] <- objective.internal(x, v, c)
+objective[1] <- objective.internal(x, v, cc)
 if (verbose) 
 	cat("\nIteration",0,"Objective",objective[1])
 
@@ -143,10 +144,10 @@ eps <- 1e-14 # numerical tolerance for zero
 rmv <- logical(m)
 
 ## Test if the objective weights are equal or separable
-cequal <- all(c == c[1])
+cequal <- all(cc == cc[1])
 if (cequal) csep <- TRUE
 if (!cequal) {
-	eigc <- eigen(c, TRUE)
+	eigc <- eigen(cc, TRUE)
 	csep <- (sum(eigc$values > eps) == 1)
 	cvec <- if (csep) { 
 		eigc$vectors[,1] * sqrt(eigc$values[1]) } else NULL
@@ -228,7 +229,7 @@ for (it in 1:maxit) {
 			vg <- svdxv$u
 			if (ii == groupsize && all(group[,g] > 0)) {
 				objective[it+1] <- ifelse(cequal,
-					(svdxv$d)^2 * c[1] * m / n,
+					(svdxv$d)^2 * cc[1] * m / n,
 					(svdxv$d)^2 * m / n) }
 		} else {
 			# Case: objective weight matrix nonseparable (EVD)
@@ -239,7 +240,7 @@ for (it in 1:maxit) {
 				for (jj in 1:groupsize) {
 					j <- idxg[jj]
 					cols <- start[ij]:end[jj]
-					xv[rows, cols] <- c[i, j] * xv[rows, cols]
+					xv[rows, cols] <- cc[i, j] * xv[rows, cols]
 				}			
 			}
 			eigxv <- if (max(dim(xv)) > 2) {
@@ -247,7 +248,7 @@ for (it in 1:maxit) {
 			vg <- eigxv$vectors[,1]
 			if (ii == groupsize && all(group[,g] > 0)) {
 				objective[it+1] <- ifelse(cequal,
-					eigxv$values[1] * c[1] * m / n,
+					eigxv$values[1] * cc[1] * m / n,
 					eigxv$values[1] * m / n) }
 		}
 		## Rescale solution to meet global norm constraint 
@@ -269,7 +270,7 @@ for (it in 1:maxit) {
 	## to full calculation
 	# test <- objective.internal(x, v, c)
 	if (any(group[,ngroups] == 0))
-		objective[it+1] <- objective.internal(x, v, c)
+		objective[it+1] <- objective.internal(x, v, cc)
 	if (verbose) 
 		cat("\nIteration",it,"Objective",objective[it+1])
 	# browser()
@@ -279,7 +280,7 @@ for (it in 1:maxit) {
 	    	tol * max(1,objective[it])) break
 }
 
-list(v = v, y = image.scores(x, v), objective = objective[it+1], 
+list(v = v, y = canon.scores(x, v), objective = objective[it+1], 
 	iters = it, trace = objective[1:(it+1)])
 
 }

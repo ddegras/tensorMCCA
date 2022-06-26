@@ -5,6 +5,28 @@
 
 
 
+####################################
+# Wrapper function for optimization
+####################################
+
+
+
+## Inputs
+# v:	initial solution for canonical tensor
+# a:	entire data tensor for quadratic term
+# b:	reduced data tensor (weighted average over individuals) for linear term
+
+optim.block.cov <- function(v, a, b, maxit = 1000, tol = 1e-6)
+{
+if (length(v) == 1) { return(optim1D.cov(a, b)) }
+if (length(v) == 2) { return(optim2D.cov(v, a, b, maxit, tol)) }
+if (length(v) == 3) { return(optim3D.cov(v, a, b, maxit, tol)) }
+return(optim.gen.cov(v, a, b, maxit, tol))
+}
+
+
+
+
 #####################################
 # Maximize { v'AA'v + 2 b'v } 
 # subject to v'v = 1 
@@ -21,7 +43,10 @@ dim(b) <- NULL
 ## Trivial case: A = 0
 if (all(a == 0)) {
 	nrm <- sqrt(sum(b^2))
-	if (nrm > eps) return(list(b/nrm)) else return(list(numeric(p)))
+	if (nrm > eps) {
+		return(list(b/nrm))
+	} 
+	return(list(numeric(p)))
 }
 
 ## SVD of A
@@ -31,11 +56,13 @@ delta <- (svdA$d)^2
 if (n < p) delta[(n+1):p] <- 0
 
 ## Trivial case: no linear term in objective
-if (all(abs(b) <= eps)) return(list(P[,1]))
-
+if (all(abs(b) <= eps)) {
+	return(list(P[,1]))
+}
 ## Trivial case: AA' proportional to identity matrix
-if (abs(delta[p]-delta[1]) <= eps) return(list(b/sqrt(sum(b^2))))
-
+if (abs(delta[p]-delta[1]) <= eps) {
+	return(list(b/sqrt(sum(b^2))))
+}
 ## Change of coordinates
 b <- as.vector(crossprod(P, b))
 bzero <- (abs(b) <= eps)
@@ -261,28 +288,77 @@ return(v)
 }
 
 
+######################################################
+# Maximize (1/n) sum_{t=1:n} < v,a(t) >^2 + 2 < v,b > 
+# subject to < v,v > = 1  with a(t), b, v general order 
+# tensors (v of rank 1)
+######################################################
 
 
-####################################
-# Wrapper function for optimization
-####################################
+## Inputs: 
+# v:	list of d vectors
+# a:	array with (d+1) dimensions 
+# b:	array with d dimensions
 
-
-
-## Inputs
-# v:	initial solution for canonical tensor
-# a:	entire data tensor for quadratic term
-# b:	reduced data tensor (weighted average over individuals) for linear term
-
-optim.block.cov <- function(v, a, b, maxit = 1000, tol = 1e-6)
+optim.gen.cov <- function(v, a, b, maxit = 1000, tol = 1e-6)
 {
-if (length(v) == 1) {
-	optim1D.cov(a, b)
-} else if (length(v) == 2) {
-	optim2D.cov(v, a, b, maxit, tol)
-} else {
-	optim3D.cov(v, a, b, maxit, tol)
+	
+## Data dimensions
+dima <- dim(a)
+d <- length(dima) - 1L
+p <- dima[1:d]
+n <- dima[d + 1L]
+
+## Trivial case
+if (all(a == 0))
+	return(tnsr.rk1(b, maxit, tol))
+
+## MAIN LOOP
+objective <- numeric(maxit)
+
+for (it in 1:maxit) {
+
+	## Update canonical vector in dimension 1 
+	aa <- matrix(0, p[1], n)
+	bb <- numeric(p[1])
+	for (i in 1:p[1]) { 
+		bb[i] <- crossprod(v[[2]], b[i,,] %*% v[[3]])
+		for (t in 1:n) 
+			aa[i,t] <- crossprod(v[[2]], a[i,,,t] %*% v[[3]])
+	}
+	v[[1]] <- unlist(optim1D.cov(aa, bb))
+	
+	## Update canonical vector in dimension 2
+	aa <- matrix(0, p[2], n)
+	bb <- numeric(p[2])
+	for (j in 1:p[2]) { 
+		bb[j] <- crossprod(v[[1]], b[,j,] %*% v[[3]])
+		for (t in 1:n) 
+			aa[j,t] <- crossprod(v[[1]], a[,j,,t] %*% v[[3]])
+	}
+	v[[2]] <- unlist(optim1D.cov(aa, bb))
+
+	## Update canonical vector in dimension 3
+	aa <- matrix(0, p[3], n)
+	bb <- numeric(p[3])
+	for (k in 1:p[3]) { 
+		bb[k] <- crossprod(v[[1]], b[,,k] %*% v[[2]])
+		for (t in 1:n) 
+			aa[k,t] <- crossprod(v[[1]], a[,,k,t] %*% v[[2]])
+	}
+	v[[3]] <- unlist(optim1D.cov(aa, bb))
+
+	## Calculate objective
+	objective[it] <- mean(crossprod(v[[3]], aa)^2) + 
+		2 * sum(bb * v[[3]])
+	
+	## Check convergence 
+	if (it > 1 && abs(objective[it]-objective[it-1]) <= 
+	    	tol * max(1,objective[it-1])) break
 }
+
+return(v)
 }
+
 
 

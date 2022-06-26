@@ -1,29 +1,29 @@
 
-MCCA.cor <- function(x, r, c = 1, ortho = c("block.score",
+mcca.cor <- function(x, r, w = 1, ortho = c("block.score",
 	"global.score", "canon.tnsr"), init = list(), maxit = 1000, 
 	tol = 1e-6, sweep = c("cyclical", "random"), verbose = FALSE)
 {
 
 ## Check arguments
 stopifnot(is.list(init))
-test <- check.arguments(x, init$value)
+test <- check.arguments(x, init$value, w)
 eps <- 1e-14
 
 ## Data dimensions
 m <- length(x) # number of datasets
-dimx <- lapply(x, dim) # tensor dimensions for each dataset
+dimx <- lapply(x, dim) # dimensions of each dataset
 p <- lapply(dimx, function(x) x[-length(x)]) 
 # dimensions of each dataset, last mode (instances) omitted
 d <- sapply(p, length) 
 # numbers of image dimensions for each dataset
-n <- tail(dimx[[1]], 1) # numbers of instances per dataset
+n <- tail(dimx[[1]], 1) # numbers of instances in each dataset
 
 ## Objective weights
-stopifnot(length(c) == 1 || 
-	(is.matrix(c) && all(dim(c) == length(x))))
-stopifnot(all(c >= 0) && any(c > 0))
-c <- if (length(c) == 1) { 	matrix(1/m^2, m, m) 
-	} else { (c + t(c)) / (2 * sum(c)) }
+w <- if (length(w) == 1) { 
+	matrix(1/m^2, m, m) 
+} else { 
+	(w + t(w)) / (2 * sum(w))
+}
 
 ## Initialization parameters
 if (is.null(init$value)) {	
@@ -95,7 +95,7 @@ v <- vector("list", m * r) # canonical vectors
 dim(v) <- c(m, r)
 block.score <- array(0, c(n, m, r)) 
 global.score <- matrix(0, n, r) 
-input <- list(objective = "correlation", r = r, c = c, 
+input <- list(objective = "correlation", r = r, w = w, 
 	init = init, ortho = ortho, maxit = maxit, tol = tol, 
 	sweep = sweep) 
 objective <- iters <- numeric(r)
@@ -103,7 +103,7 @@ objective <- iters <- numeric(r)
 ## Trivial case: constant datasets  
 test <- sapply(x, function(a) all(abs(a) <= eps))
 test <- outer(test, test, "&")
-if (all(test | c == 0)) {
+if (all(test | w == 0)) {
 	r <- 1
 	input$r <- r
 	v <- vector("list", m)
@@ -125,17 +125,17 @@ for (l in 1:r) {
 		init$value[, l]	
 	} else {
 		switch(init.method, 
-			svd = MCCA.init.svd(x, objective = "correlation", 
+			svd = mcca.init.svd(x, objective = "correlation", 
 				cnstr = "block", center = FALSE),
-			cca = MCCA.init.cca(x, k = init$k, c = c, 
+			cca = mcca.init.cca(x, k = init$k, c = c, 
 				objective = "correlation", cnstr = "block",
 				search = init.search, center = FALSE),
-			random = MCCA.init.random(x, objective = "correlation"))
+			random = mcca.init.random(x, objective = "correlation"))
 	}
 
-	## Run MCCA and store results
-	if (verbose) cat("\n\nMCCA: Component",l,"\n")
-	out <- MCCA.single.cor(x, v0, c, sweep, maxit, tol, verbose)
+	## Run mcca and store results
+	if (verbose) cat("\n\nmcca: Component",l,"\n")
+	out <- mcca.single.cor(x, v0, w, sweep, maxit, tol, verbose)
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y # canonical scores
 	global.score[,l] <- rowMeans(block.score[,,l])	
