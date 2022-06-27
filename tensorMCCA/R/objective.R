@@ -80,3 +80,46 @@ for (l in 1:r)
 sum(out)
 }
 
+
+
+
+###########################################
+# Function to calculate objective gradient
+###########################################
+
+
+objective.gradient <- function(x, v, w)
+{
+dimx <- lapply(x, dim)
+d <- sapply(dimx, length) - 1L
+m <- length(x)
+n <- tail(dimx[[1]], 1)
+
+grad <- vector("list", m)
+tvprod <- vector("list", m)
+score <- matrix(0, n, m)
+for (i in 1:m) {
+	if (d[i] == 1L) {
+		score[, i] <- crossprod(x[[i]], v[[i]][[1]])
+		next
+	}
+	for (k in 1:d[i]) 
+		tvprod[[i]][[k]] <- tnsr.vec.prod(x[[i]], 
+			v[[i]][-k], (1:d[i])[-k])	
+	score[, i] <- crossprod(tvprod[[i]][[k]], 
+		v[[i]][[k]])
+}
+
+for (i in 1:m) {
+	yy <- score %*% ((2/n) * w[, i])
+	grad[[i]] <- if (d[i] == 1L) {
+		list(x[[i]] %*% yy)
+	} else {
+		lapply(tvprod[[i]], 	"%*%", y = yy)
+	}
+}
+grad
+}
+
+
+

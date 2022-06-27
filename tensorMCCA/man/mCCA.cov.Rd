@@ -7,20 +7,21 @@
 
 \usage{
 mcca.cov(x, r, w = 1, cnstr = c("block", "global"), ortho = c("block.score", "global.score", "canon.tnsr"), 
-	init = list(),  maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), verbose = FALSE)
+	init = c("cca", "svd", "random"), maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), 
+	control = list(), verbose = FALSE)
 }
 
 \arguments{
-\item{x}{list of data arrays. All arrays must have the same number of dimensions in their last mode (= common instances, cases, or subjects).}
-\item{r}{number of canonical components to calculate.}
-\item{w}{matrix of weights in objective function.}
+\item{x}{list of data arrays. All arrays must have the same size in their last dimension (= common instances, cases, or subjects).}
+\item{r}{number of sets of canonical components to calculate.}
+\item{w}{matrix of weights in objective function. Can be specified as a single number or as a square matrix with numbers of rows and columns equal to the length of \code{x}.}
 \item{cnstr}{character: should the norm constraints on canonical tensors apply to each individual dataset (\code{block}) or on average across datasets (\code{global})?}
-\item{ortho}{character: Orthogonality constraints for higher order canonical components.}
-\item{init}{optional list of initialization parameters.}
-\item{maxit}{integer: maximum number of algorithm iterations.}
+\item{ortho}{character: type of orthogonality constraints for higher order canonical components.}
+\item{init}{character (initialization method) or list of initial values for the canonical tensors.}
+\item{maxit}{maximum number of algorithm iterations.}
 \item{tol}{numerical tolerance for algorithm convergence.}
-\item{sweep}{sweeping method for optimization blocks.}
-\item{verbose}{logical: display algorithm progress?}
+\item{sweep}{character: sweeping method in block optimization.}
+\item{verbose}{display algorithm progress?}
 }
 
 \details{

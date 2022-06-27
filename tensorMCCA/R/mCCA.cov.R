@@ -1,75 +1,49 @@
 mcca.cov <- function(x, r, w = 1, cnstr = c("block", "global"), 
 	ortho = c("block.score", "global.score", "canon.tnsr"), 
-	init = list(),  maxit = 1000, tol = 1e-6, sweep = c("cyclical", 
-	"random"), verbose = FALSE)
+	init = c("cca", "svd", "random"), maxit = 1000, tol = 1e-6, 
+	sweep = c("cyclical", "random"), control = list(), 
+	verbose = FALSE)
 {
 
 ## Check arguments
-stopifnot(is.list(init))
-test <- check.arguments(x, init$value, w)
+test <- if (is.list(init)) { 
+	check.arguments(x, init, w)
+} else check.arguments(x, w = w)
 eps <- 1e-14
 
 ## Data dimensions
-m <- length(x) # number of datasets
-dimx <- lapply(x, dim) # dimensions of each dataset
-p <- lapply(dimx, function(x) x[-length(x)]) 
-# dimensions of each dataset, last mode (instances) omitted
-d <- sapply(p, length) 
-# numbers of image dimensions for each dataset
-n <- tail(dimx[[1]], 1) # numbers of instances per dataset
+m <- length(x) 
+dimx <- lapply(x, dim) 
+d <- sapply(dimx, length) - 1L 
+p <- mapply(head, dimx, d, SIMPLIFY = FALSE) 
+n <- tail(dimx[[1]], 1) 
 
 ## Objective weights
 w <- if (length(w) == 1) {
-	matrix(1/(m^2), m, m)
-	# c <- matrix(1/(m*(m-1)), m, m)
-	# diag(c) <- 0
+	matrix(1 / (m^2), m, m)
 } else {
 	(w + t(w)) / (2 * sum(w)) 
-}
-
-## Initialization parameters
-if (is.null(init$value)) {	
-	if (is.null(init$method)) { 
-		init.method <- "cca" 
-	} else {
-		opts <- c("cca", "svd", "random")
-		idx <- na.omit(pmatch(init$method, opts))
-		if (length(idx) > 0) {
-			init.method <- opts[idx[1]]
-		} else stop(paste("The possible values of the field",
-			"'method' in argument 'init' are 'cca', 'svd',",
-			"and 'random'."))	
-	}
-}
-if (is.null(init$value) && init.method == "cca") {
-	tab <- c("exhaustive", "approximate")
-	if (is.null(init$search)) { 
-		init.search <- tab
-	} else {
-		idx <- na.omit(pmatch(init$search, tab)) 
-		if (length(idx) > 0) {
-			init.search <- tab[idx[1]]
-		} else stop(
-			paste("The possible values of the field",
-			"'search' in argument 'init' are 'exhaustive'",
-			"and 'approximate'."))
-	}
 }
 
 ## Match other arguments
 ortho <- match.arg(ortho)
 cnstr <- match.arg(cnstr)
 sweep <- match.arg(sweep)
+if (is.character(init)) init <- match.arg(init)
 
 ## Optimization method
 mcca.single.cov <- if (cnstr == "block") {
 	mcca.single.block.cov } else {
 	mcca.single.global.cov }
+mcca.init <- if (is.character(init)) {
+	switch(init, cca = mcca.init.cca, 
+		svd = mcca.init.svd, random = mcca.init.random)
+} else NULL
 
 ## Data centering
 for(i in 1:m) {
-    mu <- rowMeans(x[[i]], dims = d[i])
-    x[[i]] <- x[[i]] - as.vector(mu)
+    xbar <- rowMeans(x[[i]], dims = d[i])
+    x[[i]] <- x[[i]] - as.vector(xbar)
 }
 		
 ## Adjust number of canonical components as needed
@@ -80,8 +54,32 @@ r <- switch(ortho,
 	global.score = min(n-1, sum(pp), r0),
 	canon.tnsr = min(max(pp), r0))
 if (verbose && r != r0)
-	warning(paste("Argument 'r' set to", r,
+	warning(paste("\nArgument 'r' set to", r,
 		"to satisfy orthogonality constraints"))
+
+## Initialization parameters
+test <- (is.list(control) && !is.null(control$init))
+if (is.character(init) && init == "cca") {
+	init.args <- list(r = 1, k = NULL, w = w, 
+		objective = "cov", cnstr = "block", center = FALSE, 
+		search = ifelse(m <= 5, "exhaustive", "approximate"))
+	if (test) {
+		names. <- intersect(names(control), 
+			c("k", "cnstr", "search"))
+		init.args[names.] <- control[names.]
+	}
+}
+if (is.character(init) && init == "svd") {
+	init.args <- list(r = 1, objective = "cov", 
+		cnstr = "block", center = FALSE)
+	if (test) {
+		names. <- intersect(names(control), c("cnstr"))
+		init.args[names.] <- control[names.]
+	}
+}
+if (is.character(init) && init == "random") 
+	init.args <- list(r = 1, objective = "cov")
+
 				
 ## Prepare optimization if orthogonality 
 ## constraints are on canonical tensors
@@ -127,20 +125,16 @@ if (all(test | w == 0)) {
 vprev <- NULL
 
 for (l in 1:r) {	
+	
 	## Initialize canonical vectors
-	v0 <- if (!is.null(init$value) && NCOL(init$value) == 1) {
-		init$value 
-	} else if (!is.null(init$value) && NCOL(init$value) >= l) {
-		init$value[, l]
+	if (is.character(init)) {
+		init.args$x <- x
+		v0 <- do.call(mcca.init, init.args)
+	} else if (is.list(init) && is.vector(init)) {
+		v0 <- init
 	} else {
-		switch(init.method, 
-			svd = mcca.init.svd(x, objective = "covariance", 
-				cnstr = cnstr, center = FALSE),
-			cca = mcca.init.cca(x, k = init$k, w = w,
-				objective = "covariance", cnstr = cnstr, 
-				search = init.search, center = FALSE),
-			random = mcca.init.random(x, objective = "covariance"))
-	}
+		v0 <- init[, min(l, NCOL(init))]
+	} 
 	
 	## Run mcca and store results
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")

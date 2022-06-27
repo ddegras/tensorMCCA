@@ -10,7 +10,7 @@
 #############################
 
 
-mcca.init.svd <- function(x, objective = c("covariance", "correlation"), 
+mcca.init.svd <- function(x, objective = c("cov", "cor"), 
 	cnstr = c("block", "global"), center = TRUE)
 {
 ## Check argument x if required
@@ -67,7 +67,7 @@ for (i in 1:m) {
 }
 
 ## Scale initial canonical vectors as required	
-if (objective == "correlation") {
+if (objective == "cor") {
 	y <- canon.scores(x, v)
 	nrm <- sqrt(colMeans(y^2))
 	nz <- which(nrm > eps)
