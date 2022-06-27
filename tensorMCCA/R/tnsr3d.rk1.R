@@ -1,9 +1,16 @@
-tnsr3d.rk1 <- function(x, maxit = 100, tol = 1e-6)
+tnsr3d.rk1 <- function(x, scale = FALSE, maxit = 100, tol = 1e-6)
 {
 stopifnot(is.array(x) && length(dim(x)) == 3)
 p <- dim(x)
-if (all(x == 0)) return(lapply(p, numeric))
-v <- vector("list",3)
+if (all(x == 0)) {
+	if (scale) {
+		return(lapply(p, 
+			function(xx) rep.int(1/sqrt(length(xx)), length(xx))))
+	} else {	
+		return(lapply(p, numeric))
+	}
+}
+v <- vector("list", 3)
 maxit <- as.integer(maxit)
 stopifnot(maxit >= 0)
 
@@ -21,17 +28,15 @@ svdx <- if (all(p[2:3] > 2)) {
 } else {
 	svd(matrix(svdx$v, p[2], p[3]), nu = 1, nv = 1)
 }
-s2 <- svdx$d
-nrmv <- s1 * s2
-if (maxit == 0) {
-	s <- nrmv^(1/3)
-	v[[1]] <- v[[1]] * s
-	v[[2]] <- svdx$u * s
-	v[[3]] <- svdx$v * s
-	return(v)
-}
 v[[2]] <- svdx$u
-v[[3]] <- svdx$v * nrmv
+v[[3]] <- svdx$v
+s2 <- svdx$d
+nrmv <- if (scale) 1 else s1 * s2
+if (maxit == 0) {
+	if (scale) { return(v) } 
+	return(lapply(v, "*", nrmv^(1/3)))
+}
+if (scale) v[[3]] <- v[[3]] * nrmv
 kronv <- Reduce(kronecker, v)
 
 for (it in 1:maxit) {
@@ -48,7 +53,11 @@ for (it in 1:maxit) {
 	xv <- crossprod(x, v[[1]])
 	dim(xv) <- p[2:3]
 	v[[3]] <- crossprod(xv, v[[2]]) 
-	nrmv <- sqrt(sum(v[[3]]^2))			
+	nrmv <- sqrt(sum(v[[3]]^2))	
+	if (scale) {
+		v[[3]] <- v[[3]] / nrmv	
+		nrmv <- 1
+	}		
 	kronv <- Reduce(kronecker, v)
 	e <- sqrt(sum((kronv - kronv.old)^2)) 
 	if (e <= tol * max(nrmv, nrmv.old, 1)) break

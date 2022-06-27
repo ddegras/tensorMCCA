@@ -10,7 +10,7 @@
 #############################
 
 
-MCCA.init.svd <- function(x, objective = c("covariance", "correlation"), 
+mcca.init.svd <- function(x, objective = c("covariance", "correlation"), 
 	cnstr = c("block", "global"), center = TRUE)
 {
 ## Check argument x if required
@@ -68,13 +68,14 @@ for (i in 1:m) {
 
 ## Scale initial canonical vectors as required	
 if (objective == "correlation") {
-	scores <- image.scores(x, v)
-	s <- sqrt(colMeans(scores^2))
-	for (i in 1:m) 
-	for (k in 1:d[i]) 
-		v[[i]][[k]] <- if (s[i] <= eps) {
-			numeric(p[[i]][k]) } else {
-				v[[i]][[k]] / s[i]^(1/d[i]) }
+	y <- canon.scores(x, v)
+	nrm <- sqrt(colMeans(y^2))
+	nz <- which(nrm > eps)
+	for (i in 1:m) {
+		v[[i]] <- if (nz[i]) {
+			lapply(v[[i]], "/", y = nrm[i]^(1/d[i]))
+		} else { lapply(p[[i]], numeric) }
+	}
 }
 
 v

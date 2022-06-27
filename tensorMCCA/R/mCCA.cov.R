@@ -143,7 +143,7 @@ for (l in 1:r) {
 	}
 	
 	## Run mcca and store results
-	if (verbose) cat("\n\nmcca: Component", l, "\n")
+	if (verbose) cat("\n\nMCCA: Component", l, "\n")
 	out <- mcca.single.cov(x, v0, w, sweep, maxit, tol, verbose)
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y 
@@ -176,8 +176,8 @@ for (l in 1:r) {
 } 
 
 ## Re-order results according to objective values if needed
-objective <- objective[objective > eps]
 o <- order(objective, decreasing = TRUE)
+o <- o[objective[o] > eps]
 if (!identical(o, 1:r)) {
 	v <- v[,o]
 	block.score <- block.score[,,o]
@@ -186,6 +186,10 @@ if (!identical(o, 1:r)) {
 	iters <- iters[o]
 }
 
+if (r == 1) {
+	dim(block.score) <- c(n, m)
+	dim(global.score) <- NULL
+} 
 
 list(v = v, block.score = block.score, global.score = global.score,
 	objective = objective, iters = iters, input = input)

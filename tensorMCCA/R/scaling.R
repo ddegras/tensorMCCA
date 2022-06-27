@@ -26,13 +26,10 @@ for (i in 1:m) {
 ## rescale each canonical vector by its norm
 if (cnstr == "block") {
 	for (i in 1:m) {
-		for (k in 1:d[i]) {
-			v[[i]][[k]] <- if (nrmt[i] < eps) { 
-				numeric(length(v[[i]][[k]])) 
-			} else { v[[i]][[k]] / nrmv[[i]][k] }
-		}
+		v[[i]] <- if (nrmt[i] < eps) { lapply(p[[i]], numeric) 
+		} else { mapply("/", v[[i]], nrmv[[i]], SIMPLIFY = FALSE) }
 	}
-} 
+}
 
 ## If tensor norm constraints at the global level,
 ## rescale each canonical tensor by the same factor 
@@ -40,14 +37,11 @@ if (cnstr == "block") {
 if (cnstr == "global") {
 	s <- sqrt(mean(nrmt^2)) # grand scaling factor
 	for (i in 1:m) {
-		for (k in 1:d[i]) {
-			sik <- (nrmt[i] / s)^(1/d[i]) / nrmv[[i]][k]
-			v[[i]][[k]] <- if (nrmt[i] < eps) { 
-				numeric(length(v[[i]][[k]])) 
-			} else { v[[i]][[k]] * sik } 
-		}
+		si <- (nrmt[i] / s)^(1/d[i]) / nrmv[[i]]
+		v[[i]] <- if (nrmt[i] < eps) { lapply(p[[i]], numeric) 
+		} else { mapply("*", v[[i]], si, SIMPLIFY = FALSE) }
 	}
-} 
+}
 
 v
 }

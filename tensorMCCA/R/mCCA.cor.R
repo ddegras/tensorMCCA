@@ -127,7 +127,7 @@ for (l in 1:r) {
 		switch(init.method, 
 			svd = mcca.init.svd(x, objective = "correlation", 
 				cnstr = "block", center = FALSE),
-			cca = mcca.init.cca(x, k = init$k, c = c, 
+			cca = mcca.init.cca(x, k = init$k, w = w, 
 				objective = "correlation", cnstr = "block",
 				search = init.search, center = FALSE),
 			random = mcca.init.random(x, objective = "correlation"))

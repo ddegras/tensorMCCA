@@ -18,7 +18,7 @@ mcca.init.cca <- function(x, k = NULL, w = 1,
 
 
 ## Check argument x
-test <- check.arguments(x)
+test <- check.arguments(x, w = w)
 eps <- 1e-14
 
 ## Data dimensions
@@ -116,12 +116,12 @@ if (objective.type == "covariance" && cnstr == "global") {
 	## Calculate rank of objective weight matrix
 	const <- all(w == w[1])
 	if (const) { 
-		rankc <- 1
+		rankw <- 1
 	 } else {
-		eigc <- eigen(w, TRUE)
-		rankc <- sum(eigc$values > eps)
-		if (rankc == 1) # scaling factors
-			s <- sqrt(eigc$values[1]) * eigv$vectors[,1] 			
+		eigw <- eigen(w, TRUE)
+		rankw <- sum(eigw$values > eps)
+		if (rankw == 1) # scaling factors
+			s <- sqrt(eigw$values[1]) * eigv$vectors[,1] 			
 	}	
 	## Concatenate data
 	len <- pp
@@ -129,7 +129,7 @@ if (objective.type == "covariance" && cnstr == "global") {
 	cumlen <- c(0, cumsum(len))
 	block <- lapply(1:m, function(i) (cumlen[i]+1):cumlen[i+1])
 	xmat <- matrix(nrow = sum(pp), ncol = n)
-	noscale <- (const || rankc > 1)
+	noscale <- (const || rankw > 1)
 	for (i in 1:m) {
 		xmat[block[[i]],] <- if (reducex[i] && noscale) { 
 			xred[[i]] 
@@ -142,7 +142,7 @@ if (objective.type == "covariance" && cnstr == "global") {
 	## Perform SVD of concatenated data if objective weight 
 	## matrix has rank 1 or EVD of associated covariance 
 	## matrix otherwise
-	if (rankc == 1) {
+	if (rankw == 1) {
 		v <- if (max(dim(xmat)) > 2) {
 			svds(x, k = 1)$u
 		} else { svd(x, nu = 1, nv = 0)$u }
@@ -203,7 +203,7 @@ if (cnstr == "block") {
 			} else {
 				matrix(x[[j]], pp[j], n)
 			}
-			RSpectra.flag <- (max(nrow(xi), nrow(xj)) > 2)
+			RSpectra.flag <- (min(nrow(xi), nrow(xj)) > 2)
 			svdij <- if (i == j && RSpectra.flag) {
 				svds(xi, k = 1, nv = 0)	
 			} else if (i == j) {
@@ -239,23 +239,26 @@ if (cnstr == "block") {
 # by rank-1 tensors 
 #####################################
 
-#@@@@@@ REWRITE THIS PART WITH tnsr.rk1 @@@@@@@#
 vcopy <- v
 v <- vector("list", m^2)
 dim(v) <- c(m, m)
-for (i in 1:m)
-for (j in 1:m)
-{
-	if (d[i] == 1) {
-		vij <- vcopy[[i]][,j]
-		v[[i,j]] <- list(vij / sqrt(sum(vij^2)))
-	} else if (d[i] == 2) {
-		vij <- matrix(vcopy[[i]][,j], p[[i]][1], p[[i]][2])
-		v[[i,j]] <- hosvd(vij, 1)$u
-	} else if (d[i] == 3) {
-		vij <- array(vcopy[[i]][,j], p[[i]])
-		v[i,j] <- scale.v(list(tnsr3d.rk1(vij)))
-	} 	
+for (i in 1:m) {
+	pi <- p[[i]]
+	test <- all(pi > 2)
+	for (j in 1:m) {
+		if (d[i] == 1) {
+			vij <- vcopy[[i]][,j]
+			v[[i,j]] <- list(vij / sqrt(sum(vij^2)))
+		} else if (d[i] == 2) {
+			vij <- matrix(vcopy[[i]][,j], pi[1], pi[2])
+			svdij <- if (test) { svds(vij, 1) 
+				} else svd(vij, 1, 1)
+			v[[i,j]] <- list(svdij$u, svdij$v)
+		} else {
+			vij <- array(vcopy[[i]][,j], pi)
+			v[[i,j]] <- tnsr.rk1(vij, scale = TRUE)
+		}
+	}
 }
 rm(vcopy)
 
@@ -269,16 +272,17 @@ rm(vcopy)
 ####################################
 
 
-score <- array(dim = c(n, m, m))
-for (i in 1:m)
-for (j in 1:m)
-{
-	vij <- if (d[i] == 1) { unlist(v[[i,j]]) 
-		} else { Reduce(kronecker, rev(v[[i,j]])) }
-	dim(vij) <- NULL
-	score[,i,j] <- colSums(vij * x[[i]], dims = d[i])
-	if (center) score[,i,j] <- score[,i,j] - sum(vij * xbar[[i]])
-}
+score <- canon.scores(x, v)
+# score <- array(dim = c(n, m, m))
+# for (i in 1:m)
+# for (j in 1:m)
+# {
+	# vij <- if (d[i] == 1) { unlist(v[[i,j]]) 
+		# } else { Reduce(kronecker, rev(v[[i,j]])) }
+	# dim(vij) <- NULL
+	# score[,i,j] <- colSums(vij * x[[i]], dims = d[i])
+	# if (center) score[,i,j] <- score[,i,j] - sum(vij * xbar[[i]])
+# }
 
 
 

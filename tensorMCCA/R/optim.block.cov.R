@@ -1,4 +1,4 @@
-###########################################
+1###########################################
 # FUNCTIONS TO MAXIMIZE SUM OF COVARIANCES 
 # IN MCCA UNDER BLOCK CONSTRAINTS
 ###########################################
@@ -60,12 +60,15 @@ if (all(abs(b) <= eps)) {
 	return(list(P[,1]))
 }
 ## Trivial case: AA' proportional to identity matrix
-if (abs(delta[p]-delta[1]) <= eps) {
-	return(list(b/sqrt(sum(b^2))))
+if (abs(delta[p] - delta[1]) <= eps) {
+	return(list(b / sqrt(sum(b^2))))
 }
-## Change of coordinates
+## Change of variables
 b <- as.vector(crossprod(P, b))
 bzero <- (abs(b) <= eps)
+if (all(bzero)) {
+	return(list(P[,1]))
+}
 b[bzero] <- 0
 
 objective.best <- -Inf
@@ -116,6 +119,9 @@ while(i <= p) {
 }
 bplus <- rev(bplus)
 dplus <- rev(dplus)
+nz <- (bplus > eps)
+bplus <- bplus[nz]
+dplus <- dplus[nz]
 pplus <- length(bplus)
 
 ## Solve secular equation g(lambda) = 0 
@@ -126,34 +132,42 @@ if (length(lambda) == 1)
 	return(sum((bplus/(lambda-dplus))^2) - 1)
 colSums((bplus / outer(-dplus, lambda, "+"))^2) - 1
 }
-lambda <- rep(NA, pplus + 1)
+lambda <- lambda.opt <- numeric()
 h <- 1.01 * sqrt(sum(bplus^2))
-lb <- c(dplus[1] - h, dplus + 1e-3)
-ub <- c(dplus - 1e-3, dplus[pplus] + h)
+lb <- c(dplus[1] - h, dplus + 1e-5)
+ub <- c(dplus - 1e-5, dplus[pplus] + h)
 grid.size <- 21
 for (i in 1:(pplus + 1)) {
 	## Grid search 
 	lam <- seq(lb[i], ub[i], length.out = grid.size)
 	glam <- g(lam)
-	sign.change <- (glam[-grid.size] * glam[-1] <= 0)
+	sgn.glam <- sign(glam)
+	if (any(sgn.glam == 0)) {
+		lambda <- c(lambda, lam[sgn.lam == 0])
+		next }
+	sign.change <- (sgn.glam[-grid.size] != sgn.glam[-1])
 	## Refined search
 	if (any(sign.change)) {
 		idx <- which(sign.change)[1]
-		lambda[i] <- uniroot(g, interval = c(lam[idx], lam[idx+1]),
-			tol = 1e-6)$root
-	} 
+		root <- uniroot(g, interval = c(lam[idx], lam[idx+1]),
+			tol = 1e-7)$root
+		lambda <- c(lambda, root) 			
+	} else {
+		lambda.opt <- c(lambda.opt, lam[which.min(abs(glam))])
+	}
 }
-lambda <- lambda[!is.na(lambda)]
+if (length(lambda) == 0) { lambda <- lambda.opt }
+
 
 ## Find corresponding solutions z and objective values
 z <- b / outer(-delta, lambda, "+")
+nrmz <- sqrt(colSums(z^2))
+z <- sweep(z, 2, nrmz, "/")
 objective <- colSums(delta * z^2) + 2 * colSums(b * z)
 idx <- which.max(objective)
-if (objective[idx] > objective.best) 
-	v <- P %*% z[,idx]
+if (objective[idx] > objective.best) { v <- P %*% z[,idx] }
 dim(v) <- NULL
 v <- v / sqrt(sum(v^2))
-
 list(v)
 }
 

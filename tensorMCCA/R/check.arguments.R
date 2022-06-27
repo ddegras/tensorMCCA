@@ -59,7 +59,7 @@ if (length(v) > 0) {
 ## Check optional argument 'w'
 if (!is.null(w)) {
 	test1 <- (length(w) == 1)
-	test2 <- (is.matrix(w) && all(dim(w) == length(x))))
+	test2 <- (is.matrix(w) && all(dim(w) == length(x)))
 	if (!(test1 || test2)) 
 		stop(paste("If specified, 'w' must either be:\n* A single number, or", 
 		"\n* A square matrix with dimensions equal", 

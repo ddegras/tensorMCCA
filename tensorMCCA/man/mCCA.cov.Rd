@@ -1,42 +1,42 @@
-\name{MCCA.cov}
-\alias{MCCA.cov}
+\name{mcca.cov}
+\alias{mcca.cov}
 
 \title{Multiple CCA: Maximize Sum of Covariances}
 
 \description{Perform multiple CCA by maximizing sum of covariances between canonical scores.}
 
 \usage{
-MCCA.cov(x, r, c = 1, cnstr = c("block", "global"), ortho = c("block.score", "global.score", "canon.tnsr"), 
+mcca.cov(x, r, w = 1, cnstr = c("block", "global"), ortho = c("block.score", "global.score", "canon.tnsr"), 
 	init = list(),  maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), verbose = FALSE)
 }
 
 \arguments{
-\item{x}{Data: list of arrays. All arrays must have the same number of dimensions in their last mode (= common instances, cases, or subjects).}
-\item{r}{Number of canonical components to calculate.}
-\item{c}{Weight matrix for pairs of datasets.}
-\item{cnstr}{Norm constraints for canonical tensors.}
-\item{ortho}{Orthogonality constraints for higher order canonical components.}
-\item{init}{Optional list of initialization parameters.}
-\item{maxit}{Maximum number of algorihm iterations.}
-\item{tol}{Tolerance for algorithm convergence.}
-\item{sweep}{Sweeping method}
-\item{verbose}{Display algorithm progress?}
+\item{x}{list of data arrays. All arrays must have the same number of dimensions in their last mode (= common instances, cases, or subjects).}
+\item{r}{number of canonical components to calculate.}
+\item{w}{matrix of weights in objective function.}
+\item{cnstr}{character: should the norm constraints on canonical tensors apply to each individual dataset (\code{block}) or on average across datasets (\code{global})?}
+\item{ortho}{character: Orthogonality constraints for higher order canonical components.}
+\item{init}{optional list of initialization parameters.}
+\item{maxit}{integer: maximum number of algorithm iterations.}
+\item{tol}{numerical tolerance for algorithm convergence.}
+\item{sweep}{sweeping method for optimization blocks.}
+\item{verbose}{logical: display algorithm progress?}
 }
 
 \details{
-The objective weights \code{c} can be specified as a single number (to be recycled) or as an \eqn{n}-by-\eqn{m} matrix, where \eqn{n} is the length of \code{x} (number of datasets). These weights should be nonnegative. The weight matrix will be made symmetric and will be scaled so its elements add up to 1.
+The objective weights \code{w} can be specified as a single positive number (to be recycled) or as an \eqn{m}-by-\eqn{m} matrix, where \eqn{m} is the length of \code{x} (number of datasets). These weights must be nonnegative and have a positive sum. Within the function \code{mcca.cov}, \code{w} is made symmetric and scaled so its elements add up to 1.
 
-For each dataset, the number of canonical components cannot exceed the number of cases, say \eqn{n}, or the number of elements in each image (the dataset containing \eqn{n} images). If needed, \code{r} will be reduced to meet these limits. 
+For each dataset, the number \code{r} of canonical components cannot exceed the number of cases, say \eqn{n}, or the number of elements in each image (the dataset containing \eqn{n} images). If needed, \code{r} will be reduced to meet these limits. 
 
 The orthogonality constraints for estimating higher order canonical components (\eqn{2,...,r}) can apply either to canonical scores (defined as \eqn{m} data block-specific scores or as a single global score for each case) or to canonical tensors. Either way, the constraints are enforced by deflating the data arrays/tensors.  
 
-The norm constraint \code{cnstr = "block"} requires that each canonical tensor has Frobenius norm equal to 1. The looser constraint \code{cnstr = "global"} requires that on average across datasets, the canonical tensors have Frobenius norm equal to 1 (at each stage \eqn{1,...,r} of the MCCA). 
+The norm constraint \code{cnstr = "block"} requires that each canonical tensor has norm equal to 1. The weaker constraint \code{cnstr = "global"} requires that on average across datasets, the canonical tensors have norm equal to 1 (at each stage \eqn{1,...,r} of the MCCA). 
 	
 The optional list \code{init} can take as arguments: 
 \describe{
 \item{\code{method}}{initialization method: \code{cca} (standard CCA between pairs of matricized datasets), \code{svd} (higher order SVD), or \code{random}. Refer to Degras et al. (2022) for details.}
 
-\item{\code{value}}{List of starting values for the MCCA. If \code{value} is provided, the argument \code{method} will be ignored. \code{value} can either have the same length as \code{x}, say \eqn{m}, or have dimensions \eqn{m}-by-\code{r}. In the first case, the same starting point is used for all \code{r} stages of the MCCA. In the second, each column of \code{value} will be used as separate starting point. The \eqn{i}-th field of \code{value} (or all fields of its \eqn{i}-th row) must match the dimensions of the \eqn{i}-th field of \code{x}. More precisely, the \eqn{i}-th field of \code{value} must be a list of length equal to that of \code{x[[i]]} minus 1. If for example \code{x[[i]]} is a 4D array of 3D images of dimensions 10-by-15-by-20, then \code{value[[i]]} must be a list of length 3 with each component a single vector of length 10, 15, and 20, respectively.}
+\item{\code{value}}{List of starting values for the mcca. If \code{value} is provided, the argument \code{method} will be ignored. \code{value} can either have the same length as \code{x}, say \eqn{m}, or have dimensions \eqn{m}-by-\code{r}. In the first case, the same starting point is used for all \code{r} stages of the mcca. In the second, each column of \code{value} will be used as separate starting point. The \eqn{i}-th field of \code{value} (or all fields of its \eqn{i}-th row) must match the dimensions of the \eqn{i}-th field of \code{x}. More precisely, the \eqn{i}-th field of \code{value} must be a list of length equal to that of \code{x[[i]]} minus 1. If for example \code{x[[i]]} is a 4D array of 3D images of dimensions 10-by-15-by-20, then \code{value[[i]]} must be a list of length 3 with each component a single vector of length 10, 15, and 20, respectively.}
 
 \item{\code{search}}{Only used for \code{method = cca}. 
 Type of search in the space of possible solutions (size \eqn{m^m} where \eqn{m} is the number of datasets): \code{exhaustive} or \code{approximate}. By default, \code{search} is set to \code{exhaustive} if \eqn{m \le 5} and to 
@@ -61,7 +61,7 @@ A LIST with components
 
 
 \seealso{
-\code{\link{MCCA.cor}}
+\code{\link{mcca.cor}}
 }
 
 % \examples{

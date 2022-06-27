@@ -15,12 +15,12 @@ mcca.single.block.cov <- function(x, v, w, sweep, maxit, tol, verbose)
 	
 ## Data dimensions
 dimx <- lapply(x, dim)
-ndimx <- sapply(dimx, length)
-d <- ndimx - 1
+d <- sapply(dimx, length) - 1L
+p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 m <- length(x)
-n <- dimx[[1]][ndimx[1]]
+n <- tail(dimx[[1]], 1)
 
-objective <- numeric(maxit+1)
+objective <- numeric(maxit + 1L)
 objective[1] <- objective.internal(x, v, w)
 if (verbose) 
 	cat("\nIteration",0,"Objective",objective[1])
@@ -36,12 +36,13 @@ xzero <- logical(m)
 for (i in 1:m) {
 	xzero[i] <- all(abs(range(x[[i]])) <= eps)
 	if (xzero[i])
-		v[[i]] <- lapply(dimx[[i]][1:d[i]], numeric)
+		v[[i]] <- lapply(p[[i]], numeric)
 }
 
 ## Block Coordinate Ascent 
 for (it in 1:maxit) {
 	if (sweep == "random") idxi <- sample(m)
+	vprev <- v
 	for (i in 1:m) { 		
 		if (xzero[i]) next
 		## Calculate the inner products <X_jt, v_j> 
@@ -71,8 +72,9 @@ for (it in 1:maxit) {
 		
 		## Set up quadratic program 
 		a <- if (wiizero[i]) 0 else x[[i]] # quadratic component
-		b <- tnsr.vec.prod(x[[i]], 
-			score[, -i] %*% (w[-i, i] / s[i])) # linear component
+		b <- tnsr.vec.prod(x = x[[i]], 
+			v = list(score[, -i] %*% (w[-i, i] / s[i])), 
+			modes = d[i] + 1) # linear component
 		# ww <- crossprod(iprod[-i,, drop = FALSE], c[-i, i] / s[i])
 		# b <- x[[i]]	# linear component
 		# dim(b) <- c(prod(dimx[[i]][-ndimx[i]]), n)
@@ -84,13 +86,17 @@ for (it in 1:maxit) {
 	}								
 	
 	## Calculate objective value (sum of correlations)
-	objective[it+1] <- objective.internal(x, v, w)	
+	objective[it + 1] <- objective.internal(x, v, w)
+	if (objective[it + 1] < objective[it]) {
+		v <- vprev
+		objective[it + 1] <- objective[it]
+	}
 	if (verbose) 
 		cat("\nIteration",it,"Objective",objective[it+1])
 	
 	## Check convergence 
-	if (it > 1 && abs(objective[it+1]-objective[it]) <= 
-	    	tol * max(1,objective[it])) break
+	if (it > 1 && abs(objective[it + 1] - objective[it]) <= 
+	    	tol * max(1, objective[it])) break
 }
 
 list(v = v, y = canon.scores(x, v), objective = objective[it+1], 
