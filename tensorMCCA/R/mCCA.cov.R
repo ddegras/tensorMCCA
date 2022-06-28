@@ -8,7 +8,7 @@ mcca.cov <- function(x, r, w = 1, cnstr = c("block", "global"),
 ## Check arguments
 test <- if (is.list(init)) { 
 	check.arguments(x, init, w)
-} else check.arguments(x, w = w)
+} else check.arguments(x, NULL, w)
 eps <- 1e-14
 
 ## Data dimensions
@@ -78,7 +78,7 @@ if (is.character(init) && init == "svd") {
 	}
 }
 if (is.character(init) && init == "random") 
-	init.args <- list(r = 1, objective = "cov")
+	init.args <- list(r = 1, scale = "norm")
 
 				
 ## Prepare optimization if orthogonality 
@@ -136,7 +136,7 @@ for (l in 1:r) {
 		v0 <- init[, min(l, NCOL(init))]
 	} 
 	
-	## Run mcca and store results
+	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
 	out <- mcca.single.cov(x, v0, w, sweep, maxit, tol, verbose)
 	objective[l] <- out$objective

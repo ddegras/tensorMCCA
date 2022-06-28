@@ -1,24 +1,21 @@
-\name{MCCA.init.random}
-\alias{MCCA.init.random}
+\name{mcca.init.random}
+\alias{mcca.init.random}
 
 \title{
 Initialize Canonical Tensors Randomly
 }
 
 \description{
-%%  ~~ A concise (1-5 lines) description of what the function does. ~~
-}
+Generate random rank-1 tensors of given size under scaling constraints and optional orthogonality constraints.}
 
 \usage{
-MCCA.init.random(x, objective = c("cov", "cor"), cnstr = c("block", "global"), 
-	center = TRUE, balance = TRUE)
-}
+mcca.init.random(x, r = 1L, scale = c("norm", "var"), ortho.mode = NULL)}
 
 \arguments{
-\item{x}{Data: list of arrays. All arrays must have the same number of dimensions in their last mode (= individual or object).}
-\item{objective}{Objective function: sum of covariances or sum of correlations?}
-\item{scope}{Scaling of canonical tensors: block constraints (i.e. for each dataset) or global constraints?}
-\item{balance}{Should the canonical vectors have equal norm?}
+\item{x}{list of data arrays. All arrays must have the same number of dimensions in their last mode (= individual or object).}
+\item{r}{number of sets of canonical tensors to generate.}
+\item{scale}{character describing how to scale the canonical tensors: with unit norm (\code{norm}) or unit variance (\code{var})}
+\item{ortho.mode}{integer or list indicating in which mode(s) -if any- to orthogonalize the canonical tensors of each dataset. This argument is recycled as needed to a list with same length as \code{x}.}
 
 }
 
@@ -30,7 +27,7 @@ MCCA.init.random(x, objective = c("cov", "cor"), cnstr = c("block", "global"),
 A list representing canonical tensors. Each sublist contains as many canonical vectors as there are modes in the corresponding dataset (not counting the last mode which corresponds to individuals or objects). The vectors of a sublist have length equal to the numbers of dimensions in the modes of the corresponding dataset.}
 
 \seealso{
-\code{\link{MCCA.init.cca}}, \code{\link{MCCA.init.svd}}
+\code{\link{mcca.init.cca}}, \code{\link{mcca.init.svd}}
 }
 
 \examples{
