@@ -39,7 +39,7 @@ v <- vector("list", m * r)
 dim(v) <- c(m, r)
 for (i in 1:m) {
 	for (l in 1:r) {
-		v[[i,l]] <- lapply(p[[i]], runif, a = -1, b = 1)
+		v[[i,l]] <- lapply(p[[i]], runif, min = -1, max = 1)
 	}
 }
 
@@ -55,27 +55,10 @@ if (len.ortho > 0) {
 }
 
 ## Scale canonical vectors
-if (scale == "norm") {
-	for (i in 1:m) {
-		for (l in 1:r) {
-			v[[i,l]] <- scale.v(v[[i,l]], cnstr = "block")
-		}
-	}
-} else {
-	y <- canon.scores(x, v)
-	ybar <- colMeans(y)
-	nrm <- sqrt(colMeans(y^2) - ybar^2)
-	nrm[is.nan(nrm)] <- 0
-	dim(nrm) <- c(m, r)
-	nz <- (nrm > eps)
-	for (i in 1:m) {
-		for (l in 1:r) {
-			v[[i,l]] <- if (nz[i,l]) {
-				lapply(v[[i,l]], "/", y = nrm[i,l]^(1/d[i]))
-			} else { lapply(p[[i]], numeric) }
-		}
-	}
-}
+if (scale == "var") 
+	v <- scale.v(v, scale = "var", x = x)
+
+if (r == 1) dim(v) <- NULL
 
 v
 }

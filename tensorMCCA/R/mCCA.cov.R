@@ -1,8 +1,7 @@
 mcca.cov <- function(x, r, w = 1, cnstr = c("block", "global"), 
-	ortho = c("block.score", "global.score", "canon.tnsr"), 
-	init = c("cca", "svd", "random"), maxit = 1000, tol = 1e-6, 
-	sweep = c("cyclical", "random"), control = list(), 
-	verbose = FALSE)
+	ortho = c("score", "canon.tnsr"), init = c("cca", "svd", "random"), 
+	maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), 
+	control = list(), verbose = FALSE)
 {
 
 ## Check arguments
@@ -10,6 +9,7 @@ test <- if (is.list(init)) {
 	check.arguments(x, init, w)
 } else check.arguments(x, NULL, w)
 eps <- 1e-14
+r <- as.integer(r)
 
 ## Data dimensions
 m <- length(x) 
@@ -45,14 +45,42 @@ for(i in 1:m) {
     xbar <- rowMeans(x[[i]], dims = d[i])
     x[[i]] <- x[[i]] - as.vector(xbar)
 }
-		
+
+## Prepare optimization if orthogonality 
+## constraints are on canonical tensors
+if (ortho == "canon.tnsr" && r > 1) {
+	## Set tensor modes on which constraints apply
+	if (length(control) > 0 && (!is.null(control$ortho))) {
+		ortho.mode <- if (is.integer(control$ortho)) {
+			as.list(rep_len(control$ortho, m))
+		} else if (is.list(control$ortho)) {
+			rep_len(control$ortho, m)
+		} else if (identical(control$ortho, "all")) {
+			mapply(seq.int, from = rep(1L, m), to = d, 
+				SIMPLIFY = FALSE)
+		} else {
+			as.list(rep_len(1L, m))
+		}
+	} else {
+		ortho.mode <- as.list(rep_len(1L, m))
+	}
+}
+	
 ## Adjust number of canonical components as needed
-r0 <- as.integer(r)
+## (Not strictly needed when calculating canonical components iteratively)
+r0 <- r
 pp <- sapply(p, prod)
-r <- switch(ortho, 
-	block.score = min(n-1, max(pp), r0), 
-	global.score = min(n-1, sum(pp), r0),
-	canon.tnsr = min(max(pp), r0))
+if (cnstr == "block" && ortho == "score") { 
+	r <- min(n - 1, pp, r0)
+} else if (cnstr == "global" && ortho == "score") {
+	r <- min(n - 1, sum(pp), r0)
+} else if (cnstr == "block" && ortho == "canon.tnsr") {
+	rr <- unlist(mapply("[", p, ortho.mode))
+	r <- min(n - 1, rr, r0)
+} else {
+	rr <- sapply(1:m, function(i) min(p[ortho.mode[[i]]]))
+	r <- min(n - 1, sum(rr), r0)
+}
 if (verbose && r != r0)
 	warning(paste("\nArgument 'r' set to", r,
 		"to satisfy orthogonality constraints"))
@@ -79,22 +107,6 @@ if (is.character(init) && init == "svd") {
 }
 if (is.character(init) && init == "random") 
 	init.args <- list(r = 1, scale = "norm")
-
-				
-## Prepare optimization if orthogonality 
-## constraints are on canonical tensors
-if (ortho == "canon.tnsr" && r > 1) {
-	## Set tensor modes on which constraints apply
-	ortho.mode <- array(dim = c(r, r, m))	
-	for (i in 1:m) {
-		mat <- matrix(0L, r, r)
-		mod <- unlist(lapply((r-1):1, 
-			function(len) rep_len(1:d[i], len)))
-		if (sweep == "random") mod <- sample(mod)
-		mat[lower.tri(mat)] <- mod
-		ortho.mode[,,i] <- mat + t(mat)	
-	}
-}
 
 ## Create output objects 
 v <- vector("list", m * r) # canonical vectors
@@ -148,10 +160,9 @@ for (l in 1:r) {
 	## Prepare orthogonality constraints for next stage
 	if (ortho == "canon.tnsr" && l < r) {
 		vprev <- lapply(d, function(len) vector("list", len))
-		for (i in 1:m) {
-			k <- ortho.mode[l, l+1, i]
+		for (i in 1:m) 
+		for (k in ortho.mode[[i]])
 			vprev[[i]][[k]] <- v[[i,l]][[k]]
-		} 
 	}
 		
 	## Deflate data matrix

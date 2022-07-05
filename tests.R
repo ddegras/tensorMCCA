@@ -22,3 +22,13 @@ debug(objective.gradient)
 
 objective.cov(x, v)
 objective.gradient(x, v, w)
+
+vv <- cbind(v, v)
+dimnames(vv) <- NULL
+test <- scale.v(vv, scale = "norm", cnstr == "block")
+test <- scale.v(vv, scale = "norm", cnstr = "global")
+test <- scale.v(v, x, scale = "var")
+test <- mcca.init.random(x, r = 2, ortho.mode = 1:2)
+i <- 2; k <- 2; crossprod(sapply(test[i,], "[[", k))
+
+<x, v1> ortho <x, v2>

@@ -5,44 +5,75 @@
 # Function for scaling canonical vectors
 #########################################
 
-scale.v <- function(v, cnstr = c("block", "global"))
+scale.v <- function(v, scale = c("norm", "var"), 
+	cnstr = c("block", "global"), x = NULL)
 {
-cnstr <- match.arg(cnstr) # block or global constraints
-m <- length(v)
-d <- sapply(v, length)
+scale <- match.arg(scale) 
+cnstr <- match.arg(cnstr)
+stopifnot(scale == "norm" || !is.null(x))
+m <- NROW(v)
+r <- NCOL(v)
+isvec.v <- is.null(dim(v))
+if (isvec.v) dim(v) <- c(m, r)
+d <- sapply(v[, 1], length)
 eps <- 1e-15 # numerical tolerance for zero
 
-## Calculate Frobenius norms of canonical tensors
+## Calculate norms of canonical tensors
 ## (= products of Euclidean norms of canonical vectors)
-nrmv <- vector("list", m) 
-nrmt <- numeric(m)
+nrmv <- vector("list", m * r) 
+dim(nrmv) <- c(m, r)
+nrmt <- matrix(nrow = m, ncol = r)
 nrmfun <- function(vv) sqrt(sum(vv^2))
 for (i in 1:m) {
-	nrmv[[i]] <- sapply(v[[i]], nrmfun)
-	nrmt[i] <- prod(nrmv[[i]])
-}
-
-## If tensor norm constraints at the block level,
-## rescale each canonical vector by its norm
-if (cnstr == "block") {
-	for (i in 1:m) {
-		v[[i]] <- if (nrmt[i] < eps) { lapply(p[[i]], numeric) 
-		} else { mapply("/", v[[i]], nrmv[[i]], SIMPLIFY = FALSE) }
+	for (l in 1:r) {
+		nrmv[[i,l]] <- sapply(v[[i,l]], nrmfun)
+		nrmt[i,l] <- prod(nrmv[[i,l]])
 	}
 }
 
-## If tensor norm constraints at the global level,
-## rescale each canonical tensor by the same factor 
-## in a way that its canonical vectors are balanced 
-if (cnstr == "global") {
-	s <- sqrt(mean(nrmt^2)) # grand scaling factor
+if (scale == "norm" && cnstr == "block") {
+	## rescale each canonical vector by its norm
+	zero <- (nrmt < eps)
 	for (i in 1:m) {
-		si <- (nrmt[i] / s)^(1/d[i]) / nrmv[[i]]
-		v[[i]] <- if (nrmt[i] < eps) { lapply(p[[i]], numeric) 
-		} else { mapply("*", v[[i]], si, SIMPLIFY = FALSE) }
+		for (l in 1:r) {
+			v[[i,l]] <- if (zero[i,l]) { 
+				lapply(p[[i]], numeric) 
+			} else { 
+				mapply("/", v[[i,l]], nrmv[[i,l]], SIMPLIFY = FALSE) }
+		}
 	}
+} else if (scale == "norm" && cnstr == "global") {
+	## rescale each canonical tensor by the same factor 
+	## in a way that its canonical vectors are balanced 
+	sl <- sqrt(colMeans(nrmt^2)) # grand scaling factor
+	zero <- (sl < eps)
+	for (i in 1:m) {
+		for (l in 1:r) {
+			sil <- (nrmt[i,l] / sl[l])^(1/d[i]) / nrmv[[i,l]]
+			v[[i,l]] <- if (zero[l]) { 
+				lapply(p[[i]], numeric) 
+			} else { 
+				mapply("*", v[[i,l]], sil, SIMPLIFY = FALSE) }
+		}
+	}
+} else {
+	score <- canon.scores(x, v)
+	dim(score) <- c(n, m, r)
+	sd.score <- colMeans(score^2) - colMeans(score)^2
+	sd.score <- sqrt(pmax(sd.score, 0))
+	zero <- (nrmt < eps | sd.score < eps)
+	for (i in 1:m) {
+		for (l in 1:r) {
+			sil <- (nrmt[i,l] / sd.score[i,l])^(1/d[i]) / nrmv[[i,l]]
+			v[[i,l]] <- if (zero[i,l]) { 
+				lapply(p[[i]], numeric) 
+			} else { 
+				mapply("*", v[[i,l]], sil, SIMPLIFY = FALSE) }
+		}
+	}	
 }
 
+if (isvec.v) dim(v) <- NULL
 v
 }
 
