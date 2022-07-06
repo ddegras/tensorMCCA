@@ -4,12 +4,31 @@
 # General function to deflate data tensors
 ###########################################
 
-# Internal
 
-deflate.internal <- function(x, v = NULL, score = NULL, 
-	scope = c("block", "global"))
+deflate.x <- function(x, v = NULL, score = NULL, 
+	scope = c("block", "global"), check.args = TRUE)
 {
 scope <- match.arg(scope)
+	
+if (check.args) {
+	test <- check.arguments(x, v) 
+	m <- length(x)
+	n <- tail(dim(x[[1]]), 1)
+	if (is.null(v)  == is.null(score)) 
+		stop(paste("Please specify exactly one of the arguments",
+		"'v' and 'score' and leave the other set to NULL"))
+	if (!is.null(score)) {
+		stopifnot(is.vector(score) || is.matrix(score))
+		test1 <- (is.vector(score) && length(score) == m)
+		test2 <- (is.matrix(score) && all(dim(score) == c(n, m)))
+		if (!(test1 || test2))
+			stop(paste("If specified, 'score' should be either", 
+				"a vector of length n or a matrix of dimensions",
+				"(n,m)\nwhere m is the number of data tensors",
+				"(length of 'x') and n is the number of dimensions",
+				"in the last mode of the data tensors."))
+	}
+}	
 	
 ## Data dimensions
 m <- length(x)
@@ -18,7 +37,6 @@ d <- sapply(dimx, length) - 1L
 p <- lapply(1:m, function(i) dimx[[i]][1:d[i]])
 n <- tail(dimx[[1]], 1)
 eps <- 1e-14
-
 
 if (!is.null(score)) {
 	if (NCOL(score) != m) score <- matrix(score, n, m)
@@ -97,93 +115,6 @@ if (!is.null(v) && scope == "global") {
 x
 }
 
-
-
-
-
-
-
-# deflate.x <- function(x, v = NULL, score = NULL, 
-	# scope = c("block", "global"), check.args = TRUE)
-# {
-# if (check.args) test <- check.arguments(x, v) 
-# stopifnot((!is.null(v) && is.null(score)) || 
-	# (is.null(v) && !is.null(score)))
-# scope <- match.arg(scope)
-	
-# ## Data dimensions
-# m <- length(x)
-# dimx <- lapply(x, dim)
-# d <- sapply(dimx, length) - 1L
-# p <- lapply(1:m, function(i) dimx[[i]][1:d[i]])
-# n <- tail(dimx[[1]], 1)
-# eps <- 1e-14
-
-
-# if (!is.null(score)) {
-	# stopifnot(is.vector(score) || is.matrix(score))
-	# test1 <- (is.vector(score) && length(score) == n)
-	# test2 <- (is.matrix(score) && all(dim(score) == c(n, m)))
-	# if (!(test1 || test2))
-		# stop(paste("If specified, 'score' should be either", 
-			# "a vector of length n or a matrix of dimensions",
-			# "(n,m)\nwhere m is the number of data tensors",
-			# "(length of 'x') and n is the number of dimensions",
-			# "in the last mode of the data tensors."))
-	# nrm <- if (test1) sqrt(sum(score^2)) else sqrt(colSums(score^2))	
-	# zero <- rep_len(nrm <= eps, m) 	
-	# if (all(zero)) return(x)
-	# if (test1) score <- score / nrm
-
-	# ## Deflation
-	# for (i in 1:m) {
-		# if (zero[i]) next
-		# dim(x[[i]]) <- c(prod(p[[i]]), n)
-		# if (test1) {
-			# x[[i]] <- x[[i]] - tcrossprod(x[[i]] %*% score, score)	
-		# } else {
-			# score[,i] <- score[,i] / nrm[i]
-			# x[[i]] <- x[[i]] - tcrossprod(x[[i]] %*% score[,i],
-				# score[,i])
-		# }
-		# dim(x[[i]]) <- dimx[[i]]
-	# }
-# }
-
-
-# if (!is.null(v)) {
-	# test1 <- (is.list(v) && length(v) == m)
-	# test2 <- identical(sapply(v, length), d)
-	# if (!(test1 && test2))
-		# stop(paste("If specified, 'v' should be a list of vectors",
-			# "with dimensions compatible with 'x'"))
-	# for (i in 1:m) {
-		# for (k in 1:d[i]) {
-			# if (is.null(v[[i]][[k]])) next
-			# ## Basis of orthogonal space
-			# Q <- qr.Q(qr(v[[i]][[k]])) 
-			# ## Permute data tensor (exchange modes 1 and k)
-			# if (k > 1) {
-				# perm <- 1:(d[i]+1)
-				# perm[c(1,k)] <- perm[c(k,1)]
-				# x[[i]] <- aperm(x[[i]], perm)
-			# }
-			# ## Unfold permuted tensor along mode 1 
-			# ## (original along mode k)
-			# dim(x[[i]]) <- c(dimx[[i]][k], prod(dimx[[i]][-k])) 
-			# ## Orthogonal projection
-			# x[[i]] <- x[[i]] - Q %*% crossprod(Q, x[[i]]) 
-			# ## Reshape x(i) to tensor
-			# dim(x[[i]]) <- if (k == 1) dimx[[i]] else dimx[[i]][perm]
-			# ## Permute modes back
-			# if (k > 1) 
-				# x[[i]] <- aperm(x[[i]], perm)
-		# }
-	# }
-# }
-
-# x
-# }
 
 
 

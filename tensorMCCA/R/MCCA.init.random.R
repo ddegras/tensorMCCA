@@ -7,17 +7,20 @@
 ########################
 
 
-mcca.init.random <- function(x, r = 1L, 
-	scale = c("norm", "var"), ortho.mode = NULL)
+mcca.init.random <- function(x, r = 1L, objective = c("cov", "cor"), 
+	ortho.mode = NULL)
 {
 test <- check.arguments(x)
-eps <- 1e-14
+objective <- match.arg(objective) 
+
 m <- length(x) 
 dimx <- lapply(x, dim) 
 d <- sapply(dimx, length) - 1L
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE) 
 r <- as.integer(r)
 if (r == 1) ortho.mode <- NULL
+
+## Set up orthogonality constraints
 len.ortho <- length(ortho.mode)
 if (len.ortho > 0) {
 	if (is.numeric(ortho.mode)) 
@@ -30,9 +33,6 @@ if (len.ortho > 0) {
 	for (i in 1:m)
 		ortho.mode[[i]] <- intersect(ortho.mode[[i]], 1:d[i])
 }
-
-## Scaling constraints
-scale <- match.arg(scale) # objective function to maximize
 
 ## Initialize canonical vectors randomly
 v <- vector("list", m * r)
@@ -54,10 +54,9 @@ if (len.ortho > 0) {
 	}
 }
 
-## Scale canonical vectors
-if (scale == "var") 
-	v <- scale.v(v, scale = "var", x = x)
-
+## Scale and balance canonical vectors 
+v <- scale.v(v, x = x, 
+	scale = switch(objective, cov = "norm", cor = "var"))
 if (r == 1) dim(v) <- NULL
 
 v

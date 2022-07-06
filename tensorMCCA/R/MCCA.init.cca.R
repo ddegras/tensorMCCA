@@ -7,9 +7,8 @@
 
 
 mcca.init.cca <- function(x, k = NULL, w = 1, 
-	objective = c("covariance", "correlation"), 
-	cnstr = c("block", "global"), center = TRUE, 
-	search = c("exhaustive", "approximate"))
+	objective = c("cov", "cor"), norm = c("block", "global"), 
+	center = TRUE, search = c("exhaustive", "approximate"))
 {
 	
 ################
@@ -37,10 +36,10 @@ if (is.null(k)) { k <- n } else { k <- min(k, n) }
 
 ## Scaling constraints
 objective.type <- match.arg(objective)   
-if (objective.type == "correlation" && cnstr == "global")
-	stop(paste("Argument values 'objective = correlation'", 
-		"and 'cnstr = global' are incompatible."))
-cnstr <- match.arg(cnstr) # block or global constraints
+if (objective.type == "cor" && norm == "global")
+	stop(paste("Argument values 'objective = cor'", 
+		"and 'norm = global' are incompatible."))
+norm <- match.arg(norm) # block or global constraints
 
 ## Search method in optimization
 search <- if (identical(search, 
@@ -85,7 +84,7 @@ k <- pmin(rankx, k)
 
 ## Calculate SVDs of each unfolded dataset
 reducex <- switch(objective.type, 
-	covariance = (k <= pp / 2), correlation = rep(TRUE, m))
+	cov = (k <= pp / 2), cor = rep(TRUE, m))
 u <- dd <- xred <- vector("list", m) 
 for (i in which(reducex)) {
 	xmat <- if (center) { matrix(x[[i]] - xbar[[i]], pp[i], n)  
@@ -99,7 +98,7 @@ for (i in which(reducex)) {
 	## Reduce data
 	u[[i]] <- svdx$u  # left singular vectors
 	dd[[i]] <- svdx$d # singular values
-	xred[[i]] <- if (objective.type == "covariance") { 
+	xred[[i]] <- if (objective.type == "cov") { 
 		# reduced data
 		t(svdx$v) * svdx$d }  else t(svdx$v) 
 }
@@ -112,7 +111,7 @@ if (any(reducex)) rm(xmat, svdx)
 #####################################
 
 
-if (objective.type == "covariance" && cnstr == "global") { 
+if (objective.type == "cov" && norm == "global") { 
 	## Calculate rank of objective weight matrix
 	const <- all(w == w[1])
 	if (const) { 
@@ -179,7 +178,7 @@ if (objective.type == "covariance" && cnstr == "global") {
 # the canonical vectors are expressed up to scale factors. 
 # Only their directions matter at this stage, not their scale.   
 
-if (cnstr == "block") {
+if (norm == "block") {
 	v <- lapply(pp, function(nr) matrix(0, nr, m)) 
 	# canonical vectors
 	for (i in 1:m) {
@@ -191,7 +190,7 @@ if (cnstr == "block") {
 			matrix(x[[i]], pp[i], n)
 		}		
 		for (j in 1:i) {
-			if (i == j && objective.type == "correlation") {
+			if (i == j && objective.type == "cor") {
 				v[[i]][,i] <- u[[i]][,1] 
 				next
 			}
@@ -213,7 +212,7 @@ if (cnstr == "block") {
 			} else {
 				svd(tcrossprod(xi, xj), nu = 1, nv = 1)
 			} 		
-			v[[i]][,j] <- if (objective.type == "correlation") {
+			v[[i]][,j] <- if (objective.type == "cor") {
 				u[[i]] %*% (svdij$u / dd[[i]])
 			} else if (reducex[i]) {
 				u[[i]] %*% svdij$u 
@@ -221,7 +220,7 @@ if (cnstr == "block") {
 				svdij$u		
 			}				
 			if (i == j) next
-			v[[j]][,i] <- if (objective.type == "correlation") {
+			v[[j]][,i] <- if (objective.type == "cor") {
 				u[[j]] %*% (svdij$v / dd[[j]])
 			} else if (reducex[j]) { 
 				u[[j]] %*% svdij$v
@@ -292,7 +291,7 @@ score <- canon.scores(x, v)
 ####################################
 
 
-if (objective.type == "correlation") {
+if (objective.type == "cor") {
 	for (i in 1:m) {
 		s <- sqrt(colMeans(score[,i,]^2))
 		s[s <= eps] <- Inf
@@ -315,7 +314,7 @@ if (objective.type == "correlation") {
 # tensor one dataset at a time while keeping the 
 # other canonical tensors fixed
  
-if (cnstr == "block" && search == "approximate") {
+if (norm == "block" && search == "approximate") {
 	## Initialization @@@@ does not do what it's supposed to do. FIX IT
 	objective <- 0
 	part <- matrix(0, m, m) # partial objective values
@@ -359,7 +358,7 @@ if (cnstr == "block" && search == "approximate") {
 ######################################
 
 
-if (cnstr == "block" && search == "exhaustive") {
+if (norm == "block" && search == "exhaustive") {
 	part <- array(dim = rep(m, 4))
 	for (i in 1:m) 
 	for (j in 1:i) 

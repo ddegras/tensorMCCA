@@ -1,8 +1,3 @@
-
-
-
-
-
 #############################
 # HOSVD-based initialization
 # of canonical vectors 
@@ -11,7 +6,7 @@
 
 
 mcca.init.svd <- function(x, objective = c("cov", "cor"), 
-	cnstr = c("block", "global"), center = TRUE)
+	norm = c("block", "global"), center = TRUE)
 {
 ## Check argument x if required
 test <- check.arguments(x)

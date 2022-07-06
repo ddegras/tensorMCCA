@@ -1,4 +1,4 @@
-mcca.cov <- function(x, r, w = 1, cnstr = c("block", "global"), 
+mcca.cov <- function(x, r = 1, w = 1, norm = c("block", "global"), 
 	ortho = c("score", "canon.tnsr"), init = c("cca", "svd", "random"), 
 	maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), 
 	control = list(), verbose = FALSE)
@@ -27,14 +27,11 @@ w <- if (length(w) == 1) {
 
 ## Match other arguments
 ortho <- match.arg(ortho)
-cnstr <- match.arg(cnstr)
+norm <- match.arg(norm)
 sweep <- match.arg(sweep)
 if (is.character(init)) init <- match.arg(init)
 
-## Optimization method
-mcca.single.cov <- if (cnstr == "block") {
-	mcca.single.block.cov } else {
-	mcca.single.global.cov }
+## Initialization method
 mcca.init <- if (is.character(init)) {
 	switch(init, cca = mcca.init.cca, 
 		svd = mcca.init.svd, random = mcca.init.random)
@@ -69,13 +66,13 @@ if (ortho == "canon.tnsr" && r > 1) {
 ## Adjust number of canonical components as needed
 ## (Not strictly needed when calculating canonical components iteratively)
 r0 <- r
-if (cnstr == "block" && ortho == "score") { 
+if (norm == "block" && ortho == "score") { 
 	pp <- sapply(p, prod)
 	r <- min(n - 1, pp, r0)
-} else if (cnstr == "global" && ortho == "score") {
+} else if (norm == "global" && ortho == "score") {
 	pp <- sapply(p, prod)
 	r <- min(n - 1, sum(pp), r0)
-} else if (cnstr == "block" && ortho == "canon.tnsr") {
+} else if (norm == "block" && ortho == "canon.tnsr") {
 	rr <- unlist(mapply("[", p, ortho.mode))
 	r <- min(n - 1, rr, r0)
 } else {
@@ -88,26 +85,25 @@ if (verbose && r != r0)
 
 ## Initialization parameters
 test <- (is.list(control) && !is.null(control$init))
-if (is.character(init) && init == "cca") {
-	init.args <- list(r = 1, k = NULL, w = w, 
-		objective = "cov", cnstr = "block", center = FALSE, 
+if (identical(init, "cca")) {
+	init.args <- list(k = NULL, w = w, 
+		objective = "cov", norm = "block", center = FALSE, 
 		search = ifelse(m <= 5, "exhaustive", "approximate"))
 	if (test) {
 		names. <- intersect(names(control), 
-			c("k", "cnstr", "search"))
+			c("k", "norm", "search"))
 		init.args[names.] <- control[names.]
 	}
-}
-if (is.character(init) && init == "svd") {
-	init.args <- list(r = 1, objective = "cov", 
-		cnstr = "block", center = FALSE)
+} else if (identical(init, "svd")) {
+	init.args <- list(r = 1L, objective = "cov", 
+		norm = "block", center = FALSE)
 	if (test) {
-		names. <- intersect(names(control), c("cnstr"))
+		names. <- intersect(names(control), c("norm"))
 		init.args[names.] <- control[names.]
 	}
+} else if (identical(init, "random")) {
+	init.args <- list(r = 1L, objective = "cov")
 }
-if (is.character(init) && init == "random") 
-	init.args <- list(r = 1, scale = "norm")
 
 ## Create output objects 
 v <- vector("list", m * r) # canonical vectors
@@ -151,20 +147,29 @@ for (l in 1:r) {
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
-	out <- mcca.single.cov(x, v0, w, sweep, maxit, tol, verbose)
+	out <- if (norm == "block") {
+		mcca.single.cov.block(x = x, v = v0, w = w, sweep = sweep, 
+			maxit = maxit, tol = tol, verbose = verbose)
+	} else {
+		mcca.single.cov.global(x = x, v = v0, w = w, ortho = vprev, 
+			sweep = sweep, maxit = maxit, tol = tol, verbose = verbose)
+	}
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y 
 	global.score[,l] <- rowMeans(block.score[,,l]) 
 	iters[l] <- out$iters
 	v[,l] <- out$v
 
+	## Monitor objective value
+	if (objective[l] <= eps) break 
+
 	## Prepare orthogonality constraints for next stage
-	if (l < r && ortho == "canon.tnsr") {
-		if (cnstr == "block") {
+	if (ortho == "canon.tnsr" && l < r) {
+		if (norm == "block") {
 			vprev <- lapply(d, function(len) vector("list", len))
 			for (i in 1:m) 
 				vprev[[i]][ortho.mode[[i]]] <- v[[i,l]][ortho.mode[[i]]]
-		} else {
+		} else { # norm == "global"
 			vprev <- v[, 1:l]
 			for (i in 1:m) {
 				idx <- setdiff(1:d[i], ortho.mode[[i]])
@@ -173,20 +178,17 @@ for (l in 1:r) {
 			}
 		}
 	} 
-	x	
+	
 	## Deflate data matrix
 	if (l < r) { 	
-		x <- if (cnstr == "block" && ortho == "score") { 
-			deflate.x(x, score = block.score[,,l])
-		} else if (cnstr == "global" && ortho == "score") { 
-			deflate.x(x, score = global.score[,l])
-		 else { 
-			deflate.x(x, v = vprev, scope = cnstr)	
-	}
-	
-	## Monitor objective value
-	if (objective[l] <= eps) break 
-		
+		x <- if (norm == "block" && ortho == "score") { 
+			deflate.x(x, score = block.score[,,l], check.args = FALSE)
+		} else if (norm == "global" && ortho == "score") { 
+			deflate.x(x, score = global.score[,l], check.args = FALSE)
+		} else if (norm == "block" && ortho == "canon.tnsr") { 
+			deflate.x(x, v = vprev, scope = norm, check.args = FALSE	)
+		}
+	}		
 } 
 
 ## Re-order results according to objective values if needed

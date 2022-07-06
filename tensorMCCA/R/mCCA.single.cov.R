@@ -162,7 +162,12 @@ if (!equal.w) {
 }
 
 ## Orthogonality constraints
-northo <- if (is.null(ortho)) 0L else NCOL(ortho)
+if (is.null(ortho)) {
+	northo <- 0L 
+} else {
+	if (!is.matrix(ortho)) ortho <- as.matrix(ortho)
+	northo <- ncol(ortho)
+}
 
 for (it in 1:maxit) {
 	## Determine blocks of variables to update in each dataset
@@ -208,40 +213,26 @@ for (it in 1:maxit) {
 		vortho <- matrix(0, sum(p), northo)		
 		for (ii in 1:groupsize) {
 			i <- idxg[ii]
-			# tvprod <- x[[i]] 
-			# pi <- head(dimx[[i]], d[i])
-			# vi <- v[[i]]
 			kopt <- group[i,g] # selected mode for optimization
 			tvprod <- tnsr.vec.prod(x[[i]], v[[i]][-kopt], 
-				(1:d[i])[-kopt])
-			## If the selected mode is not next to last in X_i
-			## permute the dimensions of X_i to enforce it
-			# if (kopt < d[i]) {
-				# perm <- c((1:d[i])[-kopt], kopt, d[i]+1)
-				# tvprod <- aperm(tvprod, perm)
-			# }
-			# ## Calculate successive tensor-vector products
-			# for (k in 1:d[i]) {
-				# if (k == kopt) next
-				# dim(tvprod) <- c(pi[k], length(tvprod)/pi[k])
-				# tvprod <- crossprod(vi[[k]], tvprod)
-			# }
-			# dim(tvprod) <- c(pi[kopt], n)
+				(1:d[i])[-kopt]) # tensor-vector products		
 			if (separable.w && (!equal.w)) 
-				tvprod <- wvec[i] * tvprod
-			
-			## Fill matrix block			
+				tvprod <- wvec[i] * tvprod			
 			xv[start[ii]:end[ii],] <- tvprod
 			
+			## Set up orthogonality constraints
 			if (northo > 0) {
 				for (ll in 1:northo) 
 					vortho[start[ii]:end[ii], ll] <- ortho[[i,ll]][kopt]
 			}
-		}
-				
+		}		
+		if (northo > 0) 	Q <- qr.Q(qr(vortho))
+			
 		## Update canonical vectors and objective value
 		if (separable.w) { 
 			# Case: objective weight matrix separable (SVD)
+			if (northo > 0) # orthogonality constraints
+				xv <- xv - Q %*% crossprod(Q, xv) 
 			svdxv <- if (max(dim(xv)) > 2) {
 				svds(xv, k = 1, nu = 1, nv = 0)
 			} else { svd(xv, nu = 1, nv = 1) }
@@ -262,6 +253,10 @@ for (it in 1:maxit) {
 					xv[rows, cols] <- w[i, j] * xv[rows, cols]
 				}			
 			}
+			if (northo > 0) { # project on othogonality constraints
+				xv <- xv - Q %*% crossprod(Q, xv)
+				xv <- xv -	tcrossprod(xv %*% Q, Q)
+			}				
 			eigxv <- if (max(dim(xv)) > 2) {
 				eigs_sym(xv, k = 1) } else { eigen(xv, TRUE) }
 			vg <- eigxv$vectors[,1]
@@ -284,12 +279,7 @@ for (it in 1:maxit) {
 	
 	## Balance canonical vectors  
 	v <- scale.v(v, cnstr = "global")
-	
-	## Debugging: Compare objective value calculated in loop 
-	## to full calculation
-	# test <- objective.internal(x, v, c)
-	if (any(group[,ngroups] == 0))
-		objective[it+1] <- objective.internal(x, v, w)
+	objective[it+1] <- objective.internal(x, v, w)
 	if (verbose) 
 		cat("\nIteration",it,"Objective",objective[it+1])
 	# browser()
