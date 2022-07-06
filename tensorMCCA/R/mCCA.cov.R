@@ -69,10 +69,11 @@ if (ortho == "canon.tnsr" && r > 1) {
 ## Adjust number of canonical components as needed
 ## (Not strictly needed when calculating canonical components iteratively)
 r0 <- r
-pp <- sapply(p, prod)
 if (cnstr == "block" && ortho == "score") { 
+	pp <- sapply(p, prod)
 	r <- min(n - 1, pp, r0)
 } else if (cnstr == "global" && ortho == "score") {
+	pp <- sapply(p, prod)
 	r <- min(n - 1, sum(pp), r0)
 } else if (cnstr == "block" && ortho == "canon.tnsr") {
 	rr <- unlist(mapply("[", p, ortho.mode))
@@ -158,21 +159,29 @@ for (l in 1:r) {
 	v[,l] <- out$v
 
 	## Prepare orthogonality constraints for next stage
-	if (ortho == "canon.tnsr" && l < r) {
-		vprev <- lapply(d, function(len) vector("list", len))
-		for (i in 1:m) 
-		for (k in ortho.mode[[i]])
-			vprev[[i]][[k]] <- v[[i,l]][[k]]
-	}
-		
+	if (l < r && ortho == "canon.tnsr") {
+		if (cnstr == "block") {
+			vprev <- lapply(d, function(len) vector("list", len))
+			for (i in 1:m) 
+				vprev[[i]][ortho.mode[[i]]] <- v[[i,l]][ortho.mode[[i]]]
+		} else {
+			vprev <- v[, 1:l]
+			for (i in 1:m) {
+				idx <- setdiff(1:d[i], ortho.mode[[i]])
+				for (ll in 1:l)
+					vprev[[i,ll]][idx] <- lapply(p[[i]][idx], numeric)
+			}
+		}
+	} 
+	x	
 	## Deflate data matrix
 	if (l < r) { 	
-		x <- switch(ortho, 
-			block.score = deflate.x(x, score = block.score[,,l], 
-				check.args = FALSE),
-			global.score = deflate.x(x, score = global.score[,l], 
-				check.args = FALSE),  
-			canon.tnsr = deflate.x(x, v = vprev, check.args = FALSE))	
+		x <- if (cnstr == "block" && ortho == "score") { 
+			deflate.x(x, score = block.score[,,l])
+		} else if (cnstr == "global" && ortho == "score") { 
+			deflate.x(x, score = global.score[,l])
+		 else { 
+			deflate.x(x, v = vprev, scope = cnstr)	
 	}
 	
 	## Monitor objective value

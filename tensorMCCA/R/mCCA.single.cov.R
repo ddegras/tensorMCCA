@@ -111,16 +111,18 @@ list(v = v, y = canon.scores(x, v), objective = objective[it+1],
 
 
 ################################
-# Internal function for mcca 
+# Internal function for MCCA 
 # Maximize sum of covariances 
-# under global norm constraints 
+# under global norm constraints
+# and orthogonality constraints
+# on canonical vectors 
 ################################
 
 # This function is not meant to be called by the user
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-mcca.single.global.cov <- function(x, v, cc, sweep, maxit, tol, verbose)
+mcca.single.global.cov <- function(x, v, w, ortho, sweep, maxit, tol, verbose)
 {
 	
 ## Data dimensions
@@ -131,7 +133,7 @@ m <- length(x) # number of datasets
 n <- dimx[[1]][ndimx[1]] # number of individuals/objects
 
 objective <- numeric(maxit+1)
-objective[1] <- objective.internal(x, v, cc)
+objective[1] <- objective.internal(x, v, w)
 if (verbose) 
 	cat("\nIteration",0,"Objective",objective[1])
 
@@ -150,14 +152,17 @@ eps <- 1e-14 # numerical tolerance for zero
 rmv <- logical(m)
 
 ## Test if the objective weights are equal or separable
-cequal <- all(cc == cc[1])
-if (cequal) csep <- TRUE
-if (!cequal) {
-	eigc <- eigen(cc, TRUE)
-	csep <- (sum(eigc$values > eps) == 1)
-	cvec <- if (csep) { 
-		eigc$vectors[,1] * sqrt(eigc$values[1]) } else NULL
+equal.w <- all(w == w[1])
+if (equal.w) separable.w <- TRUE
+if (!equal.w) {
+	eigw <- eigen(w, TRUE)
+	separable.w <- (sum(eigw$values > eps) == 1)
+	wvec <- if (separable.w) { 
+		eigw$vectors[,1] * sqrt(eigw$values[1]) } else NULL
 }
+
+## Orthogonality constraints
+northo <- if (is.null(ortho)) 0L else NCOL(ortho)
 
 for (it in 1:maxit) {
 	## Determine blocks of variables to update in each dataset
@@ -199,43 +204,51 @@ for (it in 1:maxit) {
 		groupsize <- length(idxg)
 		start <- cumsum(c(0, p[-groupsize])) + 1
 		end <- cumsum(p)
-		xv <- matrix(0, sum(p), n)		
+		xv <- matrix(0, sum(p), n)
+		vortho <- matrix(0, sum(p), northo)		
 		for (ii in 1:groupsize) {
 			i <- idxg[ii]
-			tvprod <- x[[i]] 
-			pi <- head(dimx[[i]], d[i])
-			vi <- v[[i]]
+			# tvprod <- x[[i]] 
+			# pi <- head(dimx[[i]], d[i])
+			# vi <- v[[i]]
 			kopt <- group[i,g] # selected mode for optimization
+			tvprod <- tnsr.vec.prod(x[[i]], v[[i]][-kopt], 
+				(1:d[i])[-kopt])
 			## If the selected mode is not next to last in X_i
 			## permute the dimensions of X_i to enforce it
-			if (kopt < d[i]) {
-				perm <- c((1:d[i])[-kopt], kopt, d[i]+1)
-				tvprod <- aperm(tvprod, perm)
-			}
-			## Calculate successive tensor-vector products
-			for (k in 1:d[i]) {
-				if (k == kopt) next
-				dim(tvprod) <- c(pi[k], length(tvprod)/pi[k])
-				tvprod <- crossprod(vi[[k]], tvprod)
-			}
-			dim(tvprod) <- c(pi[kopt], n)
-			if (csep && (!cequal)) 
-				tvprod <- cvec[i] * tvprod
+			# if (kopt < d[i]) {
+				# perm <- c((1:d[i])[-kopt], kopt, d[i]+1)
+				# tvprod <- aperm(tvprod, perm)
+			# }
+			# ## Calculate successive tensor-vector products
+			# for (k in 1:d[i]) {
+				# if (k == kopt) next
+				# dim(tvprod) <- c(pi[k], length(tvprod)/pi[k])
+				# tvprod <- crossprod(vi[[k]], tvprod)
+			# }
+			# dim(tvprod) <- c(pi[kopt], n)
+			if (separable.w && (!equal.w)) 
+				tvprod <- wvec[i] * tvprod
 			
 			## Fill matrix block			
 			xv[start[ii]:end[ii],] <- tvprod
+			
+			if (northo > 0) {
+				for (ll in 1:northo) 
+					vortho[start[ii]:end[ii], ll] <- ortho[[i,ll]][kopt]
+			}
 		}
 				
 		## Update canonical vectors and objective value
-		if (csep) { 
+		if (separable.w) { 
 			# Case: objective weight matrix separable (SVD)
 			svdxv <- if (max(dim(xv)) > 2) {
 				svds(xv, k = 1, nu = 1, nv = 0)
 			} else { svd(xv, nu = 1, nv = 1) }
 			vg <- svdxv$u
 			if (ii == groupsize && all(group[,g] > 0)) {
-				objective[it+1] <- ifelse(cequal,
-					(svdxv$d)^2 * cc[1] * m / n,
+				objective[it+1] <- ifelse(equal.w,
+					(svdxv$d)^2 * w[1] * m / n,
 					(svdxv$d)^2 * m / n) }
 		} else {
 			# Case: objective weight matrix nonseparable (EVD)
@@ -246,15 +259,15 @@ for (it in 1:maxit) {
 				for (jj in 1:groupsize) {
 					j <- idxg[jj]
 					cols <- start[ij]:end[jj]
-					xv[rows, cols] <- cc[i, j] * xv[rows, cols]
+					xv[rows, cols] <- w[i, j] * xv[rows, cols]
 				}			
 			}
 			eigxv <- if (max(dim(xv)) > 2) {
 				eigs_sym(xv, k = 1) } else { eigen(xv, TRUE) }
 			vg <- eigxv$vectors[,1]
 			if (ii == groupsize && all(group[,g] > 0)) {
-				objective[it+1] <- ifelse(cequal,
-					eigxv$values[1] * cc[1] * m / n,
+				objective[it+1] <- ifelse(equal.w,
+					eigxv$values[1] * w[1] * m / n,
 					eigxv$values[1] * m / n) }
 		}
 		## Rescale solution to meet global norm constraint 
@@ -276,7 +289,7 @@ for (it in 1:maxit) {
 	## to full calculation
 	# test <- objective.internal(x, v, c)
 	if (any(group[,ngroups] == 0))
-		objective[it+1] <- objective.internal(x, v, cc)
+		objective[it+1] <- objective.internal(x, v, w)
 	if (verbose) 
 		cat("\nIteration",it,"Objective",objective[it+1])
 	# browser()
