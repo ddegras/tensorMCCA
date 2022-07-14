@@ -122,6 +122,12 @@ list(v = v, y = canon.scores(x, v), objective = objective[it+1],
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
+	
+# Note to self: for a given v(i,k) to optimize, 
+# cannot rescale the other v(i,kk) to all have norm 1 
+# because this will likely break orthogonality constraints :-(
+ 
+	
 mcca.single.global.cov <- function(x, v, w, ortho, sweep, maxit, tol, verbose)
 {
 	
@@ -129,36 +135,47 @@ mcca.single.global.cov <- function(x, v, w, ortho, sweep, maxit, tol, verbose)
 dimx <- lapply(x, dim)
 ndimx <- sapply(dimx, length)
 d <- ndimx - 1 # number of image dimensions for each dataset
+p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 m <- length(x) # number of datasets
 n <- dimx[[1]][ndimx[1]] # number of individuals/objects
 
 objective <- numeric(maxit+1)
 objective[1] <- objective.internal(x, v, w)
 if (verbose) 
-	cat("\nIteration",0,"Objective",objective[1])
+	cat("\nIteration", 0, "Objective", objective[1])
 
 ## Define the blocks of optimization variables 
-ngroups <- max(d)
+ngroups <- prod(d)
 ## Dataset/mode combinations to include in each group
-group <- matrix(0, m, ngroups) 
+# group <- matrix(0, m, ngroups) 
 if (sweep == "cyclical") {
+	modes <- mapply(seq.int, 1, d, SIMPLIFY = FALSE)
+	group <- expand.grid(modes, KEEP.OUT.ATTRS = FALSE)
+	group <- matrix(unlist(group), m, ngroups, byrow = TRUE)
 	for (i in 1:m) 
-		group[i,1:d[i]] <- 1:d[i]
+		group[i, ] <- rep_len(1:d[i], ngroups)
 }
 
 ## Logical flags for datasets & associated variables to be 
 ## removed from optimization in case variables become zero
 eps <- 1e-14 # numerical tolerance for zero
 rmv <- logical(m)
+nrm2v <- vector("list", m) 
+nrmt.mk <- numeric(m) # products of norms of canonical vectors
+# except for the one being optimized
 
 ## Test if the objective weights are equal or separable
 equal.w <- all(w == w[1])
-if (equal.w) separable.w <- TRUE
-if (!equal.w) {
+if (equal.w) {
+	wvec <- rep(1/m, m)
+	separable.w <- TRUE
+} else {
 	eigw <- eigen(w, TRUE)
-	separable.w <- (sum(eigw$values > eps) == 1)
+	nonzero <- sum(abs(eigw$values) > (eps * eigw$values[1]))
+	separable.w <- (nonzero == 1)
 	wvec <- if (separable.w) { 
-		eigw$vectors[,1] * sqrt(eigw$values[1]) } else NULL
+		eigw$vectors[,1] * sqrt(eigw$values[1]) 
+	} else NULL	
 }
 
 ## Orthogonality constraints
@@ -169,61 +186,58 @@ if (is.null(ortho)) {
 	northo <- ncol(ortho)
 }
 
+
 for (it in 1:maxit) {
 	## Determine blocks of variables to update in each dataset
 	## in case of a random sweeping pattern
 	if (sweep == "random") {
-		group <- matrix(0, m, ngroups)
-		for (i in 1:m)
-			group[i,sample.int(ngroups, d[i])] <- 1:d[i] 
-	}
-	
-	for (g in 1:ngroups) {
-		## Calculate norms of canonical vectors and rescale 
-		## vectors that are not part of the current update 
-		## so their product is one
-		nrmt <- numeric(m)
+		group <- sapply(d, sample.int, n = ngroups, replace = TRUE)
+		group <- t(group)
+	}	
+
+	## Calculate squared norms of canonical vectors
+	for (i in 1:m) 
+		nrm2v[[i]] <- sapply(v[[i]], function(x) sum(x^2))
+
+	for (g in 1:ngroups) {		
+
+		## Set to zero canonical tensors that are approximately 
+		## zero and remove them from the optimization
 		for (i in 1:m) {
-			nrmv <- sapply(v[[i]], function(x) sqrt(sum(x^2)))
-			nrmt[i] <- prod(nrmv)
-			if (nrmt[i] < eps) { 
-				nrmt[i] <- 0
-				v[[i]] <- lapply(dimx[[i]][-d[i]], numeric)
+			if (any(nrm2v[[i]] < p[[i]] * eps)) { 
+				v[[i]] <- lapply(p[[i]], numeric)
 				rmv[i] <- TRUE
-			} else if (group[i,g] > 0) {
-				for (k in 1:d[i]) {
-					if (k == group[i,g]) next
-					v[[i]][[k]] <- v[[i]][[k]] / nrmv[k] 
-				}
-			}
+			} 
 		}
+		if (all(rmv)) break
+		idxg <- which(!rmv)
+		groupsize <- length(idxg)
 
 		## Create block matrix of tensor-vector products
 		## between X_it and vectors v_il in all modes 
 		## l = 1, ..., d(i) except mode k(i,g) 
 		## Each block corresponds to one dataset and the 
 		## blocks are stacked vertically
-		idxg <- which(group[,g] > 0 & (!rmv))
-		if (length(idxg) == 0) next
-		p <- mapply("[", dimx[idxg], group[idxg,g])
-		groupsize <- length(idxg)
-		start <- cumsum(c(0, p[-groupsize])) + 1
-		end <- cumsum(p)
-		xv <- matrix(0, sum(p), n)
-		vortho <- matrix(0, sum(p), northo)		
+		pg <- mapply("[", p[idxg], group[idxg,g])
+		start <- cumsum(c(0, pg[-groupsize])) + 1
+		end <- cumsum(pg)
+		xv <- matrix(0, sum(pg), n)
+		vortho <- matrix(0, sum(pg), northo)	
 		for (ii in 1:groupsize) {
 			i <- idxg[ii]
-			kopt <- group[i,g] # selected mode for optimization
-			tvprod <- tnsr.vec.prod(x[[i]], v[[i]][-kopt], 
-				(1:d[i])[-kopt]) # tensor-vector products		
-			if (separable.w && (!equal.w)) 
-				tvprod <- wvec[i] * tvprod			
+			k <- group[i,g] # selected mode for optimization
+			tvprod <- tnsr.vec.prod(x[[i]], v[[i]][-k], 
+				(1:d[i])[-k]) # tensor-vector products	
+			nrmt.mk[i] <- sqrt(prod(nrm2v[[i]][-k]))	
+			if (separable.w) 
+				tvprod <- (wvec[i] / nrmt.mk[i]) * tvprod			
 			xv[start[ii]:end[ii],] <- tvprod
 			
 			## Set up orthogonality constraints
 			if (northo > 0) {
 				for (ll in 1:northo) 
-					vortho[start[ii]:end[ii], ll] <- ortho[[i,ll]][kopt]
+					vortho[start[ii]:end[ii], ll] <- 
+						ortho[[i,ll]][[k]] / nrmt.mk[i]
 			}
 		}		
 		if (northo > 0) 	Q <- qr.Q(qr(vortho))
@@ -233,60 +247,71 @@ for (it in 1:maxit) {
 			# Case: objective weight matrix separable (SVD)
 			if (northo > 0) # orthogonality constraints
 				xv <- xv - Q %*% crossprod(Q, xv) 
-			svdxv <- if (max(dim(xv)) > 2) {
+			svdxv <- if (all(dim(xv) > 2)) {
 				svds(xv, k = 1, nu = 1, nv = 0)
-			} else { svd(xv, nu = 1, nv = 1) }
+			} else { svd(xv, nu = 1, nv = 0) }
 			vg <- svdxv$u
-			if (ii == groupsize && all(group[,g] > 0)) {
-				objective[it+1] <- ifelse(equal.w,
-					(svdxv$d)^2 * w[1] * m / n,
-					(svdxv$d)^2 * m / n) }
 		} else {
 			# Case: objective weight matrix nonseparable (EVD)
 			xv <- tcrossprod(xv)
+			s <- tcrossprod(1 / nrmt.mk) * w 
 			for (ii in 1:groupsize) {
 				i <- idxg[ii]
 				rows <- start[ii]:end[ii] 
 				for (jj in 1:groupsize) {
 					j <- idxg[jj]
-					cols <- start[ij]:end[jj]
-					xv[rows, cols] <- w[i, j] * xv[rows, cols]
-				}			
+					cols <- start[jj]:end[jj]
+					xv[rows, cols] <- s[i,j] * xv[rows, cols]
+				}
 			}
-			if (northo > 0) { # project on othogonality constraints
+			if (northo > 0) { # project on orthogonality constraints
 				xv <- xv - Q %*% crossprod(Q, xv)
 				xv <- xv -	tcrossprod(xv %*% Q, Q)
 			}				
-			eigxv <- if (max(dim(xv)) > 2) {
-				eigs_sym(xv, k = 1) } else { eigen(xv, TRUE) }
+			eigxv <- if (all(dim(xv) > 2)) {
+				eigs_sym(xv, k = 1) 
+			} else { eigen(xv, TRUE) }
 			vg <- eigxv$vectors[,1]
-			if (ii == groupsize && all(group[,g] > 0)) {
-				objective[it+1] <- ifelse(equal.w,
-					eigxv$values[1] * w[1] * m / n,
-					eigxv$values[1] * m / n) }
 		}
-		## Rescale solution to meet global norm constraint 
-		s <- sqrt(m - sum(nrmt[group[,g] == 0]^2))
-		vg <-  s * vg
+
+		## Calculate norms of unscaled canonical vectors
+		for (ii in 1:groupsize) {
+			i <- idxg[ii]
+			k <- group[i,g]
+			idx <- start[ii]:end[ii]
+			vg[idx] <- vg[idx] / nrmt.mk[i]
+			nrm2v[[i]][k] <- sum(vg[idx]^2)
+		}
+		
+		## Update canonical vectors and rescale 
+		## to meet global norm constraint 
+		nrm2t <- sapply(nrm2v, prod)
+		s <- sqrt(mean(nrm2t))
+		vg <- vg / s
 		for (ii in 1:groupsize) {
 			i <- idxg[ii]
 			k <- group[i,g]
 			v[[i]][[k]] <- vg[start[ii]:end[ii]]
+			nrm2v[[i]][k] <- nrm2v[[i]][k] / s^2 
 		}
-	
-					
+			
+		## Debugging
+		# nrm2fun <- function(x) sum(x^2)
+		# nrm2v <- lapply(v, function(vv) sapply(vv, nrm2fun))
+		test <- mean(sapply(nrm2v, prod))	
+		browser()		
 	}								
 	
 	## Balance canonical vectors  
 	v <- scale.v(v, cnstr = "global")
 	objective[it+1] <- objective.internal(x, v, w)
 	if (verbose) 
-		cat("\nIteration",it,"Objective",objective[it+1])
+		cat("\nIteration", it, "Objective", objective[it+1])
 	# browser()
 	
 	## Check convergence 
-	if (it > 1 && abs(objective[it+1]-objective[it]) <= 
-	    	tol * max(1,objective[it])) break
+	if (it > 1 && objective[it+1] <= (1 + tol) * 
+		objective[it]) break
 }
 
 list(v = v, y = canon.scores(x, v), objective = objective[it+1], 

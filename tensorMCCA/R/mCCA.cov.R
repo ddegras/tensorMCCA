@@ -9,6 +9,7 @@ test <- if (is.list(init)) {
 	check.arguments(x, init, w)
 } else check.arguments(x, NULL, w)
 eps <- 1e-14
+r0 <- r 
 r <- as.integer(r)
 
 ## Data dimensions
@@ -65,23 +66,24 @@ if (ortho == "canon.tnsr" && r > 1) {
 	
 ## Adjust number of canonical components as needed
 ## (Not strictly needed when calculating canonical components iteratively)
-r0 <- r
-if (norm == "block" && ortho == "score") { 
-	pp <- sapply(p, prod)
-	r <- min(n - 1, pp, r0)
-} else if (norm == "global" && ortho == "score") {
-	pp <- sapply(p, prod)
-	r <- min(n - 1, sum(pp), r0)
-} else if (norm == "block" && ortho == "canon.tnsr") {
-	rr <- unlist(mapply("[", p, ortho.mode))
-	r <- min(n - 1, rr, r0)
-} else {
-	rr <- sapply(1:m, function(i) min(p[ortho.mode[[i]]]))
-	r <- min(n - 1, sum(rr), r0)
-}
-if (verbose && r != r0)
-	warning(paste("\nArgument 'r' set to", r,
-		"to satisfy orthogonality constraints"))
+r <- min(r, n - 1L)
+# r0 <- r
+# if (norm == "block" && ortho == "score") { 
+	# pp <- sapply(p, prod)
+	# r <- min(n - 1, pp, r0)
+# } else if (norm == "global" && ortho == "score") {
+	# pp <- sapply(p, prod)
+	# r <- min(n - 1, sum(pp), r0)
+# } else if (norm == "block" && ortho == "canon.tnsr") {
+	# rr <- unlist(mapply("[", p, ortho.mode))
+	# r <- min(n - 1, rr, r0)
+# } else {
+	# rr <- sapply(1:m, function(i) min(p[ortho.mode[[i]]]))
+	# r <- min(n - 1, sum(rr), r0)
+# }
+# if (verbose && r != r0)
+	# warning(paste("\nArgument 'r' set to", r,
+		# "to satisfy orthogonality constraints"))
 
 ## Initialization parameters
 test <- (is.list(control) && !is.null(control$init))
@@ -95,7 +97,7 @@ if (identical(init, "cca")) {
 		init.args[names.] <- control[names.]
 	}
 } else if (identical(init, "svd")) {
-	init.args <- list(r = 1L, objective = "cov", 
+	init.args <- list(objective = "cov", 
 		norm = "block", center = FALSE)
 	if (test) {
 		names. <- intersect(names(control), c("norm"))
@@ -111,7 +113,7 @@ dim(v) <- c(m, r)
 block.score <- array(dim = c(n, m, r)) # canonical scores
 global.score <- matrix(nrow = n, ncol = r) 
 objective <- iters <- numeric(r)
-input <- list(objective = "covariance", r = r, w = w, 
+input <- list(objective = "covariance", r = r0, w = w, 
 	init = init, ortho = ortho, maxit = maxit, tol = tol, 
 	sweep = sweep) 
 
@@ -148,10 +150,10 @@ for (l in 1:r) {
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
 	out <- if (norm == "block") {
-		mcca.single.cov.block(x = x, v = v0, w = w, sweep = sweep, 
+		mcca.single.block.cov(x = x, v = v0, w = w, sweep = sweep, 
 			maxit = maxit, tol = tol, verbose = verbose)
 	} else {
-		mcca.single.cov.global(x = x, v = v0, w = w, ortho = vprev, 
+		mcca.single.global.cov(x = x, v = v0, w = w, ortho = vprev, 
 			sweep = sweep, maxit = maxit, tol = tol, verbose = verbose)
 	}
 	objective[l] <- out$objective
@@ -170,7 +172,7 @@ for (l in 1:r) {
 			for (i in 1:m) 
 				vprev[[i]][ortho.mode[[i]]] <- v[[i,l]][ortho.mode[[i]]]
 		} else { # norm == "global"
-			vprev <- v[, 1:l]
+			vprev <- v[, 1:l, drop = FALSE]
 			for (i in 1:m) {
 				idx <- setdiff(1:d[i], ortho.mode[[i]])
 				for (ll in 1:l)
@@ -181,12 +183,12 @@ for (l in 1:r) {
 	
 	## Deflate data matrix
 	if (l < r) { 	
-		x <- if (norm == "block" && ortho == "score") { 
-			deflate.x(x, score = block.score[,,l], check.args = FALSE)
+		if (norm == "block" && ortho == "score") { 
+			x <- deflate.x(x, score = block.score[,,l], check.args = FALSE)
 		} else if (norm == "global" && ortho == "score") { 
-			deflate.x(x, score = global.score[,l], check.args = FALSE)
+			x <- deflate.x(x, score = global.score[,l], check.args = FALSE)
 		} else if (norm == "block" && ortho == "canon.tnsr") { 
-			deflate.x(x, v = vprev, scope = norm, check.args = FALSE	)
+			x <- deflate.x(x, v = vprev, scope = norm, check.args = FALSE)
 		}
 	}		
 } 
@@ -202,6 +204,7 @@ if (!identical(o, 1:r)) {
 	iters <- iters[o]
 }
 
+r <- length(o)
 if (r == 1) {
 	dim(block.score) <- c(n, m)
 	dim(global.score) <- NULL

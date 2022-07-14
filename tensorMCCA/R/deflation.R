@@ -40,13 +40,14 @@ eps <- 1e-14
 
 if (!is.null(score)) {
 	if (NCOL(score) != m) score <- matrix(score, n, m)
+	score <- sweep(score, 2, colMeans(score), "-")
 	nrm <- sqrt(colSums(score^2))	
 	nzero <- which(nrm > eps)
 	if (length(nzero) == 0) return(x)
-	score[, nzero] <- sweep(score, 2, nrm[nzero], "/")
 	for (i in nzero) {
 		dim(x[[i]]) <- c(prod(p[[i]]), n)
-		x[[i]] <- x[[i]] - tcrossprod(x[[i]] %*% score[,i], score[,i])
+		x[[i]] <- x[[i]] - tcrossprod(x[[i]] %*% score[,i], 
+			score[,i] / nrm[i]^2)
 		dim(x[[i]]) <- dimx[[i]]
 	}
 }

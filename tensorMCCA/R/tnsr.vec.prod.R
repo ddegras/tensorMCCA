@@ -1,5 +1,6 @@
 tnsr.vec.prod <- function(x, v, modes = NULL)
 {	
+if (length(v) == 0) return(x)
 p <- dim(x) 
 d <- length(p)
 if (is.null(modes) && length(v) == d) modes <- 1:d

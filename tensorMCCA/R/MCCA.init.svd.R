@@ -21,7 +21,7 @@ d <- sapply(p, length)
 n <- tail(dimx[[1]], 1)
 
 objective <- match.arg(objective) # norm or variance constraints
-cnstr <- match.arg(cnstr) # block or global constraints
+norm <- match.arg(norm) # block or global norm constraints
 
 ## Initialize canonical vectors 
 v <- vector("list", m)
@@ -37,10 +37,10 @@ if (center)
 	xmat <- xmat - rowMeans(xmat)
 
 ## Initial SVD
-svdfun <- if (max(dim(xmat)) > 2) {
-	function(x) svds(x, k = 1) } else {
-	function(x) svd(x, nu = 1, nv = 1) } 
-xmat <- svdfun(xmat)$u
+xmat <- if (all(dim(xmat) > 2)) {
+	svds(xmat, k = 1, nv = 0)$u 
+} else svd(xmat, nu = 1, nv = 0)$u
+
 
 ## Iteratively unfold singular vectors and recalculate SVD
 lenx <- sapply(p, prod)
@@ -52,7 +52,9 @@ for (i in 1:m) {
 	for (k in 1:d[i]) {	
 		if (k < d[i]) {
 			dim(xi) <- c(pi[k], length(xi) / pi[k])
-			svdx <- svdfun(xi)
+			svdx <- if (all(dim(xi) > 2)) {
+				svds(xi, k = 1)
+			} else svd(xi, nu = 1, nv = 1)
 			v[[i]][[k]] <- svdx$u
 			xi <- svdx$v
 		} else {
