@@ -75,10 +75,10 @@ if (!is.null(v)) {
 	} else {
 		for (i in 1:m) {
 			for (k in 1:d[i]) {
-				idxl <- which(sapply(ortho.mode[,i], 
+				idx <- which(sapply(ortho.mode[,i], 
 					is.element, el = k))
-				if (length(idxl) == 0) next
-				vik <- sapply(v[i,idxl], "[[", k)
+				if (length(idx) == 0) next
+				vik <- sapply(v[i,idx], "[[", k)
 				qrvik <- qr(vik)
 				if (qrvik$rank == 0L) next
 				vik <- qr.Q(qrvik)[, 1:qrvik$rank]
@@ -97,6 +97,7 @@ if (!is.null(v)) {
 	}
 	return(x)
 }
+
 
 ## Deflate with respect to canonical scores
 if (!is.null(score)) {

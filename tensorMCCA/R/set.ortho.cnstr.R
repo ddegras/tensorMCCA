@@ -1,4 +1,4 @@
-set.ortho.cnstr <- function(x, r, cnstr = NULL,  
+set.ortho.mode <- function(x, r, cnstr = NULL,  
 	method = c("cyclical", "random", "alldim", "maxdim"))
 {
 test <- check.arguments(x)
@@ -55,3 +55,36 @@ if (!is.null(cnstr)) {
 ortho.mode
 }
 
+
+set.ortho.mat <- function(v, ortho.mode)
+{
+if (!is.matrix(v)) v <- as.matrix(v)
+if (!is.matrix(ortho.mode)) 
+	ortho.mode <- as.matrix(ortho.mode)
+stopifnot(all(dim(v) == dim(ortho.mode)))
+m <- nrow(v)
+ortho.mat <- modes <- vector("list", m)
+for (i in 1:m) {
+	idxi <- ortho.mode[, i]
+	di <- length(v[[i]]) 
+	mat <- vector("list", di)
+	for (k in 1:di) {
+		idxik <- which(sapply(idxi, is.element, el = k))
+		if (length(idxik) == 0) next
+		vik <- sapply(v[i,idxik], "[[", k)
+		qrvik <- qr(vik)
+		pik <-  nrow(vik)
+		rik <- qrvik$rank
+		if (rik > 0 && rik < pik) {
+			mat[[k]] <- t(qr.Q(qrvik, TRUE)[, -(1:rik)])
+		} else if (rik == pik) {
+			mat[[k]] <- matrix(0, 1, nrow(vik))
+		}
+	}
+	modei <- which(!sapply(mat, is.null))
+	ortho.mat[[i]] <- mat[modei]
+	modes[[i]] <- modei
+}
+
+list(mat = ortho.mat, modes = modes)
+}

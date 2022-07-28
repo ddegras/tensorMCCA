@@ -39,9 +39,13 @@ mcca.init <- if (is.character(init)) {
 } else NULL
 
 ## Center data
-for(i in 1:m) {
-    xbar <- rowMeans(x[[i]], dims = d[i])
-    x[[i]] <- x[[i]] - as.vector(xbar)
+if (ortho == "canon.tnsr" && norm == "block") {
+	xbar <- mapply(rowMeans, x = x, dims = d, SIMPLIFY = FALSE)	
+} else {	
+	for(i in 1:m) {
+	    xbar <- rowMeans(x[[i]], dims = d[i])
+	    x[[i]] <- x[[i]] - as.vector(xbar)
+	}
 }
 
 ## Adjust number of canonical components 
@@ -65,7 +69,7 @@ r <- if (ortho == "score" && norm == "block") {
 ## constraints are on canonical tensors
 if (ortho == "canon.tnsr" && r > 1) {
 	## Set tensor modes on which constraints apply
-	ortho.mode <- set.ortho.cnstr(x, r, 
+	ortho.mode <- set.ortho.mode(x, r, 
 		cnstr = control$ortho$cnstr, 
 		method = control$ortho$method)
 }
@@ -126,14 +130,36 @@ if (ortho == "canon.tnsr") x0 <- x
 
 for (l in 1:r) {	
 	
+	
+	## Deflate data matrix
+	if (l > 1) { 	
+		if (ortho == "score" && norm == "block") { 
+			x <- deflate.x(x, score = block.score[,,l], 
+				check.args = FALSE)
+		} else if (ortho == "score" && norm == "global") { 
+			x <- deflate.x(x, score = global.score[,l], 
+				check.args = FALSE)
+		} else if (ortho == "canon.tnsr" && norm == "block") {
+			cnstr <- set.ortho.mat(v = v[, 1:(l-1)], 
+				modes = t(ortho.mode[1:(l-1), l, ]))
+			for(i in 1:m) 
+				x[[i]] <- tnsr.mat.prod(
+					x = x0[[i]] - as.vector(xbar[[i]]), 
+					mat = cnstr$mat[[i]], modes = cnstr$modes[[i]])
+		} 
+	}
+	
 	## Initialize canonical vectors
 	if (is.character(init)) {
 		init.args$x <- x
 		v0 <- do.call(mcca.init, init.args)
-	} else if (is.list(init) && is.vector(init)) {
-		v0 <- init
+	} else if (is.list(init)) {
+		v0 <- if (is.vector(init)) {
+			init } else { init[, min(l, ncol(init))] }
+		if (ortho == "canon.tnsr" && norm == "block")
+			v0
 	} else {
-		v0 <- init[, min(l, NCOL(init))]
+		v0 <- 
 	} 
 	
 	## Run MCCA and store results
@@ -169,21 +195,7 @@ for (l in 1:r) {
 			}
 		}
 	} 
-	
-	## Deflate data matrix
-	if (l < r) { 	
-		if (ortho == "score" && norm == "block") { 
-			x <- deflate.x(x, score = block.score[,,l], check.args = FALSE)
-		} else if (ortho == "score" && norm == "global") { 
-			x <- deflate.x(x, score = global.score[,l], check.args = FALSE)
-		} else if (ortho == "canon.tnsr" && norm == "block") {
-			x <- deflate.x(x, v = v[, 1:l], 
-				ortho.mode = ortho.mode[1:l, l+1,], check.args = FALSE)
-		} 
-		# else if (norm == "block" && ortho == "canon.tnsr") { 
-			# x <- deflate.x(x, v = vprev, scope = norm, check.args = FALSE)
-		# }
-	}		
+		
 } 
 
 ## Re-order results according to objective values if needed
