@@ -12,9 +12,9 @@
 
 
 ## Inputs
-# v:	initial solution for canonical tensor
-# a:	entire data tensor for quadratic term
-# b:	reduced data tensor (weighted average over individuals) for linear term
+# v: initial solution for canonical tensor
+# a:	 entire data tensor for quadratic term
+# b:	 reduced data tensor (weighted average over individuals) for linear term
 
 optim.block.cov <- function(v, a, b, maxit = 1000, tol = 1e-6)
 {

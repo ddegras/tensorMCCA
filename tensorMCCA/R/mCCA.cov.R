@@ -32,58 +32,43 @@ norm <- match.arg(norm)
 sweep <- match.arg(sweep)
 if (is.character(init)) init <- match.arg(init)
 
-## Initialization method
+## Set initialization method
 mcca.init <- if (is.character(init)) {
 	switch(init, cca = mcca.init.cca, 
 		svd = mcca.init.svd, random = mcca.init.random)
 } else NULL
 
-## Data centering
+## Center data
 for(i in 1:m) {
     xbar <- rowMeans(x[[i]], dims = d[i])
     x[[i]] <- x[[i]] - as.vector(xbar)
 }
 
+## Adjust number of canonical components 
+r <- min(r, n - 1L)
+r0 <- r
+pp <- sapply(p, prod)
+r <- if (ortho == "score" && norm == "block") { 
+	min(n - 1, max(pp), r0)
+} else if (ortho == "score" && norm == "global") {
+	min(n - 1, sum(pp), r0)
+} else if (ortho == "canon.tnsr" && norm == "block") {
+	min(max(pp), r0)
+} else {
+	min(sum(pp), r0)
+}
+# if (verbose && r != r0)
+	# warning(paste("\nArgument 'r' set to", r,
+		# "to satisfy orthogonality constraints"))
+
 ## Prepare optimization if orthogonality 
 ## constraints are on canonical tensors
 if (ortho == "canon.tnsr" && r > 1) {
 	## Set tensor modes on which constraints apply
-	if (length(control) > 0 && (!is.null(control$ortho))) {
-		ortho.mode <- if (is.integer(control$ortho)) {
-			as.list(rep_len(control$ortho, m))
-		} else if (is.list(control$ortho)) {
-			rep_len(control$ortho, m)
-		} else if (identical(control$ortho, "all")) {
-			mapply(seq.int, from = rep(1L, m), to = d, 
-				SIMPLIFY = FALSE)
-		} else {
-			as.list(rep_len(1L, m))
-		}
-	} else {
-		ortho.mode <- as.list(rep_len(1L, m))
-	}
+	ortho.mode <- set.ortho.cnstr(x, r, 
+		cnstr = control$ortho$cnstr, 
+		method = control$ortho$method)
 }
-	
-## Adjust number of canonical components as needed
-## (Not strictly needed when calculating canonical components iteratively)
-r <- min(r, n - 1L)
-# r0 <- r
-# if (norm == "block" && ortho == "score") { 
-	# pp <- sapply(p, prod)
-	# r <- min(n - 1, pp, r0)
-# } else if (norm == "global" && ortho == "score") {
-	# pp <- sapply(p, prod)
-	# r <- min(n - 1, sum(pp), r0)
-# } else if (norm == "block" && ortho == "canon.tnsr") {
-	# rr <- unlist(mapply("[", p, ortho.mode))
-	# r <- min(n - 1, rr, r0)
-# } else {
-	# rr <- sapply(1:m, function(i) min(p[ortho.mode[[i]]]))
-	# r <- min(n - 1, sum(rr), r0)
-# }
-# if (verbose && r != r0)
-	# warning(paste("\nArgument 'r' set to", r,
-		# "to satisfy orthogonality constraints"))
 
 ## Initialization parameters
 test <- (is.list(control) && !is.null(control$init))
@@ -92,16 +77,16 @@ if (identical(init, "cca")) {
 		objective = "cov", norm = "block", center = FALSE, 
 		search = ifelse(m <= 5, "exhaustive", "approximate"))
 	if (test) {
-		names. <- intersect(names(control), 
+		names. <- intersect(names(control$init), 
 			c("k", "norm", "search"))
-		init.args[names.] <- control[names.]
+		init.args[names.] <- control$init[names.]
 	}
 } else if (identical(init, "svd")) {
 	init.args <- list(objective = "cov", 
 		norm = "block", center = FALSE)
 	if (test) {
-		names. <- intersect(names(control), c("norm"))
-		init.args[names.] <- control[names.]
+		names. <- intersect(names(control$init), c("norm"))
+		init.args[names.] <- control$init[names.]
 	}
 } else if (identical(init, "random")) {
 	init.args <- list(r = 1L, objective = "cov")
@@ -133,7 +118,11 @@ if (all(test | w == 0)) {
 
 
 ## MAIN LOOP
-vprev <- NULL
+vzero <- vector("list", m)
+for (i in 1:m) vzero[[i]] <- lapply(d, numeric) 
+vortho <- NULL
+# browser()
+if (ortho == "canon.tnsr") x0 <- x
 
 for (l in 1:r) {	
 	
@@ -153,7 +142,7 @@ for (l in 1:r) {
 		mcca.single.block.cov(x = x, v = v0, w = w, sweep = sweep, 
 			maxit = maxit, tol = tol, verbose = verbose)
 	} else {
-		mcca.single.global.cov(x = x, v = v0, w = w, ortho = vprev, 
+		mcca.single.global.cov(x = x, v = v0, w = w, ortho = vortho, 
 			sweep = sweep, maxit = maxit, tol = tol, verbose = verbose)
 	}
 	objective[l] <- out$objective
@@ -183,13 +172,17 @@ for (l in 1:r) {
 	
 	## Deflate data matrix
 	if (l < r) { 	
-		if (norm == "block" && ortho == "score") { 
+		if (ortho == "score" && norm == "block") { 
 			x <- deflate.x(x, score = block.score[,,l], check.args = FALSE)
-		} else if (norm == "global" && ortho == "score") { 
+		} else if (ortho == "score" && norm == "global") { 
 			x <- deflate.x(x, score = global.score[,l], check.args = FALSE)
-		} else if (norm == "block" && ortho == "canon.tnsr") { 
-			x <- deflate.x(x, v = vprev, scope = norm, check.args = FALSE)
-		}
+		} else if (ortho == "canon.tnsr" && norm == "block") {
+			x <- deflate.x(x, v = v[, 1:l], 
+				ortho.mode = ortho.mode[1:l, l+1,], check.args = FALSE)
+		} 
+		# else if (norm == "block" && ortho == "canon.tnsr") { 
+			# x <- deflate.x(x, v = vprev, scope = norm, check.args = FALSE)
+		# }
 	}		
 } 
 

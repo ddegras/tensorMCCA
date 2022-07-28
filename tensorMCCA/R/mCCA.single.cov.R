@@ -23,10 +23,12 @@ n <- tail(dimx[[1]], 1)
 objective <- numeric(maxit + 1L)
 objective[1] <- objective.internal(x, v, w)
 if (verbose) 
-	cat("\nIteration",0,"Objective",objective[1])
+	cat("\nIteration", 0, "Objective", objective[1])
+v.best <- v
+objective.best <- objective[1]
 
-score <- matrix(0, n, m) # inner products <X_it, v_i>
-wiizero <- diag(w) == 0
+score <- matrix(0, n, m) # canonical scores <X_it, v_i>
+wiizero <- (diag(w) == 0)
 s <- ifelse(wiizero, rep(1,m), diag(w)) # scaling term 
 if (sweep == "cyclical") idxi <- 1:m
 
@@ -45,61 +47,41 @@ for (it in 1:maxit) {
 	vprev <- v
 	for (i in 1:m) { 		
 		if (xzero[i]) next
-		## Calculate the inner products <X_jt, v_j> 
+		## Calculate the scores <X_jt, v_j> 
 		## After the first algorithm iteration (it = 1), in each 
 		## iteration of the i loop, only the inner products associated 
 		## with the previous value of i need being updated
 		idxj <- if (it == 1 && i == 1) { idxi[-1]  
 			} else if (i == 1) { lastidx } else idxi[i-1]
-		for (j in idxj) {
-			## Calculate tensor-vector products between X_j and 
-			## all vectors v_(jk) for k != i
+		for (j in idxj) 
 			score[, j] <- tnsr.vec.prod(x[[j]], v[[j]], 1:d[j]) 
-			# tvprod <- x[[j]] 
-			# pj <- head(dimx[[j]], d[j])
-			# vj <- v[[j]]
-			# for (k in 1:d[j]) {
-				# if (k < d[j]) {
-					# dim(tvprod) <- c(pj[k], prod(pj[(k+1):d[j]], n))
-					# tvprod <- crossprod(vj[[k]], tvprod)
-					# dim(tvprod) <- c(pj[k+1], length(tvprod) / pj[k+1])	
-				# } else {
-					# iprod[j,] <- crossprod(vj[[k]], tvprod)
-				# }				
-			# }
-		}
 		lastidx <- idxi[m]
 		
 		## Set up quadratic program 
 		a <- if (wiizero[i]) 0 else x[[i]] # quadratic component
 		b <- tnsr.vec.prod(x = x[[i]], 
 			v = list(score[, -i] %*% (w[-i, i] / s[i])), 
-			modes = d[i] + 1) # linear component
-		# ww <- crossprod(iprod[-i,, drop = FALSE], c[-i, i] / s[i])
-		# b <- x[[i]]	# linear component
-		# dim(b) <- c(prod(dimx[[i]][-ndimx[i]]), n)
-		# b <- b %*% ww
-		# if (d[i] > 1) dim(b) <- dimx[[i]][-ndimx[i]]
+			modes = d[i] + 1L) # linear component
 		
 		## Update canonical vectors
 		v[[i]] <- optim.block.cov(v[[i]], a, b, maxit, tol) 	
 	}								
 	
-	## Calculate objective value (sum of correlations)
-	objective[it + 1] <- objective.internal(x, v, w)
-	if (objective[it + 1] < objective[it]) {
-		v <- vprev
-		objective[it + 1] <- objective[it]
+	## Calculate objective value 
+	objective[it + 1L] <- objective.internal(x, v, w)
+	if (objective[it + 1L] > objective.best) {
+		v.best <- v
+		objective.best <- objective[it + 1L]
 	}
 	if (verbose) 
-		cat("\nIteration",it,"Objective",objective[it+1])
+		cat("\nIteration", it, "Objective", objective[it+1L])
 	
 	## Check convergence 
 	if (it > 1 && abs(objective[it + 1] - objective[it]) <= 
 	    	tol * max(1, objective[it])) break
 }
 
-list(v = v, y = canon.scores(x, v), objective = objective[it+1], 
+list(v = v.best, y = canon.scores(x, v.best), objective = objective.best, 
 	iters = it, trace = objective[1:(it+1)])
 
 }
@@ -298,8 +280,8 @@ for (it in 1:maxit) {
 		## Debugging
 		# nrm2fun <- function(x) sum(x^2)
 		# nrm2v <- lapply(v, function(vv) sapply(vv, nrm2fun))
-		test <- mean(sapply(nrm2v, prod))	
-		browser()		
+		# test <- mean(sapply(nrm2v, prod))	
+		# browser()		
 	}								
 	
 	## Balance canonical vectors  
@@ -310,8 +292,8 @@ for (it in 1:maxit) {
 	# browser()
 	
 	## Check convergence 
-	if (it > 1 && objective[it+1] <= (1 + tol) * 
-		objective[it]) break
+	if (it > 1 && abs(objective[it+1] - objective[it]) <= 
+		max(1, tol) * objective[it]) break
 }
 
 list(v = v, y = canon.scores(x, v), objective = objective[it+1], 

@@ -5,12 +5,12 @@ library(tensorMCCA)
 load_all(path)
 
 
-
+n <- 10
 w <- matrix(1/9, 3, 3)
 w2 <- matrix(1/6, 3, 3)
 diag(w2) <- 0
-x <- list(matrix(runif(50), 5, 10), array(runif(60), c(2, 3, 10)), 
-	array(runif(80), c(2, 2, 2, 10))) 
+x <- list(matrix(runif(5*n), 5, n), array(runif(6*n), c(2, 3, n)), 
+	array(runif(8*n), c(2, 2, 2, n))) 
 v <- list(list(runif(5)), list(runif(2), runif(3)), 
 	list(runif(2), runif(2), runif(2)))
 control <- list(ortho = 1:3)
@@ -22,6 +22,9 @@ test <- mcca.cov(x, r = 10, init = "cca", verbose = TRUE)
 test <- mcca.cov(x, r = 10, init = "svd", verbose = TRUE)
 test <- mcca.cov(x, r = 10, init = "random", verbose = TRUE)
 test <- mcca.cov(x, r = 10, init = v, verbose = TRUE)
+
+test <- mcca.cov(x, r = 10, ortho = "canon", 
+	init = "cca", verbose = TRUE)
 
 undebug(mcca.single.global.cov)
 test <- mcca.cov(x, r = 10, w = w2, norm = "global",
