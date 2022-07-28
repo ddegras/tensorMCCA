@@ -38,3 +38,20 @@ for (kk in 1:nmodes) {
 }
 x
 }
+
+
+
+tnsr.rk1.mat.prod <- function(v, mat, modes, transpose.mat = FALSE)
+{
+m <- length(v)
+nmodes <- sapply(modes, length)
+for (i in 1:m) {
+	for (kk in nmodes[i]) {
+		k <- modes[[i]][kk]
+		v[[i]][[k]] <- if (transpose.mat) {
+			crossprod(mat[[i]][[kk]], v[[i]][[k]])
+		} else { mat[[i]][[kk]] %*% v[[i]][[k]] }
+	}
+}
+v
+}

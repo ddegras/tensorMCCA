@@ -131,7 +131,7 @@ if (ortho == "canon.tnsr") x0 <- x
 for (l in 1:r) {	
 	
 	
-	## Deflate data matrix
+	## Prepare orthogonality constraints
 	if (l > 1) { 	
 		if (ortho == "score" && norm == "block") { 
 			x <- deflate.x(x, score = block.score[,,l], 
@@ -146,7 +146,14 @@ for (l in 1:r) {
 				x[[i]] <- tnsr.mat.prod(
 					x = x0[[i]] - as.vector(xbar[[i]]), 
 					mat = cnstr$mat[[i]], modes = cnstr$modes[[i]])
-		} 
+		} else { # ortho == "canon.tnsr" && norm == "global"
+			vortho <- v[, 1:(l-1), drop = FALSE]
+			for (i in 1:m) {
+				idx <- setdiff(1:d[i], ortho.mode[[1:(l-1),l,i]])
+				for (ll in 1:(l-1))
+					vortho[[i,ll]][idx] <- lapply(p[[i]][idx], numeric)
+			}
+		}
 	}
 	
 	## Initialize canonical vectors
@@ -156,10 +163,11 @@ for (l in 1:r) {
 	} else if (is.list(init)) {
 		v0 <- if (is.vector(init)) {
 			init } else { init[, min(l, ncol(init))] }
-		if (ortho == "canon.tnsr" && norm == "block")
-			v0
-	} else {
-		v0 <- 
+		if (ortho == "canon.tnsr" && norm == "block") {
+			v0 <- mapply(tnsr.rk1.mat.prod, v = v0, 
+				mat = cnstr$mat, modes = cnstr$modes, 
+				transpose.mat = TRUE, SIMPLIFY = FALSE)
+		}
 	} 
 	
 	## Run MCCA and store results
@@ -175,26 +183,14 @@ for (l in 1:r) {
 	block.score[,,l] <- out$y 
 	global.score[,l] <- rowMeans(block.score[,,l]) 
 	iters[l] <- out$iters
-	v[,l] <- out$v
+	v[,l] <- if (ortho == "canon.tnsr" && norm == "block") {
+		mapply(tnsr.rk1.mat.prod, v = out$v, 
+				mat = cnstr$mat, modes = cnstr$modes, 
+				transpose.mat = FALSE, SIMPLIFY = FALSE)
+	} else { out$v }
 
 	## Monitor objective value
 	if (objective[l] <= eps) break 
-
-	## Prepare orthogonality constraints for next stage
-	if (ortho == "canon.tnsr" && l < r) {
-		if (norm == "block") {
-			vprev <- lapply(d, function(len) vector("list", len))
-			for (i in 1:m) 
-				vprev[[i]][ortho.mode[[i]]] <- v[[i,l]][ortho.mode[[i]]]
-		} else { # norm == "global"
-			vprev <- v[, 1:l, drop = FALSE]
-			for (i in 1:m) {
-				idx <- setdiff(1:d[i], ortho.mode[[i]])
-				for (ll in 1:l)
-					vprev[[i,ll]][idx] <- lapply(p[[i]][idx], numeric)
-			}
-		}
-	} 
 		
 } 
 
