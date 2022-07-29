@@ -8,11 +8,11 @@ if (is.null(modes) && length(mat) == d) modes <- 1:d
 stopifnot(length(mat) == length(modes))
 modes <- as.integer(modes)
 nmodes <- length(modes)
-if (nmodes > 1 && any(diff(modes) < 0)) {
-	ord <- order(modes)
-	mat <- mat[ord]
-	modes <- modes[ord]
-}
+# if (nmodes > 1 && any(diff(modes) < 0)) {
+	# ord <- order(modes)
+	# mat <- mat[ord]
+	# modes <- modes[ord]
+# }
 
 if (d == 2) {
 	if (identical(modes, 1L)) {
@@ -32,8 +32,8 @@ for (kk in 1:nmodes) {
 	dimx <- dim(x)
 	if (k > 1) x <- aperm(x, perm)
 	dim(x) <- c(dimx[k], prod(dimx[-k]))
-	x <- mat[[k]] %*% x
-	dim(x) <- c(nrow.mat[k], dimx[perm[-1]])
+	x <- mat[[kk]] %*% x
+	dim(x) <- c(nrow.mat[kk], dimx[perm[-1]])
 	if (k > 1) x <- aperm(x, perm)
 }
 x
@@ -46,11 +46,13 @@ tnsr.rk1.mat.prod <- function(v, mat, modes, transpose.mat = FALSE)
 m <- length(v)
 nmodes <- sapply(modes, length)
 for (i in 1:m) {
-	for (kk in nmodes[i]) {
+	for (kk in 1:nmodes[i]) {
 		k <- modes[[i]][kk]
+		# if (length(v[[i]][[k]]) == 1) browser() 
 		v[[i]][[k]] <- if (transpose.mat) {
 			crossprod(mat[[i]][[kk]], v[[i]][[k]])
 		} else { mat[[i]][[kk]] %*% v[[i]][[k]] }
+		dim(v[[i]][[k]]) <- NULL	
 	}
 }
 v

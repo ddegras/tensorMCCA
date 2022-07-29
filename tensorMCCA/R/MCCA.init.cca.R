@@ -25,14 +25,26 @@ m <- length(x) # number of datasets
 dimx <- lapply(x, dim) # full data dimensions
 p <- lapply(dimx, function(idx) idx[-length(idx)]) 
 # image dimensions (omit last dimension = instances/cases)
+cnst.set <- sapply(x, function(xx) all(abs(xx - xx[1]) < eps))
+if (all(cnst.set)) {
+	v <- vector("list", m)
+	for (i in 1:m) 
+		v[[i]] <- lapply(p[[i]], numeric)
+	return(v)
+} else if (any(cnst.set)) {
+	m0 <- m
+	dimx0 <- dimx
+	p0 <- p
+	x <- x[!cnst.set]
+	m <- sum(!cnst.set)
+	p <- p[!cnst.set]
+}
 pp <- sapply(p, prod)
 d <- sapply(p, length)
-n <- sapply(dimx, tail, 1)
-if (!all(n == n[1])) 
-	stop(paste("The last modes of the components of 'x'",
-		"must have the same dimension"))
-n <- n[[1]]
+n <- tail(dimx[[1]], 1)
 if (is.null(k)) { k <- n } else { k <- min(k, n) }
+
+
 
 ## Scaling constraints
 objective.type <- match.arg(objective)   
@@ -48,6 +60,8 @@ search <- if (identical(search,
 } else { match.arg(search) }
 
 ## Objective weights
+if (is.matrix(w)) 
+	w <- w[!cnst.set, !cnst.set]
 stopifnot(length(w) == 1 || 
 	(is.matrix(w) && all(dim(w) == length(x))))
 stopifnot(all(w >= 0) && any(w > 0))
@@ -89,7 +103,7 @@ u <- dd <- xred <- vector("list", m)
 for (i in which(reducex)) {
 	xmat <- if (center) { matrix(x[[i]] - xbar[[i]], pp[i], n)  
 		} else { matrix(x[[i]], pp[i], n) }
-	svdx <- if(max(n, pp[i]) > 2 && min(n, pp[i]) > k[i]) {
+	svdx <- if (min(n, pp[i]) > max(2, k[i])) {
 		svds(xmat, k[i])
 	} else {
 		svd(xmat, nu = k[i], nv = k[i])
@@ -409,6 +423,15 @@ if (norm == "block" && search == "exhaustive") {
 ## Drop singleton dimensions
 for (i in 1:m)
 	v[[i]] <- lapply(v[[i]], drop)
+
+## Put back canonical tensors for constant datasets
+if (any(cnst.set)) {
+	vv <- vector("list", m0)
+	vv[!cnst.set] <- v
+	for (i in which(cnst.set))
+		vv[[i]] <- lapply(p0[[i]], numeric)
+	v <- vv
+}
 
 v
 

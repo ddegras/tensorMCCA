@@ -204,24 +204,36 @@ objective <- numeric(maxit)
 for (it in 1:maxit) {
 
 	## Update canonical vector in dimension 1 
-	aa <- matrix(0, p[1], n)
-	for (t in 1:n) aa[,t] <- a[,,t] %*% v[[2]]
-	bb <- b %*% v[[2]]
+	if (p[2] == 1) {
+		aa <- drop(a) * v[[2]]
+		bb <- b * v[[2]]
+	} else {
+		aa <- matrix(0, p[1], n)
+		for (t in 1:n) aa[,t] <- a[,,t] %*% v[[2]]
+		bb <- b %*% v[[2]]
+	}
 	v[1] <- optim1D.cov(aa, bb)
 		
 	## Update canonical vector in dimension 2
-	aa <- matrix(0, p[2], n)
-	for (t in 1:n) aa[,t] <- crossprod(a[,,t], v[[1]])
-	bb <- crossprod(b, v[[1]])
+	if (p[1] == 1) {
+		aa <- drop(a) * v[[1]]
+		bb <- t(b) * v[[1]]
+	} else {
+		aa <- matrix(0, p[2], n)
+		for (t in 1:n) aa[,t] <- crossprod(a[,,t], v[[1]])
+		bb <- crossprod(b, v[[1]])
+	}
 	v[2] <- optim1D.cov(aa, bb)
 	
 	## Calculate objective
-	objective[it] <- mean(crossprod(v[[2]], aa)^2) + 
-		2 * sum(bb * v[[2]])
+	objective[it] <- if (p[2] == 1) {
+		v[[2]]^2 * mean(aa^2) + 2 * v[[2]] * sum(bb)
+	} else { mean(crossprod(v[[2]], aa)^2) + 
+		2 * sum(bb * v[[2]]) }
 	
 	## Check convergence 
-	if (it > 1 && abs(objective[it]-objective[it-1]) <= 
-	    	tol * max(1,objective[it-1])) break
+	if (it > 1 && abs(objective[it] - objective[it-1]) <= 
+	    	tol * max(1, objective[it-1])) break
 }
 
 return(v)
@@ -258,44 +270,55 @@ if (all(a == 0))
 objective <- numeric(maxit)
 
 for (it in 1:maxit) {
-
-	## Update canonical vector in dimension 1 
-	aa <- matrix(0, p[1], n)
-	bb <- numeric(p[1])
-	for (i in 1:p[1]) { 
-		bb[i] <- crossprod(v[[2]], b[i,,] %*% v[[3]])
-		for (t in 1:n) 
-			aa[i,t] <- crossprod(v[[2]], a[i,,,t] %*% v[[3]])
-	}
-	v[[1]] <- unlist(optim1D.cov(aa, bb))
 	
-	## Update canonical vector in dimension 2
-	aa <- matrix(0, p[2], n)
-	bb <- numeric(p[2])
-	for (j in 1:p[2]) { 
-		bb[j] <- crossprod(v[[1]], b[,j,] %*% v[[3]])
-		for (t in 1:n) 
-			aa[j,t] <- crossprod(v[[1]], a[,j,,t] %*% v[[3]])
+	## Update canonical vector in dimension k = 1,2,3
+	for (k in 1:3) {
+		i1 <- min((1:3)[-k])
+		i2 <- max((1:3)[-k])
+		aa <- aperm(a, c(i1, k, 4, i2))
+		bb <- aperm(b, c(i1, k, i2))
+		if (all(p[c(i1,i2)] == 1)) {
+			aa <- v[[i1]] * v[[i2]] * drop(aa)
+			bb <- v[[i1]] * v[[i2]] * drop(b)
+		} else if (p[i1] == 1 && p[i2] > 1) {
+			dim(aa) <- c(p[k] * n, p[i2])
+			aa <- aa %*% v[[i2]]
+			bb <- if (p[k] == 1) {
+				v[[i1]] * sum(drop(bb) * v[[i2]])
+			} else {
+				v[[i1]] * drop(bb) %*% v[[i2]]
+			}
+		} else if (p[i1] > 1 && p[i2] == 1) {
+			dim(aa) <- c(p[i1], p[k] * n)
+			aa <- crossprod(v[[i1]], aa)
+			bb <- if (p[k] == 1) {
+				v[[i2]] * sum(drop(bb) * v[[i1]])
+			} else {
+				crossprod(v[[i1]], drop(bb)) * v[[i2]]
+			}
+		} else {		
+			dim(aa) <- c(p[i1], prod(p[c(k,i2)], n))
+			aa <- crossprod(v[[i1]], aa)
+			dim(aa) <- c(p[k] * n, p[i2])
+			aa <- aa %*% v[[i2]]
+			dim(bb) <- c(p[i1], prod(p[c(k,i2)]))
+			bb <- crossprod(v[[i1]], bb) 
+			dim(bb) <- p[c(k,i2)]
+			bb <- bb %*% v[[i2]]
+		}
+		dim(aa) <- c(p[k], n)	
+		v[[k]] <- unlist(optim1D.cov(aa, bb))
 	}
-	v[[2]] <- unlist(optim1D.cov(aa, bb))
-
-	## Update canonical vector in dimension 3
-	aa <- matrix(0, p[3], n)
-	bb <- numeric(p[3])
-	for (k in 1:p[3]) { 
-		bb[k] <- crossprod(v[[1]], b[,,k] %*% v[[2]])
-		for (t in 1:n) 
-			aa[k,t] <- crossprod(v[[1]], a[,,k,t] %*% v[[2]])
-	}
-	v[[3]] <- unlist(optim1D.cov(aa, bb))
-
+	
 	## Calculate objective
-	objective[it] <- mean(crossprod(v[[3]], aa)^2) + 
-		2 * sum(bb * v[[3]])
+	objective[it] <- if (p[[3]] == 1) {
+		v[[3]]^2 * mean(aa^2) + 2  * v[[3]] * sum(bb)
+	} else { mean(crossprod(v[[3]], aa)^2) + 
+		2 * sum(bb * v[[3]]) }
 	
 	## Check convergence 
-	if (it > 1 && abs(objective[it]-objective[it-1]) <= 
-	    	tol * max(1,objective[it-1])) break
+	if (it > 1 && abs(objective[it] - objective[it-1]) <= 
+	    	tol * max(1, objective[it-1])) break
 }
 
 return(v)
@@ -332,43 +355,22 @@ objective <- numeric(maxit)
 
 for (it in 1:maxit) {
 
-	## Update canonical vector in dimension 1 
-	aa <- matrix(0, p[1], n)
-	bb <- numeric(p[1])
-	for (i in 1:p[1]) { 
-		bb[i] <- crossprod(v[[2]], b[i,,] %*% v[[3]])
-		for (t in 1:n) 
-			aa[i,t] <- crossprod(v[[2]], a[i,,,t] %*% v[[3]])
+	## Update canonical vector in dimension k = 1,...,d
+	for (k in 1:d) { 
+		aa <- tnsr.vec.prod(a, v[-k], (1:(d+1))[-k])
+		bb <- tnsr.vec.prod(b, v[-k], (1:d)[-k])
+		v[[k]] <- unlist(optim1D.cov(aa, bb))
 	}
-	v[[1]] <- unlist(optim1D.cov(aa, bb))
-	
-	## Update canonical vector in dimension 2
-	aa <- matrix(0, p[2], n)
-	bb <- numeric(p[2])
-	for (j in 1:p[2]) { 
-		bb[j] <- crossprod(v[[1]], b[,j,] %*% v[[3]])
-		for (t in 1:n) 
-			aa[j,t] <- crossprod(v[[1]], a[,j,,t] %*% v[[3]])
-	}
-	v[[2]] <- unlist(optim1D.cov(aa, bb))
-
-	## Update canonical vector in dimension 3
-	aa <- matrix(0, p[3], n)
-	bb <- numeric(p[3])
-	for (k in 1:p[3]) { 
-		bb[k] <- crossprod(v[[1]], b[,,k] %*% v[[2]])
-		for (t in 1:n) 
-			aa[k,t] <- crossprod(v[[1]], a[,,k,t] %*% v[[2]])
-	}
-	v[[3]] <- unlist(optim1D.cov(aa, bb))
 
 	## Calculate objective
-	objective[it] <- mean(crossprod(v[[3]], aa)^2) + 
-		2 * sum(bb * v[[3]])
+	objective[it] <- if (p[d] == 1) {
+		v[[d]]^2 * mean(aa^2) + 2 * v[[d]] * sum(bb)
+		} else { mean(crossprod(v[[d]], aa)^2) + 
+		2 * sum(bb * v[[d]]) }
 	
 	## Check convergence 
-	if (it > 1 && abs(objective[it]-objective[it-1]) <= 
-	    	tol * max(1,objective[it-1])) break
+	if (it > 1 && abs(objective[it] - objective[it-1]) <= 
+	    	tol * max(1, objective[it-1])) break
 }
 
 return(v)

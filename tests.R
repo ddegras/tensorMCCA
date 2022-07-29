@@ -23,8 +23,7 @@ test <- mcca.cov(x, r = 10, init = "svd", verbose = TRUE)
 test <- mcca.cov(x, r = 10, init = "random", verbose = TRUE)
 test <- mcca.cov(x, r = 10, init = v, verbose = TRUE)
 
-test <- mcca.cov(x, r = 10, ortho = "canon", 
-	init = "cca", verbose = TRUE)
+test <- mcca.cov(x, r = 10, ortho = "canon", init = "cca", verbose = TRUE)
 
 undebug(mcca.single.global.cov)
 test <- mcca.cov(x, r = 10, w = w2, norm = "global",

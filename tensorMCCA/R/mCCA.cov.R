@@ -122,34 +122,30 @@ if (all(test | w == 0)) {
 
 
 ## MAIN LOOP
-vzero <- vector("list", m)
-for (i in 1:m) vzero[[i]] <- lapply(d, numeric) 
-vortho <- NULL
-# browser()
 if (ortho == "canon.tnsr") x0 <- x
-
-for (l in 1:r) {	
-	
+for (l in 1:r) {		
 	
 	## Prepare orthogonality constraints
 	if (l > 1) { 	
+		# browser()
 		if (ortho == "score" && norm == "block") { 
-			x <- deflate.x(x, score = block.score[,,l], 
+			x <- deflate.x(x, score = block.score[,,l-1], 
 				check.args = FALSE)
 		} else if (ortho == "score" && norm == "global") { 
-			x <- deflate.x(x, score = global.score[,l], 
+			x <- deflate.x(x, score = global.score[,l-1], 
 				check.args = FALSE)
 		} else if (ortho == "canon.tnsr" && norm == "block") {
 			cnstr <- set.ortho.mat(v = v[, 1:(l-1)], 
-				modes = t(ortho.mode[1:(l-1), l, ]))
-			for(i in 1:m) 
+				modes = ortho.mode[, 1:(l-1), l])
+			for(i in 1:m) {
 				x[[i]] <- tnsr.mat.prod(
 					x = x0[[i]] - as.vector(xbar[[i]]), 
 					mat = cnstr$mat[[i]], modes = cnstr$modes[[i]])
+			}
 		} else { # ortho == "canon.tnsr" && norm == "global"
 			vortho <- v[, 1:(l-1), drop = FALSE]
 			for (i in 1:m) {
-				idx <- setdiff(1:d[i], ortho.mode[[1:(l-1),l,i]])
+				idx <- setdiff(1:d[i], ortho.mode[[i, 1:(l-1), l]])
 				for (ll in 1:(l-1))
 					vortho[[i,ll]][idx] <- lapply(p[[i]][idx], numeric)
 			}
@@ -166,9 +162,9 @@ for (l in 1:r) {
 		if (ortho == "canon.tnsr" && norm == "block") {
 			v0 <- mapply(tnsr.rk1.mat.prod, v = v0, 
 				mat = cnstr$mat, modes = cnstr$modes, 
-				transpose.mat = TRUE, SIMPLIFY = FALSE)
+				transpose.mat = FALSE, SIMPLIFY = FALSE)
 		}
-	} 
+	}
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
@@ -183,11 +179,16 @@ for (l in 1:r) {
 	block.score[,,l] <- out$y 
 	global.score[,l] <- rowMeans(block.score[,,l]) 
 	iters[l] <- out$iters
-	v[,l] <- if (ortho == "canon.tnsr" && norm == "block") {
-		mapply(tnsr.rk1.mat.prod, v = out$v, 
-				mat = cnstr$mat, modes = cnstr$modes, 
-				transpose.mat = FALSE, SIMPLIFY = FALSE)
-	} else { out$v }
+
+	if (l > 1 && ortho == "canon.tnsr" && norm == "block") {
+		v[,l] <- tnsr.rk1.mat.prod(v = out$v, 
+			mat = cnstr$mat, modes = cnstr$modes, 
+			transpose.mat = TRUE)
+		for (i in which(cnstr$vzero)) 
+			v[[i,l]] <- lapply(p[[i]], numeric)
+	} else { 
+		v[,l] <- out$v 
+	}
 
 	## Monitor objective value
 	if (objective[l] <= eps) break 
@@ -210,6 +211,11 @@ if (r == 1) {
 	dim(block.score) <- c(n, m)
 	dim(global.score) <- NULL
 } 
+
+## Clean up scores
+block.score[abs(block.score) < eps] <- 0
+global.score[abs(global.score) < eps] <- 0
+
 
 list(v = v, block.score = block.score, global.score = global.score,
 	objective = objective, iters = iters, input = input)
