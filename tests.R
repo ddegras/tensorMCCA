@@ -6,14 +6,22 @@ load_all(path)
 
 
 n <- 10
-w <- matrix(1/9, 3, 3)
-w2 <- matrix(1/6, 3, 3)
+m <- 3
+dimx <- list(c(10,n), c(10,15,n), c(10,5,5,n))
+w <- matrix(1, m, m)
+w2 <- w
 diag(w2) <- 0
-x <- list(matrix(runif(5*n), 5, n), array(runif(6*n), c(2, 3, n)), 
-	array(runif(8*n), c(2, 2, 2, n))) 
-v <- list(list(runif(5)), list(runif(2), runif(3)), 
-	list(runif(2), runif(2), runif(2)))
-control <- list(ortho = 1:3)
+
+x <- vector("list", m)
+for (i in 1:m) {
+	x[[i]] <- array(runif(prod(dimx[[i]])), dimx[[i]])
+	v[[i]] <- lapply(dimx[[i]][-length(dimx[[i]])], runif)
+}
+# list(matrix(runif(5*n), 5, n), array(runif(6*n), c(2, 3, n)), 
+	# array(runif(8*n), c(2, 2, 2, n))) 
+# v <- list(list(runif(5)), list(runif(2), runif(3)), 
+	# list(runif(2), runif(2), runif(2)))
+# control <- list(ortho = 1:3)
 
 # options(error = NULL)
 # debug(mcca.cov)

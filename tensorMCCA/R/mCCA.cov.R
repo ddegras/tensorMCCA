@@ -39,9 +39,7 @@ mcca.init <- if (is.character(init)) {
 } else NULL
 
 ## Center data
-if (ortho == "canon.tnsr" && norm == "block") {
-	xbar <- mapply(rowMeans, x = x, dims = d, SIMPLIFY = FALSE)	
-} else {	
+if (ortho == "score" || norm == "global") {	
 	for(i in 1:m) {
 	    xbar <- rowMeans(x[[i]], dims = d[i])
 	    x[[i]] <- x[[i]] - as.vector(xbar)
@@ -49,7 +47,6 @@ if (ortho == "canon.tnsr" && norm == "block") {
 }
 
 ## Adjust number of canonical components 
-r <- min(r, n - 1L)
 r0 <- r
 pp <- sapply(p, prod)
 r <- if (ortho == "score" && norm == "block") { 
@@ -61,9 +58,6 @@ r <- if (ortho == "score" && norm == "block") {
 } else {
 	min(sum(pp), r0)
 }
-# if (verbose && r != r0)
-	# warning(paste("\nArgument 'r' set to", r,
-		# "to satisfy orthogonality constraints"))
 
 ## Prepare optimization if orthogonality 
 ## constraints are on canonical tensors
@@ -127,7 +121,6 @@ for (l in 1:r) {
 	
 	## Prepare orthogonality constraints
 	if (l > 1) { 	
-		# browser()
 		if (ortho == "score" && norm == "block") { 
 			x <- deflate.x(x, score = block.score[,,l-1], 
 				check.args = FALSE)
