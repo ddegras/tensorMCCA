@@ -19,9 +19,9 @@ objective.internal <- function(x, v, w)
 n <- tail(dim(x[[1]]), 1) 
 score <- canon.scores(x, v)
 r <- NCOL(v)
-if (r == 1) {
+if (r == 1) 
 	return(sum(w * crossprod(score)) / n)	
-}
+
 out <- numeric(r)
 for (l in 1:r) 
 	out[l] <- sum(w * crossprod(score[, , l])) / n

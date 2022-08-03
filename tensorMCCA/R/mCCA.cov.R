@@ -39,12 +39,11 @@ mcca.init <- if (is.character(init)) {
 } else NULL
 
 ## Center data
-if (ortho == "score" || norm == "global") {	
-	for(i in 1:m) {
-	    xbar <- rowMeans(x[[i]], dims = d[i])
-	    x[[i]] <- x[[i]] - as.vector(xbar)
-	}
+for(i in 1:m) {
+    xbar <- rowMeans(x[[i]], dims = d[i])
+    x[[i]] <- x[[i]] - as.vector(xbar)
 }
+if (ortho == "canon.tnsr") x0 <- x
 
 ## Adjust number of canonical components 
 r0 <- r
@@ -59,16 +58,14 @@ r <- if (ortho == "score" && norm == "block") {
 	min(sum(pp), r0)
 }
 
-## Prepare optimization if orthogonality 
-## constraints are on canonical tensors
-if (ortho == "canon.tnsr" && r > 1) {
-	## Set tensor modes on which constraints apply
+## Set orthogonality constraints on canonical tensors
+if (ortho == "canon.tnsr" && norm == "block" && r > 1) 
 	ortho.mode <- set.ortho.mode(x, r, 
 		cnstr = control$ortho$cnstr, 
 		method = control$ortho$method)
-}
 
-## Initialization parameters
+
+## Set up initialization parameters
 test <- (is.list(control) && !is.null(control$init))
 if (identical(init, "cca")) {
 	init.args <- list(k = NULL, w = w, 
@@ -116,10 +113,9 @@ if (all(test | w == 0)) {
 
 
 ## MAIN LOOP
-if (ortho == "canon.tnsr") x0 <- x
-for (l in 1:r) {		
+for (l in 1:r) {	
 	
-	## Prepare orthogonality constraints
+	## Deflate data as needed
 	if (l > 1) { 	
 		if (ortho == "score" && norm == "block") { 
 			x <- deflate.x(x, score = block.score[,,l-1], 
@@ -130,19 +126,19 @@ for (l in 1:r) {
 		} else if (ortho == "canon.tnsr" && norm == "block") {
 			cnstr <- set.ortho.mat(v = v[, 1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
-			for(i in 1:m) {
-				x[[i]] <- tnsr.mat.prod(
-					x = x0[[i]] - as.vector(xbar[[i]]), 
+			for(i in 1:m) 
+				x[[i]] <- tnsr.mat.prod(x = x0[[i]], 
 					mat = cnstr$mat[[i]], modes = cnstr$modes[[i]])
-			}
-		} else { # ortho == "canon.tnsr" && norm == "global"
-			vortho <- v[, 1:(l-1), drop = FALSE]
-			for (i in 1:m) {
-				idx <- setdiff(1:d[i], ortho.mode[[i, 1:(l-1), l]])
-				for (ll in 1:(l-1))
-					vortho[[i,ll]][idx] <- lapply(p[[i]][idx], numeric)
-			}
-		}
+		} 
+		# else { # ortho == "canon.tnsr" && norm == "global"
+			# vortho <- v[, 1:(l-1), drop = FALSE]
+			# for (i in 1:m) {
+				# for (ll in 1:(l-1)) {
+					# idx <- setdiff(1:d[i], ortho.mode[[i, ll, l]])
+					
+					# vortho[[i,ll]][idx] <- lapply(p[[i]][idx], numeric)
+			# }
+		# }
 	}
 	
 	## Initialize canonical vectors
@@ -152,11 +148,11 @@ for (l in 1:r) {
 	} else if (is.list(init)) {
 		v0 <- if (is.vector(init)) {
 			init } else { init[, min(l, ncol(init))] }
-		if (ortho == "canon.tnsr" && norm == "block") {
-			v0 <- mapply(tnsr.rk1.mat.prod, v = v0, 
-				mat = cnstr$mat, modes = cnstr$modes, 
-				transpose.mat = FALSE, SIMPLIFY = FALSE)
+		if (l > 1 && ortho == "canon.tnsr" && norm == "block") {
+			v0 <- tnsr.rk1.mat.prod(v0, 	mat = cnstr$mat, 
+				modes = cnstr$modes, transpose.mat = FALSE)
 		}
+		v0 <- scale.v(v0, scale = "norm", cnstr = norm)
 	}
 	
 	## Run MCCA and store results
@@ -165,8 +161,10 @@ for (l in 1:r) {
 		mcca.single.block.cov(x = x, v = v0, w = w, sweep = sweep, 
 			maxit = maxit, tol = tol, verbose = verbose)
 	} else {
-		mcca.single.global.cov(x = x, v = v0, w = w, ortho = vortho, 
-			sweep = sweep, maxit = maxit, tol = tol, verbose = verbose)
+		mcca.single.global.cov(x = x, v = v0, w = w, 
+			ortho = if (l == 1L) NULL else v[,1:(l-1)], 
+			sweep = sweep, 
+			maxit = maxit, tol = tol, verbose = verbose)
 	}
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y 
@@ -208,7 +206,6 @@ if (r == 1) {
 ## Clean up scores
 block.score[abs(block.score) < eps] <- 0
 global.score[abs(global.score) < eps] <- 0
-
 
 list(v = v, block.score = block.score, global.score = global.score,
 	objective = objective, iters = iters, input = input)

@@ -18,9 +18,9 @@
 
 optim.block.cov <- function(v, a, b, maxit = 1000, tol = 1e-6)
 {
-if (length(v) == 1) { return(optim1D.cov(a, b)) }
-if (length(v) == 2) { return(optim2D.cov(v, a, b, maxit, tol)) }
-if (length(v) == 3) { return(optim3D.cov(v, a, b, maxit, tol)) }
+if (length(v) == 1L) { return(optim1D.cov(a, b)) }
+if (length(v) == 2L) { return(optim2D.cov(v, a, b, maxit, tol)) }
+if (length(v) == 3L) { return(optim3D.cov(v, a, b, maxit, tol)) }
 return(optim.gen.cov(v, a, b, maxit, tol))
 }
 
@@ -32,6 +32,10 @@ return(optim.gen.cov(v, a, b, maxit, tol))
 # subject to v'v = 1 
 #####################################
 
+## Inputs
+# a: matrix of dimensions p-by-n
+# b: vector of length p
+
 
 optim1D.cov <- function(a, b)
 {
@@ -39,6 +43,10 @@ eps <- 1e-14
 n <- NCOL(a)
 p <- length(b)
 dim(b) <- NULL
+
+## Trivial case: b scalar
+if (p == 1L) 
+	return(if (b >= 0) 1 else -1)
 
 ## Trivial case: A = 0
 if (all(a == 0)) {
@@ -57,7 +65,7 @@ if (n < p) delta[(n+1):p] <- 0
 
 ## Trivial case: no linear term in objective
 if (all(abs(b) <= eps)) {
-	return(list(P[,1]))
+	return(list(as.vector(P[,1])))
 }
 ## Trivial case: AA' proportional to identity matrix
 if (abs(delta[p] - delta[1]) <= eps) {
@@ -67,7 +75,7 @@ if (abs(delta[p] - delta[1]) <= eps) {
 b <- as.vector(crossprod(P, b))
 bzero <- (abs(b) <= eps)
 if (all(bzero)) {
-	return(list(P[,1]))
+	return(list(as.vector(P[,1])))
 }
 b[bzero] <- 0
 
@@ -189,9 +197,10 @@ optim2D.cov <- function(v, a, b, maxit = 1000, tol = 1e-6)
 {
 	
 ## Data dimensions
+a <- aperm(a, c(1, 3, 2))
 dima <- dim(a)
-p <- dima[1:2]
-n <- dima[3]
+p <- dima[c(1,3)]
+n <- dima[2]
 
 ## Trivial case
 if (all(a == 0)) {
@@ -204,30 +213,41 @@ objective <- numeric(maxit)
 for (it in 1:maxit) {
 
 	## Update canonical vector in dimension 1 
-	if (p[2] == 1) {
-		aa <- drop(a) * v[[2]]
-		bb <- b * v[[2]]
+	if (p[2] == 1L) {
+		aa <- matrix(a * v[[2]], p[1], n)
+		bb <- as.vector(b * v[[2]])
 	} else {
-		aa <- matrix(0, p[1], n)
-		for (t in 1:n) aa[,t] <- a[,,t] %*% v[[2]]
+		# a <- aperm(a, c(2, 1, 3))
+		# dim(a) <- c(p[2], p[1] * n)
+		# aa <- crossprod(v[[2]], a)
+		# dim(aa) <- c(p[1], n)
+		# dim(a) <- c(p[2], p[1], n)
+		# a <- aperm(a, c(2, 1, 3))
+		dim(a) <- c(p[1] * n, p[2])
+		aa <- a %*% v[[2]]
+		dim(aa) <- c(p[1], n)
+		dim(a) <- dima
 		bb <- b %*% v[[2]]
 	}
 	v[1] <- optim1D.cov(aa, bb)
 		
 	## Update canonical vector in dimension 2
-	if (p[1] == 1) {
-		aa <- drop(a) * v[[1]]
-		bb <- t(b) * v[[1]]
+	if (p[1] == 1L) {
+		aa <- matrix(a * v[[1]], p[2], n)
+		bb <- as.vector(b) * v[[1]]
 	} else {
-		aa <- matrix(0, p[2], n)
-		for (t in 1:n) aa[,t] <- crossprod(a[,,t], v[[1]])
+		dim(a) <- c(p[1], n * p[2])
+		aa <- crossprod(v[[1]], a)
+		dim(aa) <- c(n, p[2])
+		aa <- t(aa)
+		dim(a) <- dima
 		bb <- crossprod(b, v[[1]])
 	}
 	v[2] <- optim1D.cov(aa, bb)
 	
 	## Calculate objective
 	objective[it] <- if (p[2] == 1) {
-		v[[2]]^2 * mean(aa^2) + 2 * v[[2]] * sum(bb)
+		v[[2]]^2 * mean(aa^2) + 2 * v[[2]] * bb
 	} else { mean(crossprod(v[[2]], aa)^2) + 
 		2 * sum(bb * v[[2]]) }
 	
@@ -250,9 +270,9 @@ return(v)
 
 
 ## Inputs: 
-# v:	list of 3 vectors
-# a:	4D array 
-# b:	3D array
+# v:	 list of 3 vectors
+# a:	 4D array 
+# b:	 3D array
 
 optim3D.cov <- function(v, a, b, maxit = 1000, tol = 1e-6)
 {
@@ -273,37 +293,38 @@ for (it in 1:maxit) {
 	
 	## Update canonical vector in dimension k = 1,2,3
 	for (k in 1:3) {
-		i1 <- min((1:3)[-k])
-		i2 <- max((1:3)[-k])
+		i1 <- if (k == 1L) 2L else 1L
+		i2 <- if (k == 3L) 2L else 3L
 		aa <- aperm(a, c(i1, k, 4, i2))
 		bb <- aperm(b, c(i1, k, i2))
-		if (all(p[c(i1,i2)] == 1)) {
-			aa <- v[[i1]] * v[[i2]] * drop(aa)
-			bb <- v[[i1]] * v[[i2]] * drop(b)
-		} else if (p[i1] == 1 && p[i2] > 1) {
+		
+		if (p[i1] == 1 && p[i2] == 1) {
+			aa <- (v[[i1]] * v[[i2]]) * drop(aa)
+			bb <- (v[[i1]] * v[[i2]]) * drop(b)
+		} else if (p[i1] == 1) {
 			dim(aa) <- c(p[k] * n, p[i2])
-			aa <- aa %*% v[[i2]]
+			aa <- aa %*% (v[[i1]] * v[[i2]])
 			bb <- if (p[k] == 1) {
-				v[[i1]] * sum(drop(bb) * v[[i2]])
+				v[[i1]] * sum(bb * v[[i2]])
 			} else {
-				v[[i1]] * drop(bb) %*% v[[i2]]
+				drop(bb) %*% (v[[i1]] * v[[i2]])
 			}
-		} else if (p[i1] > 1 && p[i2] == 1) {
+		} else if (p[i2] == 1) {
 			dim(aa) <- c(p[i1], p[k] * n)
-			aa <- crossprod(v[[i1]], aa)
+			aa <- crossprod(v[[i1]] * v[[i2]], aa)
 			bb <- if (p[k] == 1) {
-				v[[i2]] * sum(drop(bb) * v[[i1]])
+				v[[i2]] * sum(bb * v[[i1]])
 			} else {
-				crossprod(v[[i1]], drop(bb)) * v[[i2]]
+				crossprod(v[[i1]] * v[[i2]], drop(bb)) 
 			}
 		} else {		
-			dim(aa) <- c(p[i1], prod(p[c(k,i2)], n))
+			dim(aa) <- c(p[i1], p[k] * n * p[i2])
 			aa <- crossprod(v[[i1]], aa)
 			dim(aa) <- c(p[k] * n, p[i2])
 			aa <- aa %*% v[[i2]]
-			dim(bb) <- c(p[i1], prod(p[c(k,i2)]))
+			dim(bb) <- c(p[i1], p[k] * p[i2])
 			bb <- crossprod(v[[i1]], bb) 
-			dim(bb) <- p[c(k,i2)]
+			dim(bb) <- c(p[k], p[i2])
 			bb <- bb %*% v[[i2]]
 		}
 		dim(aa) <- c(p[k], n)	
@@ -312,7 +333,7 @@ for (it in 1:maxit) {
 	
 	## Calculate objective
 	objective[it] <- if (p[[3]] == 1) {
-		v[[3]]^2 * mean(aa^2) + 2  * v[[3]] * sum(bb)
+		v[[3]]^2 * mean(aa^2) + 2  * v[[3]] * bb
 	} else { mean(crossprod(v[[3]], aa)^2) + 
 		2 * sum(bb * v[[3]]) }
 	
@@ -342,38 +363,38 @@ optim.gen.cov <- function(v, a, b, maxit = 1000, tol = 1e-6)
 	
 ## Data dimensions
 dima <- dim(a)
-d <- length(dima) - 1L
-p <- dima[1:d]
-n <- dima[d + 1L]
+d <- length(v)
 
 ## Trivial case
 if (all(a == 0))
 	return(tnsr.rk1(b, maxit, tol))
 
 ## MAIN LOOP
-objective <- numeric(maxit)
+objective <- -Inf
 
 for (it in 1:maxit) {
 
+	objective.old <- objective
+	
 	## Update canonical vector in dimension k = 1,...,d
 	for (k in 1:d) { 
-		aa <- tnsr.vec.prod(a, v[-k], (1:(d+1))[-k])
+		aa <- tnsr.vec.prod(a, v[-k], (1:d)[-k])
 		bb <- tnsr.vec.prod(b, v[-k], (1:d)[-k])
-		v[[k]] <- unlist(optim1D.cov(aa, bb))
+		v[k] <- optim1D.cov(aa, bb)
 	}
 
 	## Calculate objective
-	objective[it] <- if (p[d] == 1) {
-		v[[d]]^2 * mean(aa^2) + 2 * v[[d]] * sum(bb)
-		} else { mean(crossprod(v[[d]], aa)^2) + 
+	objective[it] <- if (dima[d] == 1) {
+		v[[d]]^2 * mean(aa^2) + 2 * v[[d]] * bb
+	} else { mean(crossprod(v[[d]], aa)^2) + 
 		2 * sum(bb * v[[d]]) }
 	
 	## Check convergence 
-	if (it > 1 && abs(objective[it] - objective[it-1]) <= 
-	    	tol * max(1, objective[it-1])) break
+	if (abs(objective - objective.old) <= 
+	    	tol * max(1, objective.old)) break
 }
 
-return(v)
+v
 }
 
 

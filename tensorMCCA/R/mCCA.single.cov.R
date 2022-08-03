@@ -74,7 +74,7 @@ for (it in 1:maxit) {
 		objective.best <- objective[it + 1L]
 	}
 	if (verbose) 
-		cat("\nIteration", it, "Objective", objective[it+1L])
+		cat("\nIteration", it, "Objective", objective[it + 1L])
 	
 	## Check convergence 
 	if (it > 1 && abs(objective[it + 1] - objective[it]) <= 
@@ -166,8 +166,8 @@ if (is.null(ortho)) {
 } else {
 	if (!is.matrix(ortho)) ortho <- as.matrix(ortho)
 	northo <- ncol(ortho)
+	cpfun <- function(x, y) sum(x * y)
 }
-
 
 for (it in 1:maxit) {
 	## Determine blocks of variables to update in each dataset
@@ -217,9 +217,13 @@ for (it in 1:maxit) {
 			
 			## Set up orthogonality constraints
 			if (northo > 0) {
-				for (ll in 1:northo) 
+				for (ll in 1:northo) {
+					ip <- if (d[i] > 1L) {
+						prod(mapply(cpfun, v[[i]][-k], 
+							ortho[[i,ll]][-k])) } else 1
 					vortho[start[ii]:end[ii], ll] <- 
-						ortho[[i,ll]][[k]] / nrmt.mk[i]
+						ortho[[i,ll]][[k]] * (ip / nrmt.mk[i])
+				}
 			}
 		}		
 		if (northo > 0) 	Q <- qr.Q(qr(vortho))
@@ -236,23 +240,25 @@ for (it in 1:maxit) {
 		} else {
 			# Case: objective weight matrix nonseparable (EVD)
 			xv <- tcrossprod(xv)
-			s <- tcrossprod(1 / nrmt.mk) * w 
 			for (ii in 1:groupsize) {
 				i <- idxg[ii]
 				rows <- start[ii]:end[ii] 
 				for (jj in 1:groupsize) {
 					j <- idxg[jj]
 					cols <- start[jj]:end[jj]
-					xv[rows, cols] <- s[i,j] * xv[rows, cols]
+					sij <- w[i,j] / nrmt.mk[i] / nrmt.mk[j]			
+					xv[rows, cols] <-  sij * xv[rows, cols]
 				}
 			}
 			if (northo > 0) { # project on orthogonality constraints
-				xv <- xv - Q %*% crossprod(Q, xv)
-				xv <- xv -	tcrossprod(xv %*% Q, Q)
+				QQtxv <- Q %*% crossprod(Q, xv)
+				xv <- xv - QQtxv - t(QQtxv) + 
+					tcrossprod(QQtxv %*% Q, Q)
 			}				
 			eigxv <- if (all(dim(xv) > 2)) {
 				eigs_sym(xv, k = 1) 
 			} else { eigen(xv, TRUE) }
+			# if (eigxv$values[1] <= 0) browser()
 			vg <- eigxv$vectors[,1]
 		}
 
@@ -293,7 +299,7 @@ for (it in 1:maxit) {
 	
 	## Check convergence 
 	if (it > 1 && abs(objective[it+1] - objective[it]) <= 
-		max(1, tol) * objective[it]) break
+		max(1, tol) * abs(objective[it])) break
 }
 
 list(v = v, y = canon.scores(x, v), objective = objective[it+1], 
