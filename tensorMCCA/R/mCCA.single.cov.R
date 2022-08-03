@@ -134,8 +134,6 @@ if (sweep == "cyclical") {
 	modes <- mapply(seq.int, 1, d, SIMPLIFY = FALSE)
 	group <- expand.grid(modes, KEEP.OUT.ATTRS = FALSE)
 	group <- matrix(unlist(group), m, ngroups, byrow = TRUE)
-	for (i in 1:m) 
-		group[i, ] <- rep_len(1:d[i], ngroups)
 }
 
 ## Logical flags for datasets & associated variables to be 
@@ -200,7 +198,7 @@ for (it in 1:maxit) {
 		## l = 1, ..., d(i) except mode k(i,g) 
 		## Each block corresponds to one dataset and the 
 		## blocks are stacked vertically
-		pg <- mapply("[", p[idxg], group[idxg,g])
+		pg <- mapply("[", p[idxg], group[idxg, g])
 		start <- cumsum(c(0, pg[-groupsize])) + 1
 		end <- cumsum(pg)
 		xv <- matrix(0, sum(pg), n)
@@ -212,20 +210,24 @@ for (it in 1:maxit) {
 				(1:d[i])[-k]) # tensor-vector products	
 			nrmt.mk[i] <- sqrt(prod(nrm2v[[i]][-k]))	
 			if (separable.w) 
-				tvprod <- (wvec[i] / nrmt.mk[i]) * tvprod			
+				tvprod <- (wvec[i] / nrmt.mk[i] / sqrt(m*n)) * tvprod	
 			xv[start[ii]:end[ii],] <- tvprod
-			
+
 			## Set up orthogonality constraints
 			if (northo > 0) {
-				for (ll in 1:northo) {
-					ip <- if (d[i] > 1L) {
-						prod(mapply(cpfun, v[[i]][-k], 
-							ortho[[i,ll]][-k])) } else 1
-					vortho[start[ii]:end[ii], ll] <- 
-						ortho[[i,ll]][[k]] * (ip / nrmt.mk[i])
+				for (l in 1:northo) {
+					if (d[i] == 1L) {
+						vortho[start[ii]:end[ii], l] <- 
+						ortho[[i,l]][[k]]	
+					} else {
+					ip <- prod(mapply(cpfun, v[[i]][-k], 
+						ortho[[i,l]][-k]))
+					vortho[start[ii]:end[ii], l] <- 
+						ortho[[i,l]][[k]] * (ip / nrmt.mk[i])
+					}
 				}
-			}
-		}		
+			}	
+		}
 		if (northo > 0) 	Q <- qr.Q(qr(vortho))
 			
 		## Update canonical vectors and objective value
@@ -240,62 +242,89 @@ for (it in 1:maxit) {
 		} else {
 			# Case: objective weight matrix nonseparable (EVD)
 			xv <- tcrossprod(xv)
+			s <- m * w / n / tcrossprod(nrmt.mk)
+			vv <- vector("list", groupsize)
 			for (ii in 1:groupsize) {
 				i <- idxg[ii]
+				vv[[i]] <- v[[i]][[group[i,g]]] * nrmt.mk[i] / sqrt(m)
+				# debugging
 				rows <- start[ii]:end[ii] 
 				for (jj in 1:groupsize) {
 					j <- idxg[jj]
 					cols <- start[jj]:end[jj]
-					sij <- w[i,j] / nrmt.mk[i] / nrmt.mk[j]			
-					xv[rows, cols] <-  sij * xv[rows, cols]
+					xv[rows, cols] <- s[i,j] * xv[rows, cols]
 				}
 			}
+			## Debugging
+			# vv <- unlist(vv)
+			# objective.implicit <- crossprod(vv, xv %*% vv)
+			# objective.explicit <- objective.internal(x, v, w)
+			# objective.test.1 <- (abs(objective.implicit - 
+				# objective.explicit) < 1e-6)
+			# print(paste("Test: objective (before ortho)", objective.test.1))
+			
 			if (northo > 0) { # project on orthogonality constraints
 				QQtxv <- Q %*% crossprod(Q, xv)
 				xv <- xv - QQtxv - t(QQtxv) + 
 					tcrossprod(QQtxv %*% Q, Q)
 			}				
 			eigxv <- if (all(dim(xv) > 2)) {
-				eigs_sym(xv, k = 1) 
+				eigs_sym(xv, k = 1, which = "LA") 
 			} else { eigen(xv, TRUE) }
-			# if (eigxv$values[1] <= 0) browser()
 			vg <- eigxv$vectors[,1]
 		}
-
-		## Calculate norms of unscaled canonical vectors
+		
+		## Debugging
+		# vv <- list()
+		# for (ii in 1:groupsize) {
+			# i <- idxg[ii]
+			# k <- group[i,g]
+			# vv[[ii]] <- v[[i]][[k]]	* nrmt.mk[i] / sqrt(m) 
+		# }
+		# vv <- unlist(vv)
+		# print(paste("Norm v (before update):", sum(vv^2)))
+		# objective.implicit <- crossprod(vv, xv %*% vv)
+		# print(paste("Objective (before update):", objective.implicit))
+					
+		## Update canonical vectors
 		for (ii in 1:groupsize) {
 			i <- idxg[ii]
 			k <- group[i,g]
 			idx <- start[ii]:end[ii]
-			vg[idx] <- vg[idx] / nrmt.mk[i]
-			nrm2v[[i]][k] <- sum(vg[idx]^2)
+			v[[i]][[k]] <- vg[idx] * (sqrt(m) / nrmt.mk[i])
+			nrm2v[[i]][k] <- sum(v[[i]][[k]]^2)
 		}
 		
-		## Update canonical vectors and rescale 
-		## to meet global norm constraint 
-		nrm2t <- sapply(nrm2v, prod)
-		s <- sqrt(mean(nrm2t))
-		vg <- vg / s
-		for (ii in 1:groupsize) {
-			i <- idxg[ii]
-			k <- group[i,g]
-			v[[i]][[k]] <- vg[start[ii]:end[ii]]
-			nrm2v[[i]][k] <- nrm2v[[i]][k] / s^2 
-		}
-			
 		## Debugging
-		# nrm2fun <- function(x) sum(x^2)
-		# nrm2v <- lapply(v, function(vv) sapply(vv, nrm2fun))
-		# test <- mean(sapply(nrm2v, prod))	
-		# browser()		
-	}								
+		# nrm2t <- sapply(nrm2v, prod)
+		# norm.test <- (abs(mean(nrm2t) - 1) < 1e-10)
+		# print(paste("Test: norm v", norm.test))
+		# if (northo > 0) {
+			# ortho.test <- logical(northo)
+			# acc <- numeric(m)
+			# for (l in 1:northo) {
+				# for (i in 1:m) 
+					# acc[i] <- prod(mapply(cpfun, v[[i]], ortho[[i,l]]))
+				# ortho.test[l] <- (abs(sum(acc)) < 1e-7)
+			# }
+		# } else ortho.test <- TRUE
+		# print(paste("Test: ortho v", ortho.test))
+
+		# objective.implicit <- if (separable.w) {
+			# svdxv$d[1]^2 } else eigxv$values[1]
+		# objective.explicit <- objective.internal(x, v, w)
+		# objective.test.2 <- (abs(objective.implicit - 
+			# objective.explicit) < 1e-6)
+		# print(paste("Test: objective (after ortho)", objective.test.2))
+		# print(paste("Objective:", objective.explicit))
 	
+	}
+									
 	## Balance canonical vectors  
 	v <- scale.v(v, cnstr = "global")
 	objective[it+1] <- objective.internal(x, v, w)
 	if (verbose) 
 		cat("\nIteration", it, "Objective", objective[it+1])
-	# browser()
 	
 	## Check convergence 
 	if (it > 1 && abs(objective[it+1] - objective[it]) <= 
