@@ -1,36 +1,6 @@
-#####################################
-# Function to calculate image scores
-# y_it = <v_i, X_it> 
-#####################################
 
-image.scores <- function(x, v)
-{
-m <- length(x) # number of datasets
-dimx <- lapply(x, dim)
-n <- tail(dimx[[1]], 1) # number of instances per dataset
-d <- sapply(dimx, length) - 1 # number of dimensions in images/features 
-y <- matrix(0, n, m) # image/individual scores on canonical components
-for (i in 1:m) { 		
-	iprod <- x[[i]]
-	pi <- dimx[[i]]
-	if (d[i] == 1) { # 1D case
-		y[,i] <- crossprod(iprod, v[[i]][[1]]) 
-	} else if (d[i] == 2) { # 2D case
-		dim(iprod) <- c(pi[1], pi[2] * n)
-		iprod <- crossprod(v[[i]][[1]], iprod)
-		dim(iprod) <- c(pi[2], n) 
-		y[,i] <- crossprod(iprod, v[[i]][[2]]) 
-	} else if (d[i] == 3) { # 3D case
-		dim(iprod) <- c(pi[1], prod(pi[2:4]))
-		iprod <- crossprod(v[[i]][[1]], iprod)
-		dim(iprod) <- c(pi[2], pi[3] * n)
-		iprod <- crossprod(v[[i]][[2]], iprod)
-		dim(iprod) <- c(pi[3], n) 
-		y[,i] <- crossprod(iprod, v[[i]][[3]])
-	} else warning("Function not yet supported for tensors of order 4+")
-}
-y
-}
+
+
 
 
 
@@ -44,12 +14,20 @@ y
 # the canonical vectors should be scaled beforehand to have 
 # unit variance, e.g., with function 'scale.v'.
 
-objective.internal <- function(x, v, c = 1)
+objective.internal <- function(x, v, w)
 {
 n <- tail(dim(x[[1]]), 1) 
-y <- image.scores(x, v)
-sum(c * crossprod(y)) / n
+score <- canon.scores(x, v)
+r <- NCOL(v)
+if (r == 1) 
+	return(sum(w * crossprod(score)) / n)	
+
+out <- numeric(r)
+for (l in 1:r) 
+	out[l] <- sum(w * crossprod(score[, , l])) / n
+sum(out)
 }
+
 
 
 
@@ -58,44 +36,21 @@ sum(c * crossprod(y)) / n
 ############################################
 
 
-objective.cor <- function(x, v, c = 1)
+objective.cor <- function(x, v, w = 1)
 {
-# Check arguments
-test <- check.arguments(x, v)
-
-## Data dimensions 
+test <- check.arguments(x, v, w)
 m <- length(x)
 n <- tail(dim(x[[1]]), 1)
-
-## Number of canonical components 
 r <- NCOL(v)
-
-## Objective weights
-if (length(c) == 1) {
-	c <- matrix(1/m^2, m, m)
-} else { 
-	c <- (c + t(c)) / (2 * sum(c))
-}
-
-## Scale canonical vectors so components have unit variance
+w <- if (length(w) == 1) { 1 / (m^2)
+} else { w <- (w + t(w)) / (2 * sum(w)) }
+score <- canon.scores(x, v)
 if (r == 1) {
-	y <- image.scores(x, v)
-	y <- y - rowMeans(y)
-	nrm <- sqrt(colMeans(y^2))
-	nrm[nrm < 1e-15] <- 1 
-	y <- scale(y, center = FALSE, scale = nrm)
-	out <- sum(c * crossprod(y)) / n
-} else {
-	out <- numeric(r)
-	for (k in 1:r) {
-		y <- image.scores(x, v[,k])
-		y <- y - rowMeans(y)
-		nrm <- sqrt(colMeans(y^2))
-		nrm[nrm < 1e-15] <- 1
-		y <- scale(y, center = FALSE, scale = nrm)
-		out[k] <- sum(c * crossprod(y)) / n
-	}
+	return(sum(w * cor(score)))
 }
+out <- numeric(r)
+for (l in 1:r) 
+	out[l] <- sum(w * cor(score[, , l]))
 sum(out)
 }
 
@@ -107,38 +62,64 @@ sum(out)
 ############################################
 
 
-objective.cov <- function(x, v, c = 1)
+objective.cov <- function(x, v, w = 1)
 {
-## Check arguments
-test <- check.arguments(x, v)
-
-## Data dimensions 
+test <- check.arguments(x, v, w)
 m <- length(x)
 n <- tail(dim(x[[1]]), 1)
-
-## Number of canonical components 
 r <- NCOL(v)
-
-## Objective weights
-if (length(c) == 1) {
-	c <- matrix(1/m^2, m, m)
-} else { 
-	c <- (c + t(c)) / (2 * sum(c))
-}
-
-## Calculate canonical scores and objective
+w <- if (length(w) == 1) { 1 / (m^2) 
+} else { w <- (w + t(w)) / (2 * sum(w)) }
+score <- canon.scores(x, v)
 if (r == 1) {
-	y <- image.scores(x, v)
-	y <- y - rowMeans(y)
-	out <- sum(c * crossprod(y)) / n
-} else {
-	out <- numeric(r)
-	for (k in 1:r) {
-		y <- image.scores(x, v[,k])
-		y <- y - rowMeans(y)
-		out[k] <- sum(c * crossprod(y)) / n
-	}
-}
+	return(sum(w * cov(score)) * (n - 1) / n)
+} 
+out <- numeric(r)
+for (l in 1:r) 
+	out[l] <- sum(w * cov(score[,,l])) * (n - 1) / n
 sum(out)
 }
+
+
+
+
+###########################################
+# Function to calculate objective gradient
+###########################################
+
+
+objective.gradient <- function(x, v, w)
+{
+dimx <- lapply(x, dim)
+d <- sapply(dimx, length) - 1L
+m <- length(x)
+n <- tail(dimx[[1]], 1)
+
+grad <- vector("list", m)
+tvprod <- vector("list", m)
+score <- matrix(0, n, m)
+for (i in 1:m) {
+	if (d[i] == 1L) {
+		score[, i] <- crossprod(x[[i]], v[[i]][[1]])
+		next
+	}
+	for (k in 1:d[i]) 
+		tvprod[[i]][[k]] <- tnsr.vec.prod(x[[i]], 
+			v[[i]][-k], (1:d[i])[-k])	
+	score[, i] <- crossprod(tvprod[[i]][[k]], 
+		v[[i]][[k]])
+}
+
+for (i in 1:m) {
+	yy <- score %*% ((2/n) * w[, i])
+	grad[[i]] <- if (d[i] == 1L) {
+		list(x[[i]] %*% yy)
+	} else {
+		lapply(tvprod[[i]], 	"%*%", y = yy)
+	}
+}
+grad
+}
+
+
 

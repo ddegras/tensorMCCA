@@ -1,6 +1,27 @@
 
+###################################################
 # FUNCTIONS FOR MAXIMIZING THE SUM OF CORRELATIONS 
 # IN MCCA ONE DATA BLOCK AT A TIME
+###################################################
+
+
+
+####################################
+# Wrapper function for optimization
+####################################
+
+
+optim.block.cor <- function(v, a, b, maxit, tol)
+{
+if (length(v) == 1L) {
+	optim1D.cor(a, b)
+} else if (length(v) == 2L) {
+	optim2D.cor(v, a, b, maxit, tol)
+} else if (length(v) == 3L) {
+	optim3D.cor(v, a, b, maxit, tol)
+}
+}
+
 
 
 
@@ -17,12 +38,16 @@
 
 optim1D.cor <- function(a, b)
 {
+if (length(a) == 1) 
+	return(sign(a) / sqrt(mean(b^2)))
+eps <- 1e-14
 n <- ncol(b)
 sigma <- tcrossprod(b) / n
 v <- tryCatch(solve(sigma, a), error = function(e) numeric(0))
 if (length(v) == 0) v <- ginv(sigma) %*% a
-s <- as.numeric(crossprod(a, v))
-if (s > 0) v <- v / sqrt(s)
+dim(v) <- NULL
+s <- sum(a * v)
+v <- if (s > eps) v / sqrt(s) else numeric(length(v))
 list(v)
 }
 
@@ -43,35 +68,51 @@ optim2D.cor <- function(v, a, b, maxit = 1000, tol = 1e-6)
 {
 	
 ## Data dimensions
+b <- aperm(b, c(1, 3, 2))
 dimb <- dim(b)
-p <- dimb[1:2]
-n <- dimb[3]
+p <- dimb[c(1,3)]
+n <- dimb[2]
+if (!is.matrix(a)) dim(a) <- p
 
 ## MAIN LOOP
-objective <- numeric(maxit)
+objective <- -Inf
 for (it in 1:maxit) {
-
+	objective.old <- objective
+	
 	## Update canonical vector in dimension 1 
-	c <- a %*% v[[2]]
-	d <- matrix(0, p[1], n)
-	for (t in 1:n) d[,t] <- b[,,t] %*% v[[2]]
-	v[[1]] <- unlist(optim1D.cor(c, d))
+	if (p[2] == 1) {
+		aa <- as.vector(a) * v[[2]]		
+		bb <- matrix(b * v[[2]], p[1], n)
+	} else {	
+		aa <- a %*% v[[2]]
+		dim(b) <- c(p[1] * n, p[2])
+		bb <- v %*% v[[2]]
+		dim(bb) <- c(p[1], n)
+	}	
+	v[1] <- optim1D.cor(aa, bb)
 		
 	## Update canonical vector in dimension 2
-	c <- crossprod(a, v[[1]])
-	d <- matrix(0, p[2], n)
-	for (t in 1:n) d[,t] <- crossprod(b[,,t], v[[1]])
-	v[[2]] <- unlist(optim1D.cor(c, d))
+	if (p[1] == 1) {
+		aa <- as.vector(a) * v[[1]]
+		bb <- matrix(b * v[[1]], p[2], n, byrow = TRUE)
+	} else {
+		aa <- crossprod(a, v[[1]])
+		dim(b) <- c(p[1], n * p[2])
+		bb <- crossprod(v[[1]], b)
+		dim(bb) <- c(n, p[2])
+		bb <- t(bb)
+	}
+	v[2] <- optim1D.cor(aa, bb)
 	
 	## Calculate objective
-	objective[it] <- crossprod(c, v[[2]])
+	objective <- sum(aa * v[[2]])
 	
 	## Check convergence 
-	if (it > 1 && abs(objective[it]-objective[it-1]) <= 
-	    	tol * max(1,objective[it-1])) break
+	if (it > 1 && abs(objective - objective.old) <= 
+	    	tol * max(1, objective.old)) break
 }
 
-return(v)
+v
 }
 
 
@@ -98,67 +139,112 @@ p <- dimb[1:3]
 n <- dimb[4]
 
 ## MAIN LOOP
-objective <- numeric(maxit)
+objective <- -Inf
+
+for (it in 1:maxit) {
+	objective.old <- objective
+	
+	## Update canonical vector in dimension k = 1,2,3
+	for (k in 1:3) {
+		i1 <- if (k == 1L) 2L else 1L
+		i2 <- if (k == 3L) 2L else 3L
+		aa <- aperm(a, c(i1, k, i2))
+		bb <- aperm(b, c(i1, k, 4, i2))
+		if (p[i1] == 1L && p[i2] == 1L) {
+			aa <- (v[[i1]] * v[[i2]]) * drop(aa)
+			bb <- (v[[i1]] * v[[i2]]) * drop(b)
+		} else if (p[i1] == 1L) {
+			aa <- if (p[k] == 1L) {
+				v[[i1]] * sum(aa * v[[i2]])
+			} else {
+				drop(aa) %*% (v[[i1]] * v[[i2]])
+			}
+			dim(bb) <- c(p[k] * n, p[i2])
+			bb <- bb %*% (v[[i1]] * v[[i2]])
+		} else if (p[i2] == 1L) {
+			aa <- if (p[k] == 1) {
+				v[[i2]] * sum(aa * v[[i1]])
+			} else {
+				crossprod(v[[i1]] * v[[i2]], drop(aa)) 
+			}
+			dim(bb) <- c(p[i1], p[k] * n)
+			bb <- crossprod(v[[i1]] * v[[i2]], bb)
+		} else {		
+			dim(aa) <- c(p[i1], p[k] * p[i2])
+			aa <- crossprod(v[[i1]], aa) 
+			dim(aa) <- c(p[k], p[i2])
+			aa <- aa %*% v[[i2]]
+			dim(bb) <- c(p[i1], p[k] * n * p[i2])
+			bb <- crossprod(v[[i1]], bb)
+			dim(bb) <- c(p[k] * n, p[i2])
+			bb <- bb %*% v[[i2]]
+		}
+		dim(bb) <- c(p[k], n)	
+		v[k] <- optim1D.cov(aa, bb)
+	}
+		
+	## Calculate objective
+	objective <- sum(aa * v[[3]]) 
+	
+	## Check convergence 
+	if (abs(objective - objective.old) <= 
+	    	tol * max(1, objective.old)) break
+}
+
+v
+}
+
+
+
+########################################################
+# Maximize inner product of rank-1 tensor 
+# with fixed tensor under quadratic constraints
+# max < v,a > subject to (1/n) sum_t (< v,b(t) >)^2 = 1
+########################################################
+
+
+## Inputs: 
+# v:	 list of d vectors
+# a:	 array with d dimensions 
+# b:	 array with (d+1) dimensions
+
+# The lengths of the vectors in v, the dimensions of a, 
+# and the first d dimensions of b must all match
+
+optim.gen.cor <- function(v, a, b, maxit = 1000, tol = 1e-6)
+{
+	
+## Data dimensions
+dima <- dim(a)
+d <- length(v)
+
+
+## MAIN LOOP
+objective <- -Inf
 
 for (it in 1:maxit) {
 
-	## Update canonical vector in dimension 1 
-	c <- numeric(p[1])
-	d <- matrix(0, p[1], n)
-	for (i in 1:p[1]) { 
-		c[i] <- crossprod(v[[2]], a[i,,] %*% v[[3]])
-		for (t in 1:n) 
-			d[i,t] <- crossprod(v[[2]], b[i,,,t] %*% v[[3]])
-	}
-	v[[1]] <- unlist(optim1D.cor(c, d))
-	
-	## Update canonical vector in dimension 2
-	c <- numeric(p[2])
-	d <- matrix(0, p[2], n)
-	for (j in 1:p[2]) { 
-		c[j] <- crossprod(v[[1]], a[,j,] %*% v[[3]])
-		for (t in 1:n) 
-			d[j,t] <- crossprod(v[[1]], b[,j,,t] %*% v[[3]])
-	}
-	v[[2]] <- unlist(optim1D.cor(c, d))
+	objective.old <- objective
 
-	## Update canonical vector in dimension 3
-	c <- numeric(p[3])
-	d <- matrix(0, p[3], n)
-	for (k in 1:p[3]) { 
-		c[k] <- crossprod(v[[1]], a[,,k] %*% v[[2]])
-		for (t in 1:n) 
-			d[k,t] <- crossprod(v[[1]], b[,,k,t] %*% v[[2]])
+	## Update canonical vector in dimension k = 1,...,d
+	for (k in 1:d) { 
+		aa <- tnsr.vec.prod(a, v[-k], (1:d)[-k])
+		bb <- tnsr.vec.prod(b, v[-k], (1:d)[-k])
+		v[k] <- optim1D.cor(aa, bb)
 	}
-	v[[3]] <- unlist(optim1D.cor(c, d))
 
 	## Calculate objective
-	objective[it] <- crossprod(c, v[[3]]) # == sqrt(cp)
+	objective[it] <- if (dima[d] == 1) {
+		v[[d]]^2 * mean(aa^2) + 2 * v[[d]] * bb
+	} else { mean(crossprod(v[[d]], aa)^2) + 
+		2 * sum(bb * v[[d]]) }
 	
 	## Check convergence 
-	if (it > 1 && abs(objective[it]-objective[it-1]) <= 
-	    	tol * max(1,objective[it-1])) break
+	if (it > 1 && abs(objective - objective.old) <= 
+	    	tol * max(1, objective.old)) break
 }
 
 return(v)
 }
-
-
-####################################
-# Wrapper function for optimization
-####################################
-
-
-optim.block.cor <- function(v, a, b, maxit, tol)
-{
-if (length(v) == 1) {
-	optim1D.cor(a, b)
-} else if (length(v) == 2) {
-	optim2D.cor(v, a, b, maxit, tol)
-} else {
-	optim3D.cor(v, a, b, maxit, tol)
-}
-}
-
 
 

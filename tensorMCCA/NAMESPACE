@@ -1,4 +1,21 @@
-export("check.arguments", "deflate.x", "hosvd", "image.scores", "MCCA.init.random", "MCCA.init.cca", "MCCA.init.svd", "MCCA.cor", "MCCA.cov", "objective.cor", "objective.cov", "permutation.test", "scale.v", "tnsr3d.rk1")
+export(
+"canon.scores",
+"check.arguments",
+"deflate.x",
+"hosvd",
+"mcca.init.random",
+"mcca.init.cca",
+"mcca.init.svd",
+"mcca.cor",
+"mcca.cov",
+"objective.cor",
+"objective.cov",
+"objective.gradient",
+"permutation.test",
+"scale.v",
+"tnsr3d.rk1",
+"tnsr.rk1"
+)
 importFrom("MASS", "ginv")
 importFrom("parallel", "mclapply")
 importFrom("RSpectra", "svds", "eigs_sym")

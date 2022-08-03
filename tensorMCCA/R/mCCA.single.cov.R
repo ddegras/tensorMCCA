@@ -10,25 +10,26 @@
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-MCCA.single.block.cov <- function(x, v, c, sweep, maxit, 
-	tol, verbose)
+mcca.single.block.cov <- function(x, v, w, sweep, maxit, tol, verbose)
 {
 	
 ## Data dimensions
 dimx <- lapply(x, dim)
-ndimx <- sapply(dimx, length)
-d <- ndimx - 1
+d <- sapply(dimx, length) - 1L
+p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 m <- length(x)
-n <- dimx[[1]][ndimx[1]]
+n <- tail(dimx[[1]], 1)
 
-objective <- numeric(maxit+1)
-objective[1] <- objective.internal(x, v, c)
+objective <- numeric(maxit + 1L)
+objective[1] <- objective.internal(x, v, w)
 if (verbose) 
-	cat("\nIteration",0,"Objective",objective[1])
+	cat("\nIteration", 0, "Objective", objective[1])
+v.best <- v
+objective.best <- objective[1]
 
-iprod <- matrix(0, m, n) # inner tensor products <X_it, v_i>
-ciizero <- diag(c) == 0
-s <- ifelse(ciizero, rep(1,m), diag(c)) # scaling term 
+score <- matrix(0, n, m) # canonical scores <X_it, v_i>
+wiizero <- (diag(w) == 0)
+s <- ifelse(wiizero, rep(1,m), diag(w)) # scaling term 
 if (sweep == "cyclical") idxi <- 1:m
 
 ## Check if some datasets are zero
@@ -37,61 +38,50 @@ xzero <- logical(m)
 for (i in 1:m) {
 	xzero[i] <- all(abs(range(x[[i]])) <= eps)
 	if (xzero[i])
-		v[[i]] <- lapply(dimx[[i]][1:d[i]], numeric)
+		v[[i]] <- lapply(p[[i]], numeric)
 }
 
-## Alternating Least Squares / Block Coordinate Ascent 
+## Block Coordinate Ascent 
 for (it in 1:maxit) {
 	if (sweep == "random") idxi <- sample(m)
+	vprev <- v
 	for (i in 1:m) { 		
 		if (xzero[i]) next
-		## Calculate the inner products <X_jt, v_j> 
+		## Calculate the scores <X_jt, v_j> 
 		## After the first algorithm iteration (it = 1), in each 
 		## iteration of the i loop, only the inner products associated 
 		## with the previous value of i need being updated
 		idxj <- if (it == 1 && i == 1) { idxi[-1]  
 			} else if (i == 1) { lastidx } else idxi[i-1]
-		for (j in idxj) {
-			## Calculate tensor-vector products between X_j and 
-			## all vectors v_(jk) for k != i
-			tvprod <- x[[j]] 
-			pj <- head(dimx[[j]], d[j])
-			vj <- v[[j]]
-			for (k in 1:d[j]) {
-				if (k < d[j]) {
-					dim(tvprod) <- c(pj[k], prod(pj[(k+1):d[j]], n))
-					tvprod <- crossprod(vj[[k]], tvprod)
-					dim(tvprod) <- c(pj[k+1], length(tvprod) / pj[k+1])	
-				} else {
-					iprod[j,] <- crossprod(vj[[k]], tvprod)
-				}				
-			}
-		}
+		for (j in idxj) 
+			score[, j] <- tnsr.vec.prod(x[[j]], v[[j]], 1:d[j]) 
 		lastidx <- idxi[m]
 		
 		## Set up quadratic program 
-		a <- if (ciizero[i]) 0 else x[[i]] # quadratic component
-		w <- crossprod(iprod[-i,, drop = FALSE], c[-i, i] / s[i])
-		b <- x[[i]]	# linear component
-		dim(b) <- c(prod(dimx[[i]][-ndimx[i]]), n)
-		b <- b %*% w
-		if (d[i] > 1) dim(b) <- dimx[[i]][-ndimx[i]]
+		a <- if (wiizero[i]) 0 else x[[i]] # quadratic component
+		b <- tnsr.vec.prod(x = x[[i]], 
+			v = list(score[, -i] %*% (w[-i, i] / s[i])), 
+			modes = d[i] + 1L) # linear component
 		
 		## Update canonical vectors
 		v[[i]] <- optim.block.cov(v[[i]], a, b, maxit, tol) 	
 	}								
 	
-	## Calculate objective value (sum of correlations)
-	objective[it+1] <- objective.internal(x, v, c)	
+	## Calculate objective value 
+	objective[it + 1L] <- objective.internal(x, v, w)
+	if (objective[it + 1L] > objective.best) {
+		v.best <- v
+		objective.best <- objective[it + 1L]
+	}
 	if (verbose) 
-		cat("\nIteration",it,"Objective",objective[it+1])
+		cat("\nIteration", it, "Objective", objective[it + 1L])
 	
 	## Check convergence 
-	if (it > 1 && abs(objective[it+1]-objective[it]) <= 
-	    	tol * max(1,objective[it])) break
+	if (it > 1 && abs(objective[it + 1] - objective[it]) <= 
+	    	tol * max(1, objective[it])) break
 }
 
-list(v = v, y = image.scores(x, v), objective = objective[it+1], 
+list(v = v.best, y = canon.scores(x, v.best), objective = objective.best, 
 	iters = it, trace = objective[1:(it+1)])
 
 }
@@ -105,181 +95,243 @@ list(v = v, y = image.scores(x, v), objective = objective[it+1],
 ################################
 # Internal function for MCCA 
 # Maximize sum of covariances 
-# under global norm constraints 
+# under global norm constraints
+# and orthogonality constraints
+# on canonical vectors 
 ################################
 
 # This function is not meant to be called by the user
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-MCCA.single.global.cov <- function(x, v, c, sweep, 
-	maxit, tol, verbose)
+	
+# Note to self: for a given v(i,k) to optimize, 
+# cannot rescale the other v(i,kk) to all have norm 1 
+# because this will likely break orthogonality constraints :-(
+ 
+	
+mcca.single.global.cov <- function(x, v, w, ortho, sweep, maxit, tol, verbose)
 {
 	
 ## Data dimensions
 dimx <- lapply(x, dim)
 ndimx <- sapply(dimx, length)
 d <- ndimx - 1 # number of image dimensions for each dataset
+p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 m <- length(x) # number of datasets
 n <- dimx[[1]][ndimx[1]] # number of individuals/objects
 
 objective <- numeric(maxit+1)
-objective[1] <- objective.internal(x, v, c)
+objective[1] <- objective.internal(x, v, w)
 if (verbose) 
-	cat("\nIteration",0,"Objective",objective[1])
+	cat("\nIteration", 0, "Objective", objective[1])
 
 ## Define the blocks of optimization variables 
-ngroups <- max(d)
+ngroups <- prod(d)
 ## Dataset/mode combinations to include in each group
-group <- matrix(0, m, ngroups) 
+# group <- matrix(0, m, ngroups) 
 if (sweep == "cyclical") {
-	for (i in 1:m) 
-		group[i,1:d[i]] <- 1:d[i]
+	modes <- mapply(seq.int, 1, d, SIMPLIFY = FALSE)
+	group <- expand.grid(modes, KEEP.OUT.ATTRS = FALSE)
+	group <- matrix(unlist(group), m, ngroups, byrow = TRUE)
 }
 
 ## Logical flags for datasets & associated variables to be 
 ## removed from optimization in case variables become zero
 eps <- 1e-14 # numerical tolerance for zero
 rmv <- logical(m)
+nrm2v <- vector("list", m) 
+nrmt.mk <- numeric(m) # products of norms of canonical vectors
+# except for the one being optimized
 
 ## Test if the objective weights are equal or separable
-cequal <- all(c == c[1])
-if (cequal) csep <- TRUE
-if (!cequal) {
-	eigc <- eigen(c, TRUE)
-	csep <- (sum(eigc$values > eps) == 1)
-	cvec <- if (csep) { 
-		eigc$vectors[,1] * sqrt(eigc$values[1]) } else NULL
+equal.w <- all(w == w[1])
+if (equal.w) {
+	wvec <- rep(1/m, m)
+	separable.w <- TRUE
+} else {
+	eigw <- eigen(w, TRUE)
+	nonzero <- sum(abs(eigw$values) > (eps * eigw$values[1]))
+	separable.w <- (nonzero == 1)
+	wvec <- if (separable.w) { 
+		eigw$vectors[,1] * sqrt(eigw$values[1]) 
+	} else NULL	
+}
+
+## Orthogonality constraints
+if (is.null(ortho)) {
+	northo <- 0L 
+} else {
+	if (!is.matrix(ortho)) ortho <- as.matrix(ortho)
+	northo <- ncol(ortho)
+	cpfun <- function(x, y) sum(x * y)
 }
 
 for (it in 1:maxit) {
 	## Determine blocks of variables to update in each dataset
 	## in case of a random sweeping pattern
 	if (sweep == "random") {
-		group <- matrix(0, m, ngroups)
-		for (i in 1:m)
-			group[i,sample.int(ngroups, d[i])] <- 1:d[i] 
-	}
-	
-	for (g in 1:ngroups) {
-		## Calculate norms of canonical vectors and rescale 
-		## vectors that are not part of the current update 
-		## so their product is one
-		nrmt <- numeric(m)
+		group <- sapply(d, sample.int, n = ngroups, replace = TRUE)
+		group <- t(group)
+	}	
+
+	## Calculate squared norms of canonical vectors
+	for (i in 1:m) 
+		nrm2v[[i]] <- sapply(v[[i]], function(x) sum(x^2))
+
+	for (g in 1:ngroups) {		
+
+		## Set to zero canonical tensors that are approximately 
+		## zero and remove them from the optimization
 		for (i in 1:m) {
-			nrmv <- sapply(v[[i]], function(x) sqrt(sum(x^2)))
-			nrmt[i] <- prod(nrmv)
-			if (nrmt[i] < eps) { 
-				nrmt[i] <- 0
-				v[[i]] <- lapply(dimx[[i]][-d[i]], numeric)
+			if (any(nrm2v[[i]] < p[[i]] * eps)) { 
+				v[[i]] <- lapply(p[[i]], numeric)
 				rmv[i] <- TRUE
-			} else if (group[i,g] > 0) {
-				for (k in 1:d[i]) {
-					if (k == group[i,g]) next
-					v[[i]][[k]] <- v[[i]][[k]] / nrmv[k] 
-				}
-			}
+			} 
 		}
+		if (all(rmv)) break
+		idxg <- which(!rmv)
+		groupsize <- length(idxg)
 
 		## Create block matrix of tensor-vector products
 		## between X_it and vectors v_il in all modes 
 		## l = 1, ..., d(i) except mode k(i,g) 
 		## Each block corresponds to one dataset and the 
 		## blocks are stacked vertically
-		idxg <- which(group[,g] > 0 & (!rmv))
-		if (length(idxg) == 0) next
-		p <- mapply("[", dimx[idxg], group[idxg,g])
-		groupsize <- length(idxg)
-		start <- cumsum(c(0, p[-groupsize])) + 1
-		end <- cumsum(p)
-		xv <- matrix(0, sum(p), n)		
+		pg <- mapply("[", p[idxg], group[idxg, g])
+		start <- cumsum(c(0, pg[-groupsize])) + 1
+		end <- cumsum(pg)
+		xv <- matrix(0, sum(pg), n)
+		vortho <- matrix(0, sum(pg), northo)	
 		for (ii in 1:groupsize) {
 			i <- idxg[ii]
-			tvprod <- x[[i]] 
-			pi <- head(dimx[[i]], d[i])
-			vi <- v[[i]]
-			kopt <- group[i,g] # selected mode for optimization
-			## If the selected mode is not next to last in X_i
-			## permute the dimensions of X_i to enforce it
-			if (kopt < d[i]) {
-				perm <- c((1:d[i])[-kopt], kopt, d[i]+1)
-				tvprod <- aperm(tvprod, perm)
-			}
-			## Calculate successive tensor-vector products
-			for (k in 1:d[i]) {
-				if (k == kopt) next
-				dim(tvprod) <- c(pi[k], length(tvprod)/pi[k])
-				tvprod <- crossprod(vi[[k]], tvprod)
-			}
-			dim(tvprod) <- c(pi[kopt], n)
-			if (csep && (!cequal)) 
-				tvprod <- cvec[i] * tvprod
-			
-			## Fill matrix block			
+			k <- group[i,g] # selected mode for optimization
+			tvprod <- tnsr.vec.prod(x[[i]], v[[i]][-k], 
+				(1:d[i])[-k]) # tensor-vector products	
+			nrmt.mk[i] <- sqrt(prod(nrm2v[[i]][-k]))	
+			if (separable.w) 
+				tvprod <- (wvec[i] / nrmt.mk[i] / sqrt(m*n)) * tvprod	
 			xv[start[ii]:end[ii],] <- tvprod
+
+			## Set up orthogonality constraints
+			if (northo > 0) {
+				for (l in 1:northo) {
+					if (d[i] == 1L) {
+						vortho[start[ii]:end[ii], l] <- 
+						ortho[[i,l]][[k]]	
+					} else {
+					ip <- prod(mapply(cpfun, v[[i]][-k], 
+						ortho[[i,l]][-k]))
+					vortho[start[ii]:end[ii], l] <- 
+						ortho[[i,l]][[k]] * (ip / nrmt.mk[i])
+					}
+				}
+			}	
 		}
-				
+		if (northo > 0) 	Q <- qr.Q(qr(vortho))
+			
 		## Update canonical vectors and objective value
-		if (csep) { 
+		if (separable.w) { 
 			# Case: objective weight matrix separable (SVD)
-			svdxv <- if (max(dim(xv)) > 2) {
+			if (northo > 0) # orthogonality constraints
+				xv <- xv - Q %*% crossprod(Q, xv) 
+			svdxv <- if (all(dim(xv) > 2)) {
 				svds(xv, k = 1, nu = 1, nv = 0)
-			} else { svd(xv, nu = 1, nv = 1) }
+			} else { svd(xv, nu = 1, nv = 0) }
 			vg <- svdxv$u
-			if (ii == groupsize && all(group[,g] > 0)) {
-				objective[it+1] <- ifelse(cequal,
-					(svdxv$d)^2 * c[1] * m / n,
-					(svdxv$d)^2 * m / n) }
 		} else {
 			# Case: objective weight matrix nonseparable (EVD)
 			xv <- tcrossprod(xv)
+			s <- m * w / n / tcrossprod(nrmt.mk)
+			vv <- vector("list", groupsize)
 			for (ii in 1:groupsize) {
 				i <- idxg[ii]
+				vv[[i]] <- v[[i]][[group[i,g]]] * nrmt.mk[i] / sqrt(m)
+				# debugging
 				rows <- start[ii]:end[ii] 
 				for (jj in 1:groupsize) {
 					j <- idxg[jj]
-					cols <- start[ij]:end[jj]
-					xv[rows, cols] <- c[i, j] * xv[rows, cols]
-				}			
+					cols <- start[jj]:end[jj]
+					xv[rows, cols] <- s[i,j] * xv[rows, cols]
+				}
 			}
-			eigxv <- if (max(dim(xv)) > 2) {
-				eigs_sym(xv, k = 1) } else { eigen(xv, TRUE) }
+			## Debugging
+			# vv <- unlist(vv)
+			# objective.implicit <- crossprod(vv, xv %*% vv)
+			# objective.explicit <- objective.internal(x, v, w)
+			# objective.test.1 <- (abs(objective.implicit - 
+				# objective.explicit) < 1e-6)
+			# print(paste("Test: objective (before ortho)", objective.test.1))
+			
+			if (northo > 0) { # project on orthogonality constraints
+				QQtxv <- Q %*% crossprod(Q, xv)
+				xv <- xv - QQtxv - t(QQtxv) + 
+					tcrossprod(QQtxv %*% Q, Q)
+			}				
+			eigxv <- if (all(dim(xv) > 2)) {
+				eigs_sym(xv, k = 1, which = "LA") 
+			} else { eigen(xv, TRUE) }
 			vg <- eigxv$vectors[,1]
-			if (ii == groupsize && all(group[,g] > 0)) {
-				objective[it+1] <- ifelse(cequal,
-					eigxv$values[1] * c[1] * m / n,
-					eigxv$values[1] * m / n) }
 		}
-		## Rescale solution to meet global norm constraint 
-		s <- sqrt(m - sum(nrmt[group[,g] == 0]^2))
-		vg <-  s * vg
+		
+		## Debugging
+		# vv <- list()
+		# for (ii in 1:groupsize) {
+			# i <- idxg[ii]
+			# k <- group[i,g]
+			# vv[[ii]] <- v[[i]][[k]]	* nrmt.mk[i] / sqrt(m) 
+		# }
+		# vv <- unlist(vv)
+		# print(paste("Norm v (before update):", sum(vv^2)))
+		# objective.implicit <- crossprod(vv, xv %*% vv)
+		# print(paste("Objective (before update):", objective.implicit))
+					
+		## Update canonical vectors
 		for (ii in 1:groupsize) {
 			i <- idxg[ii]
 			k <- group[i,g]
-			v[[i]][[k]] <- vg[start[ii]:end[ii]]
+			idx <- start[ii]:end[ii]
+			v[[i]][[k]] <- vg[idx] * (sqrt(m) / nrmt.mk[i])
+			nrm2v[[i]][k] <- sum(v[[i]][[k]]^2)
 		}
+		
+		## Debugging
+		# nrm2t <- sapply(nrm2v, prod)
+		# norm.test <- (abs(mean(nrm2t) - 1) < 1e-10)
+		# print(paste("Test: norm v", norm.test))
+		# if (northo > 0) {
+			# ortho.test <- logical(northo)
+			# acc <- numeric(m)
+			# for (l in 1:northo) {
+				# for (i in 1:m) 
+					# acc[i] <- prod(mapply(cpfun, v[[i]], ortho[[i,l]]))
+				# ortho.test[l] <- (abs(sum(acc)) < 1e-7)
+			# }
+		# } else ortho.test <- TRUE
+		# print(paste("Test: ortho v", ortho.test))
+
+		# objective.implicit <- if (separable.w) {
+			# svdxv$d[1]^2 } else eigxv$values[1]
+		# objective.explicit <- objective.internal(x, v, w)
+		# objective.test.2 <- (abs(objective.implicit - 
+			# objective.explicit) < 1e-6)
+		# print(paste("Test: objective (after ortho)", objective.test.2))
+		# print(paste("Objective:", objective.explicit))
 	
-					
-	}								
-	
+	}
+									
 	## Balance canonical vectors  
 	v <- scale.v(v, cnstr = "global")
-	
-	## Debugging: Compare objective value calculated in loop 
-	## to full calculation
-	# test <- objective.internal(x, v, c)
-	if (any(group[,ngroups] == 0))
-		objective[it+1] <- objective.internal(x, v, c)
+	objective[it+1] <- objective.internal(x, v, w)
 	if (verbose) 
-		cat("\nIteration",it,"Objective",objective[it+1])
-	# browser()
+		cat("\nIteration", it, "Objective", objective[it+1])
 	
 	## Check convergence 
-	if (it > 1 && abs(objective[it+1]-objective[it]) <= 
-	    	tol * max(1,objective[it])) break
+	if (it > 1 && abs(objective[it+1] - objective[it]) <= 
+		max(1, tol) * abs(objective[it])) break
 }
 
-list(v = v, y = image.scores(x, v), objective = objective[it+1], 
+list(v = v, y = canon.scores(x, v), objective = objective[it+1], 
 	iters = it, trace = objective[1:(it+1)])
 
 }

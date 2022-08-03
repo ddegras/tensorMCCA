@@ -1,93 +1,94 @@
 
-MCCA.cor <- function(x, r, c = 1, ortho = c("block.score",
-	"global.score", "canon.tnsr"), init = list(), maxit = 1000, 
-	tol = 1e-6, sweep = c("cyclical", "random"), verbose = FALSE)
+mcca.cor <- function(x, r, w = 1, norm = c("block", "global"), 
+	ortho = c("score", "canon.tnsr"), init = c("cca", "svd", "random"), 
+	maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), 
+	control = list(), verbose = FALSE)
 {
 
 ## Check arguments
-stopifnot(is.list(init))
-test <- check.arguments(x, init$value)
+test <- if (is.list(init)) {
+	check.arguments(x, init, w)
+} else check.arguments(x, NULL, w) 
 eps <- 1e-14
+r0 <- r 
+r <- as.integer(r)
 
 ## Data dimensions
-m <- length(x) # number of datasets
-dimx <- lapply(x, dim) # tensor dimensions for each dataset
-p <- lapply(dimx, function(x) x[-length(x)]) 
-# dimensions of each dataset, last mode (instances) omitted
-d <- sapply(p, length) 
-# numbers of image dimensions for each dataset
-n <- tail(dimx[[1]], 1) # numbers of instances per dataset
+m <- length(x) 
+dimx <- lapply(x, dim) 
+d <- sapply(dimx, length) - 1L 
+p <- mapply(head, dimx, d, SIMPLIFY = FALSE) 
+n <- tail(dimx[[1]], 1) 
 
 ## Objective weights
-stopifnot(length(c) == 1 || 
-	(is.matrix(c) && all(dim(c) == length(x))))
-stopifnot(all(c >= 0) && any(c > 0))
-c <- if (length(c) == 1) { 	matrix(1/m^2, m, m) 
-	} else { (c + t(c)) / (2 * sum(c)) }
-
-## Initialization parameters
-if (is.null(init$value)) {	
-	if (is.null(init$method)) { 
-		init.method <- "cca" 
-	} else {
-		opts <- c("cca", "svd", "random")
-		idx <- na.omit(pmatch(init$method, opts))
-		if (length(idx) > 0) {
-			init.method <- opts[idx[1]]
-		} else stop(paste("The possible values of the field",
-			"'method' in argument 'init' are 'cca', 'svd',",
-			"and 'random'."))	
-	}
-}
-if (is.null(init$value) && init.method == "cca") {
-	tab <- c("exhaustive", "approximate")
-	if (is.null(init$search)) { 
-		init.search <- tab
-	} else {
-		idx <- na.omit(pmatch(init$search, tab)) 
-		if (length(idx) > 0) {
-			init.search <- tab[idx[1]]
-		} else stop(
-			paste("The possible values of the field",
-			"'search' in argument 'init' are 'exhaustive'",
-			"and 'approximate'."))
-	}
+w <- if (length(w) == 1) { 
+	matrix(1 / (m^2), m, m) 
+} else { 
+	(w + t(w)) / (2 * sum(w))
 }
 
 ## Match other arguments
 ortho <- match.arg(ortho)
+cnstr <- match.arg(cnstr)
 sweep <- match.arg(sweep)
+if (is.character(init)) init <- match.arg(init)
+if (norm == "global" && ortho == "canon.tnsr")
+	stop(paste("Argument values 'norm = global'",
+	"and ortho = 'canon.tnsr' are not compatible", 
+	"in function 'mcca.cor'"))
 
-## Data centering
+## Set initialization method
+mcca.init <- if (is.character(init)) {
+	switch(init, cca = mcca.init.cca, 
+		svd = mcca.init.svd, random = mcca.init.random)
+} else NULL
+
+## Center data
 for(i in 1:m) {
     mu <- rowMeans(x[[i]], dims = d[i])
     x[[i]] <- x[[i]] - as.vector(mu)
 }
-		
+if (ortho == "canon.tnsr") x0 <- x
+
 ## Adjust number of canonical components as needed
 r0 <- as.integer(r)
 pp <- sapply(p, prod)
-r <- switch(ortho, 
-	block.score = min(n-1, max(pp), r0), 
-	global.score = min(n-1, sum(pp), r0),
-	canon.tnsr = min(max(pp), r0))
-if (verbose && r != r0)
-	warning(paste("Argument 'r' set to", r,
-		"to satisfy orthogonality constraints"))
+r <- if (ortho == "score" && norm == "block") { 
+	min(n - 1, max(pp), r0)
+} else if (ortho == "score" && norm == "global") {
+	min(n - 1, sum(pp), r0)
+} else if (ortho == "canon.tnsr") {
+	min(max(pp), r0) 
+}
 
-## Prepare optimization if orthogonality 
-## constraints pertain to canonical tensors
+## Set orthogonality constraints on canonical tensors
 if (ortho == "canon.tnsr" && r > 1) {
 	## Set tensor modes on which constraints apply
-	ortho.mode <- array(dim = c(r, r, m))	
-	for (i in 1:m) {
-		mat <- matrix(0L, r, r)
-		mod <- unlist(lapply((r-1):1, 
-			function(len) rep_len(1:d[i], len)))
-		if (sweep == "random") mod <- sample(mod)
-		mat[lower.tri(mat)] <- mod
-		ortho.mode[,,i] <- mat + t(mat)	
+	ortho.mode <- set.ortho.mode(x, r, 
+		cnstr = control$ortho$cnstr, 
+		method = control$ortho$method)
+}
+
+## Set up initialization parameters
+test <- (is.list(control) && !is.null(control$init))
+if (identical(init, "cca")) {
+	init.args <- list(r = 1, k = NULL, w = w, 
+		objective = "cor", norm = "block", center = FALSE, 
+		search = ifelse(m <= 5, "exhaustive", "approximate"))
+	if (test) {
+		names. <- intersect(names(control), 
+			c("k", "norm", "search"))
+		init.args[names.] <- control[names.]
 	}
+} else if (identical(init, "svd")) {
+	init.args <- list(r = 1, objective = "cor", 
+		norm = "block", center = FALSE)
+	if (test) {
+		names. <- intersect(names(control), c("norm"))
+		init.args[names.] <- control[names.]
+	}
+} else if (identical(init, "random")) { 
+	init.args <- list(r = 1, objective = "cor")
 }
 
 ## Create output objects 
@@ -95,7 +96,7 @@ v <- vector("list", m * r) # canonical vectors
 dim(v) <- c(m, r)
 block.score <- array(0, c(n, m, r)) 
 global.score <- matrix(0, n, r) 
-input <- list(objective = "correlation", r = r, c = c, 
+input <- list(objective = "correlation", r = r, w = w, 
 	init = init, ortho = ortho, maxit = maxit, tol = tol, 
 	sweep = sweep) 
 objective <- iters <- numeric(r)
@@ -103,7 +104,7 @@ objective <- iters <- numeric(r)
 ## Trivial case: constant datasets  
 test <- sapply(x, function(a) all(abs(a) <= eps))
 test <- outer(test, test, "&")
-if (all(test | c == 0)) {
+if (all(test | w == 0)) {
 	r <- 1
 	input$r <- r
 	v <- vector("list", m)
@@ -118,48 +119,55 @@ if (all(test | c == 0)) {
 ## MAIN LOOP
 vprev <- vector("list", m)
 for (l in 1:r) {	
-	## Initialize canonical vectors
-	v0 <- if (!is.null(init$value) && NCOL(init$value) == 1) {
-		init$value 
-	} else if (!is.null(init$value) && NCOL(init$value) >= l) {
-		init$value[, l]	
-	} else {
-		switch(init.method, 
-			svd = MCCA.init.svd(x, objective = "correlation", 
-				cnstr = "block", center = FALSE),
-			cca = MCCA.init.cca(x, k = init$k, c = c, 
-				objective = "correlation", cnstr = "block",
-				search = init.search, center = FALSE),
-			random = MCCA.init.random(x, objective = "correlation"))
+	
+	## Prepare orthogonality constraints
+	if (l > 1) { 	
+		if (ortho == "score" && norm == "block") { 
+			x <- deflate.x(x, score = block.score[,,l-1], 
+				check.args = FALSE)
+		} else if (ortho == "score" && norm == "global") { 
+			x <- deflate.x(x, score = global.score[,l-1], 
+				check.args = FALSE)
+		} else if (ortho == "canon.tnsr") {
+			cnstr <- set.ortho.mat(v = v[, 1:(l-1)], 
+				modes = ortho.mode[, 1:(l-1), l])
+			for(i in 1:m) 
+				x[[i]] <- tnsr.mat.prod(x = x0[[i]], 
+					mat = cnstr$mat[[i]], modes = cnstr$modes[[i]])
+		} 
 	}
-
+		
+	## Initialize canonical vectors
+	if (is.character(init)) {
+		init.args$x <- x
+		v0 <- do.call(mcca.init, init.args)
+	} else if (is.list(init)) {
+		v0 <- if (is.vector(init)) {
+			init } else { init[, min(l, ncol(init))] }
+		if (l > 1 && ortho == "canon.tnsr") {
+			v0 <- tnsr.rk1.mat.prod(v0, 	mat = cnstr$mat, 
+				modes = cnstr$modes, transpose.mat = FALSE)
+		}
+		v0 <- scale.v(v0, scale = "norm", cnstr = norm)
+	} 
+	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component",l,"\n")
-	out <- MCCA.single.cor(x, v0, c, sweep, maxit, tol, verbose)
+	out <- mcca.single.cor(x, v0, w, sweep, maxit, tol, verbose)
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y # canonical scores
 	global.score[,l] <- rowMeans(block.score[,,l])	
 	iters[l] <- out$iters	
-	v[,l] <- out$v 
-		
-	## Prepare orthogonality constraints for next stage
-	if (ortho  == "canon.tnsr" && l < r) {
-		vprev <- lapply(d, function(len) vector("list", len))
-		for (i in 1:m) {
-			k <- ortho.mode[l, l+1, i]
-			vprev[[i]][[k]] <- v[[i,l]][[k]]
-		}
-	}
 
-	## Deflate data matrix
-	if (l < r) { 	
-		x <- switch(ortho, 
-			block.score = deflate.x(x, score = block.score[,,l], 
-				check.args = FALSE),
-			global.score = deflate.x(x, score = global.score[,l], 
-				check.args = FALSE),  
-			canon.tnsr = deflate.x(x, v = vprev, check.args = FALSE))	
-	}
+	if (l > 1 && ortho == "canon.tnsr") {
+		v[,l] <- tnsr.rk1.mat.prod(v = out$v, 
+			mat = cnstr$mat, modes = cnstr$modes, 
+			transpose.mat = TRUE)
+		for (i in which(cnstr$vzero)) 
+			v[[i,l]] <- lapply(p[[i]], numeric)
+	} else { 
+		v[,l] <- out$v 
+	}		
 
 	## Monitor objective value
 	if (objective[l] <= eps) break 
@@ -169,13 +177,17 @@ for (l in 1:r) {
 ## Re-order results according to objective values if needed
 objective <- objective[objective > 0]
 o <- order(objective, decreasing = TRUE)
-if (!identical(o,1:r)) {
+if (!identical(o, 1:r)) {
 	v <- v[,o]
 	block.score <- block.score[,,o]
 	global.score <- global.score[,o]
 	objective <- objective[o]
 	iters <- iters[o]
 }
+
+## Clean up scores
+block.score[abs(block.score) < eps] <- 0
+global.score[abs(global.score) < eps] <- 0
 
 list(v = v, block.score = block.score, global.score = global.score,
 	objective = objective, iters = iters, input = input)

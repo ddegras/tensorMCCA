@@ -4,19 +4,21 @@
 # (Quick Rank 1)
 #############################
 
+# Development version with multiple starting points
 
-mcca.init.svd <- function(x, objective = c("cov", "cor"), 
-	norm = c("block", "global"), center = TRUE)
+mcca.init.svd <- function(x, r = 1L, objective = c("cov", "cor"), 
+	ortho = c("score", "canon.tnsr"), center = TRUE, check.args = TRUE,
+	reduce.storage = FALSE)
 {
-## Check argument x if required
-test <- check.arguments(x)
+if (check.args) 
+	test <- check.arguments(x)
 eps <- 1e-14
+r <- as.integer(r)
 
 ## Data dimensions
-m <- length(x) # number of datasets 
-dimx <- lapply(x, dim) # full data dimensions
+m <- length(x) 
+dimx <- lapply(x, dim) 
 p <- lapply(dimx, function(idx) idx[-length(idx)]) 
-# image dimensions (ignore last dimension of datasets = replications)
 d <- sapply(p, length)
 n <- tail(dimx[[1]], 1)
 
@@ -24,8 +26,21 @@ objective <- match.arg(objective) # norm or variance constraints
 norm <- match.arg(norm) # block or global norm constraints
 
 ## Initialize canonical vectors 
-v <- vector("list", m)
+r <- min(n, r)
+v <- vector("list", m * r)
+dim(v) <- c(m, r)
 
+## Initial SVD in reduced space (incremental)
+if (low.storage) {
+	xx <- matrix(0, n, n)
+	for (i in 1:m) {
+		xi <- x[[i]]
+		dim(xi) <- c(prod(p[[i]]), n)
+		if (center) xi <- xi - rowMeans(xi)
+		xx <- xx + crossprod(xi)
+	}
+	
+}
 ## Unfold data along last mode (individuals/objects) and concatenate
 xmat <- x
 for (i in 1:m) 

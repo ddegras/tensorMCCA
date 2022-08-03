@@ -6,10 +6,9 @@
 
 
 
-MCCA.init.cca <- function(x, k = NULL, c = 1, 
-	objective = c("covariance", "correlation"), 
-	cnstr = c("block", "global"), center = TRUE, 
-	search = c("exhaustive", "approximate"))
+mcca.init.cca <- function(x, k = NULL, w = 1, 
+	objective = c("cov", "cor"), norm = c("block", "global"), 
+	center = TRUE, search = c("exhaustive", "approximate"))
 {
 	
 ################
@@ -18,7 +17,7 @@ MCCA.init.cca <- function(x, k = NULL, c = 1,
 
 
 ## Check argument x
-test <- check.arguments(x)
+test <- check.arguments(x, w = w)
 eps <- 1e-14
 
 ## Data dimensions
@@ -26,21 +25,33 @@ m <- length(x) # number of datasets
 dimx <- lapply(x, dim) # full data dimensions
 p <- lapply(dimx, function(idx) idx[-length(idx)]) 
 # image dimensions (omit last dimension = instances/cases)
+cnst.set <- sapply(x, function(xx) all(abs(xx - xx[1]) < eps))
+if (all(cnst.set)) {
+	v <- vector("list", m)
+	for (i in 1:m) 
+		v[[i]] <- lapply(p[[i]], numeric)
+	return(v)
+} else if (any(cnst.set)) {
+	m0 <- m
+	dimx0 <- dimx
+	p0 <- p
+	x <- x[!cnst.set]
+	m <- sum(!cnst.set)
+	p <- p[!cnst.set]
+}
 pp <- sapply(p, prod)
 d <- sapply(p, length)
-n <- sapply(dimx, tail, 1)
-if (!all(n == n[1])) 
-	stop(paste("The last modes of the components of 'x'",
-		"must have the same dimension"))
-n <- n[[1]]
+n <- tail(dimx[[1]], 1)
 if (is.null(k)) { k <- n } else { k <- min(k, n) }
+
+
 
 ## Scaling constraints
 objective.type <- match.arg(objective)   
-if (objective.type == "correlation" && cnstr == "global")
-	stop(paste("Argument values 'objective = correlation'", 
-		"and 'cnstr = global' are incompatible."))
-cnstr <- match.arg(cnstr) # block or global constraints
+if (objective.type == "cor" && norm == "global")
+	stop(paste("Argument values 'objective = cor'", 
+		"and 'norm = global' are incompatible."))
+norm <- match.arg(norm) # block or global constraints
 
 ## Search method in optimization
 search <- if (identical(search, 
@@ -49,13 +60,15 @@ search <- if (identical(search,
 } else { match.arg(search) }
 
 ## Objective weights
-stopifnot(length(c) == 1 || 
-	(is.matrix(c) && all(dim(c) == length(x))))
-stopifnot(all(c >= 0) && any(c > 0))
-if (length(c) == 1) {
-	c <- matrix(1/m^2, m, m)
+if (is.matrix(w)) 
+	w <- w[!cnst.set, !cnst.set]
+stopifnot(length(w) == 1 || 
+	(is.matrix(w) && all(dim(w) == length(x))))
+stopifnot(all(w >= 0) && any(w > 0))
+if (length(w) == 1) {
+	w <- matrix(1/m^2, m, m)
 } else {
-	c <- (c + t(c)) / (2 * sum(c))
+	w <- (w + t(w)) / (2 * sum(w))
 }
 
 ## Data centering
@@ -85,12 +98,12 @@ k <- pmin(rankx, k)
 
 ## Calculate SVDs of each unfolded dataset
 reducex <- switch(objective.type, 
-	covariance = (k <= pp / 2), correlation = rep(TRUE, m))
+	cov = (k <= pp / 2), cor = rep(TRUE, m))
 u <- dd <- xred <- vector("list", m) 
 for (i in which(reducex)) {
 	xmat <- if (center) { matrix(x[[i]] - xbar[[i]], pp[i], n)  
 		} else { matrix(x[[i]], pp[i], n) }
-	svdx <- if(max(n, pp[i]) > 2 && min(n, pp[i]) > k[i]) {
+	svdx <- if (min(n, pp[i]) > max(2, k[i])) {
 		svds(xmat, k[i])
 	} else {
 		svd(xmat, nu = k[i], nv = k[i])
@@ -99,7 +112,7 @@ for (i in which(reducex)) {
 	## Reduce data
 	u[[i]] <- svdx$u  # left singular vectors
 	dd[[i]] <- svdx$d # singular values
-	xred[[i]] <- if (objective.type == "covariance") { 
+	xred[[i]] <- if (objective.type == "cov") { 
 		# reduced data
 		t(svdx$v) * svdx$d }  else t(svdx$v) 
 }
@@ -112,16 +125,16 @@ if (any(reducex)) rm(xmat, svdx)
 #####################################
 
 
-if (objective.type == "covariance" && cnstr == "global") { 
+if (objective.type == "cov" && norm == "global") { 
 	## Calculate rank of objective weight matrix
-	const <- all(c == c[1])
+	const <- all(w == w[1])
 	if (const) { 
-		rankc <- 1
+		rankw <- 1
 	 } else {
-		eigc <- eigen(c, TRUE)
-		rankc <- sum(eigc$values > eps)
-		if (rankc == 1) # scaling factors
-			s <- sqrt(eigc$values[1]) * eigv$vectors[,1] 			
+		eigw <- eigen(w, TRUE)
+		rankw <- sum(eigw$values > eps)
+		if (rankw == 1) # scaling factors
+			s <- sqrt(eigw$values[1]) * eigv$vectors[,1] 			
 	}	
 	## Concatenate data
 	len <- pp
@@ -129,7 +142,7 @@ if (objective.type == "covariance" && cnstr == "global") {
 	cumlen <- c(0, cumsum(len))
 	block <- lapply(1:m, function(i) (cumlen[i]+1):cumlen[i+1])
 	xmat <- matrix(nrow = sum(pp), ncol = n)
-	noscale <- (const || rankc > 1)
+	noscale <- (const || rankw > 1)
 	for (i in 1:m) {
 		xmat[block[[i]],] <- if (reducex[i] && noscale) { 
 			xred[[i]] 
@@ -142,7 +155,7 @@ if (objective.type == "covariance" && cnstr == "global") {
 	## Perform SVD of concatenated data if objective weight 
 	## matrix has rank 1 or EVD of associated covariance 
 	## matrix otherwise
-	if (rankc == 1) {
+	if (rankw == 1) {
 		v <- if (max(dim(xmat)) > 2) {
 			svds(x, k = 1)$u
 		} else { svd(x, nu = 1, nv = 0)$u }
@@ -151,9 +164,9 @@ if (objective.type == "covariance" && cnstr == "global") {
 		for (i in 1:m)
 		for (j in 1:m)
 			xmat[block[[i]], block[[j]]] <- 
-				c[i,j] * x[block[[i]], block[[j]]]
+				w[i,j] * x[block[[i]], block[[j]]]
 		v <- if (ncol(xmat) > 2) {
-			eigs_sym(xmat, k = 1)$vectors
+			eigs_sym(xmat, k = 1, which = "LA")$vectors
 		} else { eigen(xmat, TRUE)$vectors[,1] }
 	}
 	
@@ -179,7 +192,7 @@ if (objective.type == "covariance" && cnstr == "global") {
 # the canonical vectors are expressed up to scale factors. 
 # Only their directions matter at this stage, not their scale.   
 
-if (cnstr == "block") {
+if (norm == "block") {
 	v <- lapply(pp, function(nr) matrix(0, nr, m)) 
 	# canonical vectors
 	for (i in 1:m) {
@@ -191,7 +204,7 @@ if (cnstr == "block") {
 			matrix(x[[i]], pp[i], n)
 		}		
 		for (j in 1:i) {
-			if (i == j && objective.type == "correlation") {
+			if (i == j && objective.type == "cor") {
 				v[[i]][,i] <- u[[i]][,1] 
 				next
 			}
@@ -203,7 +216,7 @@ if (cnstr == "block") {
 			} else {
 				matrix(x[[j]], pp[j], n)
 			}
-			RSpectra.flag <- (max(nrow(xi), nrow(xj)) > 2)
+			RSpectra.flag <- (min(nrow(xi), nrow(xj)) > 2)
 			svdij <- if (i == j && RSpectra.flag) {
 				svds(xi, k = 1, nv = 0)	
 			} else if (i == j) {
@@ -213,7 +226,7 @@ if (cnstr == "block") {
 			} else {
 				svd(tcrossprod(xi, xj), nu = 1, nv = 1)
 			} 		
-			v[[i]][,j] <- if (objective.type == "correlation") {
+			v[[i]][,j] <- if (objective.type == "cor") {
 				u[[i]] %*% (svdij$u / dd[[i]])
 			} else if (reducex[i]) {
 				u[[i]] %*% svdij$u 
@@ -221,7 +234,7 @@ if (cnstr == "block") {
 				svdij$u		
 			}				
 			if (i == j) next
-			v[[j]][,i] <- if (objective.type == "correlation") {
+			v[[j]][,i] <- if (objective.type == "cor") {
 				u[[j]] %*% (svdij$v / dd[[j]])
 			} else if (reducex[j]) { 
 				u[[j]] %*% svdij$v
@@ -239,23 +252,26 @@ if (cnstr == "block") {
 # by rank-1 tensors 
 #####################################
 
-
 vcopy <- v
 v <- vector("list", m^2)
 dim(v) <- c(m, m)
-for (i in 1:m)
-for (j in 1:m)
-{
-	if (d[i] == 1) {
-		vij <- vcopy[[i]][,j]
-		v[[i,j]] <- list(vij / sqrt(sum(vij^2)))
-	} else if (d[i] == 2) {
-		vij <- matrix(vcopy[[i]][,j], p[[i]][1], p[[i]][2])
-		v[[i,j]] <- hosvd(vij, 1)$u
-	} else if (d[i] == 3) {
-		vij <- array(vcopy[[i]][,j], p[[i]])
-		v[i,j] <- scale.v(list(tnsr3d.rk1(vij)))
-	} 	
+for (i in 1:m) {
+	pi <- p[[i]]
+	test <- all(pi > 2)
+	for (j in 1:m) {
+		if (d[i] == 1) {
+			vij <- vcopy[[i]][,j]
+			v[[i,j]] <- list(vij / sqrt(sum(vij^2)))
+		} else if (d[i] == 2) {
+			vij <- matrix(vcopy[[i]][,j], pi[1], pi[2])
+			svdij <- if (test) { svds(vij, 1) 
+				} else svd(vij, 1, 1)
+			v[[i,j]] <- list(svdij$u, svdij$v)
+		} else {
+			vij <- array(vcopy[[i]][,j], pi)
+			v[[i,j]] <- tnsr.rk1(vij, scale = TRUE)
+		}
+	}
 }
 rm(vcopy)
 
@@ -269,16 +285,17 @@ rm(vcopy)
 ####################################
 
 
-score <- array(dim = c(n, m, m))
-for (i in 1:m)
-for (j in 1:m)
-{
-	vij <- if (d[i] == 1) { unlist(v[[i,j]]) 
-		} else { Reduce(kronecker, rev(v[[i,j]])) }
-	dim(vij) <- NULL
-	score[,i,j] <- colSums(vij * x[[i]], dims = d[i])
-	if (center) score[,i,j] <- score[,i,j] - sum(vij * xbar[[i]])
-}
+score <- canon.scores(x, v)
+# score <- array(dim = c(n, m, m))
+# for (i in 1:m)
+# for (j in 1:m)
+# {
+	# vij <- if (d[i] == 1) { unlist(v[[i,j]]) 
+		# } else { Reduce(kronecker, rev(v[[i,j]])) }
+	# dim(vij) <- NULL
+	# score[,i,j] <- colSums(vij * x[[i]], dims = d[i])
+	# if (center) score[,i,j] <- score[,i,j] - sum(vij * xbar[[i]])
+# }
 
 
 
@@ -288,7 +305,7 @@ for (j in 1:m)
 ####################################
 
 
-if (objective.type == "correlation") {
+if (objective.type == "cor") {
 	for (i in 1:m) {
 		s <- sqrt(colMeans(score[,i,]^2))
 		s[s <= eps] <- Inf
@@ -311,14 +328,14 @@ if (objective.type == "correlation") {
 # tensor one dataset at a time while keeping the 
 # other canonical tensors fixed
  
-if (cnstr == "block" && search == "approximate") {
+if (norm == "block" && search == "approximate") {
 	## Initialization @@@@ does not do what it's supposed to do. FIX IT
 	objective <- 0
 	part <- matrix(0, m, m) # partial objective values
 	for (i in 1:m)
 	for (j in 1:i)
 		part[i,j] <- part[j,i] <- 
-			c[i,j] * mean(score[,i,j] * score[,j,i])
+			w[i,j] * mean(score[,i,j] * score[,j,i])
 	diag(part) <- -Inf
 	assignment <- integer(m)
 	for (i in 1:m) {
@@ -336,7 +353,7 @@ if (cnstr == "block" && search == "approximate") {
 			for (j in 1:m) { # candidate assignment
 				assignment[i] <- j
 				for (k in 1:m) # go through all datasets 
-					part[j,k] <- c[i,k] * 
+					part[j,k] <- w[i,k] * 
 					mean(score[,i,j] * score[,k,assignment[k]])	
 			}
 			assignment[i] <- which.max(colSums(part))
@@ -355,12 +372,12 @@ if (cnstr == "block" && search == "approximate") {
 ######################################
 
 
-if (cnstr == "block" && search == "exhaustive") {
+if (norm == "block" && search == "exhaustive") {
 	part <- array(dim = rep(m, 4))
 	for (i in 1:m) 
 	for (j in 1:i) 
 	{			
-		part[i, j, , ] <- (c[i,j] / n) * 
+		part[i, j, , ] <- (w[i,j] / n) * 
 			crossprod(score[,i,], score[,j,])
 		part[j, i, , ] <- t(part[i, j, , ])
 	}
@@ -407,7 +424,16 @@ if (cnstr == "block" && search == "exhaustive") {
 for (i in 1:m)
 	v[[i]] <- lapply(v[[i]], drop)
 
-return(v)
+## Put back canonical tensors for constant datasets
+if (any(cnst.set)) {
+	vv <- vector("list", m0)
+	vv[!cnst.set] <- v
+	for (i in which(cnst.set))
+		vv[[i]] <- lapply(p0[[i]], numeric)
+	v <- vv
+}
+
+v
 
 }
 
