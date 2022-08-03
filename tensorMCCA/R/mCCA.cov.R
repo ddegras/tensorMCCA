@@ -130,15 +130,6 @@ for (l in 1:r) {
 				x[[i]] <- tnsr.mat.prod(x = x0[[i]], 
 					mat = cnstr$mat[[i]], modes = cnstr$modes[[i]])
 		} 
-		# else { # ortho == "canon.tnsr" && norm == "global"
-			# vortho <- v[, 1:(l-1), drop = FALSE]
-			# for (i in 1:m) {
-				# for (ll in 1:(l-1)) {
-					# idx <- setdiff(1:d[i], ortho.mode[[i, ll, l]])
-					
-					# vortho[[i,ll]][idx] <- lapply(p[[i]][idx], numeric)
-			# }
-		# }
 	}
 	
 	## Initialize canonical vectors
@@ -162,9 +153,9 @@ for (l in 1:r) {
 			maxit = maxit, tol = tol, verbose = verbose)
 	} else {
 		mcca.single.global.cov(x = x, v = v0, w = w, 
-			ortho = if (l == 1L) NULL else v[,1:(l-1)], 
-			sweep = sweep, 
-			maxit = maxit, tol = tol, verbose = verbose)
+			ortho = if (l > 1L) v[, 1:(l-1)] else NULL, 
+			sweep = sweep, maxit = maxit, tol = tol, 
+			verbose = verbose)
 	}
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y 
