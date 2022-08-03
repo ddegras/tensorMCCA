@@ -166,7 +166,7 @@ if (objective.type == "cov" && norm == "global") {
 			xmat[block[[i]], block[[j]]] <- 
 				w[i,j] * x[block[[i]], block[[j]]]
 		v <- if (ncol(xmat) > 2) {
-			eigs_sym(xmat, k = 1)$vectors
+			eigs_sym(xmat, k = 1, which = "LA")$vectors
 		} else { eigen(xmat, TRUE)$vectors[,1] }
 	}
 	
