@@ -24,7 +24,7 @@ objective <- numeric(maxit + 1L)
 objective[1] <- objective.internal(x, v, w)
 if (verbose) 
 	cat("\nIteration", 0, "Objective", objective[1])
-v.best <- v
+vbest <- v
 objective.best <- objective[1]
 
 score <- matrix(0, n, m) # canonical scores <X_it, v_i>
@@ -44,7 +44,6 @@ for (i in 1:m) {
 ## Block Coordinate Ascent 
 for (it in 1:maxit) {
 	if (sweep == "random") idxi <- sample(m)
-	vprev <- v
 	for (i in 1:m) { 		
 		if (xzero[i]) next
 		## Calculate the scores <X_jt, v_j> 
@@ -70,7 +69,7 @@ for (it in 1:maxit) {
 	## Calculate objective value 
 	objective[it + 1L] <- objective.internal(x, v, w)
 	if (objective[it + 1L] > objective.best) {
-		v.best <- v
+		vbest <- v
 		objective.best <- objective[it + 1L]
 	}
 	if (verbose) 
@@ -81,9 +80,9 @@ for (it in 1:maxit) {
 	    	tol * max(1, objective[it])) break
 }
 
-list(v = v.best, y = canon.scores(x, v.best), objective = objective.best, 
-	iters = it, trace = objective[1:(it+1)])
-
+list(v = vbest, y = canon.scores(x, v.best), 
+	objective = objective.best, iters = it, 
+	trace = objective[1:(it+1)])
 }
 
 
@@ -171,8 +170,8 @@ for (it in 1:maxit) {
 	## Determine blocks of variables to update in each dataset
 	## in case of a random sweeping pattern
 	if (sweep == "random") {
-		group <- sapply(d, sample.int, n = ngroups, replace = TRUE)
-		group <- t(group)
+		group <- replicate(ngroups, sapply(d, sample.int, 
+			size = 1, replace = TRUE))
 	}	
 
 	## Calculate squared norms of canonical vectors
@@ -321,7 +320,7 @@ for (it in 1:maxit) {
 	}
 									
 	## Balance canonical vectors  
-	v <- scale.v(v, cnstr = "global")
+	v <- scale.v(v, cnstr = "global", check.args = FALSE)
 	objective[it+1] <- objective.internal(x, v, w)
 	if (verbose) 
 		cat("\nIteration", it, "Objective", objective[it+1])

@@ -195,18 +195,20 @@ list(v)
 
 optim2D.cov <- function(v, a, b, maxit = 1000, tol = 1e-6)
 {
-	
 ## Data dimensions
-a <- aperm(a, c(1, 3, 2))
-dima <- dim(a)
-p <- dima[c(1,3)]
-n <- dima[2]
+p <- c(length(v[[1]]), length(v[[2]]))
+if (length(dim(a)) == 3L) {
+	a <- aperm(a, c(1, 3, 2))
+	dima <- dim(a)
+	n <- dima[2]
+}
 
 ## Trivial case
 if (all(a == 0)) {
 	svdb <- if (max(p) > 2) svds(b, 1) else svd(b, 1, 1)
-	return(svdb[c("u", "v")])
+	return(list(as.numeric(svdb$u), as.numeric(svdb$v)))
 } 
+
 
 ## MAIN LOOP
 objective <- numeric(maxit)
@@ -217,12 +219,6 @@ for (it in 1:maxit) {
 		aa <- matrix(a * v[[2]], p[1], n)
 		bb <- as.vector(b * v[[2]])
 	} else {
-		# a <- aperm(a, c(2, 1, 3))
-		# dim(a) <- c(p[2], p[1] * n)
-		# aa <- crossprod(v[[2]], a)
-		# dim(aa) <- c(p[1], n)
-		# dim(a) <- c(p[2], p[1], n)
-		# a <- aperm(a, c(2, 1, 3))
 		dim(a) <- c(p[1] * n, p[2])
 		aa <- a %*% v[[2]]
 		dim(aa) <- c(p[1], n)

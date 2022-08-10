@@ -51,7 +51,7 @@ if (length(v) > 0) {
 				stop(paste("Each component 'v[[i]]' or 'v[[i,l]]'",
 				"must a list of length the number of dimensions",
 				"in 'x[[i]]' minus 1."))
-			if (!identical(sapply(v[[i,l]], length), p[[i]]))
+			if (any(sapply(v[[i,l]], length) != p[[i]]))
 				stop(paste("Each component 'v[[i]][[k]]' or",
 				"v[[i,l]][[k]] must be a numerical vector of length",
 				"'dim(x[[i]])[k]'."))

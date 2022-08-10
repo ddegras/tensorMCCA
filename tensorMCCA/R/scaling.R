@@ -6,7 +6,7 @@
 #########################################
 
 scale.v <- function(v, scale = c("norm", "var"), 
-	cnstr = c("block", "global"), x = NULL)
+	cnstr = c("block", "global"), x = NULL, check.args = TRUE)
 {
 scale <- match.arg(scale) 
 cnstr <- match.arg(cnstr)
@@ -15,8 +15,11 @@ m <- NROW(v)
 r <- NCOL(v)
 isvec.v <- is.null(dim(v))
 if (isvec.v) dim(v) <- c(m, r)
+if (check.args) test <- check.arguments(x, v)
 d <- sapply(v[, 1], length)
 eps <- 1e-15 # numerical tolerance for zero
+p <- vector("list", m)
+for (i in 1:m) p[[i]] <- sapply(v[[i,1]], length)
 
 ## Calculate norms of canonical tensors
 ## (= products of Euclidean norms of canonical vectors)
@@ -38,22 +41,22 @@ if (scale == "norm" && cnstr == "block") {
 		for (l in 1:r) {
 			v[[i,l]] <- if (zero[i,l]) { 
 				lapply(p[[i]], numeric) 
-			} else { 
-				mapply("/", v[[i,l]], nrmv[[i,l]], SIMPLIFY = FALSE) }
+			} else { mapply("/", v[[i,l]], nrmv[[i,l]], 
+				SIMPLIFY = FALSE) }
 		}
 	}
 } else if (scale == "norm" && cnstr == "global") {
 	## rescale each canonical tensor by the same factor 
 	## in a way that its canonical vectors are balanced 
 	sl <- sqrt(colMeans(nrmt^2)) # grand scaling factor
-	zero <- (sl < eps)
+	zero <- (nrmt < eps)
 	for (i in 1:m) {
 		for (l in 1:r) {
-			sil <- (nrmt[i,l] / sl[l])^(1/d[i]) / nrmv[[i,l]]
-			v[[i,l]] <- if (zero[l]) { 
-				lapply(p[[i]], numeric) 
+			if (zero[i,l]) { 
+				v[[i,l]] <- lapply(p[[i]], numeric) 			
 			} else { 
-				mapply("*", v[[i,l]], sil, SIMPLIFY = FALSE) }
+				sil <- (nrmt[i,l] / sl[l])^(1/d[i]) / nrmv[[i,l]]
+				v[[i,l]] <- mapply("*", v[[i,l]], sil, SIMPLIFY = FALSE) }
 		}
 	}
 } else {

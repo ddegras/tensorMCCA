@@ -9,83 +9,78 @@
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-mcca.single.cor <- function(x, v, c, sweep, maxit, tol, verbose)
+mcca.single.cor <- function(x, v, w, sweep, maxit, tol, verbose)
 {
 	
 ## Data dimensions
 dimx <- lapply(x, dim)
-ndimx <- sapply(dimx, length)
-d <- ndimx - 1
+d <- sapply(dimx, length) - 1L
+p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 m <- length(x)
-n <- dimx[[1]][ndimx[1]]
+n <- tail(dimx[[1]], 1) 
 
-objective <- numeric(maxit+1)
-objective[1] <- objective.internal(x, v, c)
+objective <- numeric(maxit + 1L)
+objective[1] <- objective.internal(x, v, w)
 if (verbose) 
-	cat("\nIteration",0,"Objective",objective[1])
+	cat("\nIteration", 0, "Objective", objective[1])
+vbest <- v
+objective.best <- objective[1]
 
-iprod <- matrix(0, m, n)
+score <- matrix(0, n, m) # canonical scores <X_it, v_i>
 if (sweep == "cyclical") idxi <- 1:m
+
+## Check if some datasets are zero
+eps <- 1e-14
+xzero <- logical(m)
+for (i in 1:m) {
+	xzero[i] <- all(abs(range(x[[i]])) <= eps)
+	if (xzero[i])
+		v[[i]] <- lapply(p[[i]], numeric)
+}
 
 
 for (it in 1:maxit) {
 	if (sweep == "random") idxi <- sample(m)
 	for (i in 1:m) { 		
+		if (xzero[i]) next
 		## Calculate the inner products <X_jt, v_j> 
 		## After the first algorithm iteration (it = 1), in each 
 		## iteration of the i loop, only the inner products associated 
 		## with the previous value of i need being updated
 		idxj <- if (it == 1 && i == 1) { idxi[-1] 
 			} else if (i == 1) { lastidx } else idxi[i-1]
-		for (j in idxj) {
-			## Calculate tensor-vector products between X_j and 
-			## all vectors v_(jk) for k != i
-			tvprod <- x[[j]] 
-			pj <- head(dimx[[j]], d[j])
-			vj <- v[[j]]
-			for (k in 1:d[j]) {
-				if (k < d[j]) {
-					dim(tvprod) <- c(pj[k], prod(pj[(k+1):d[j]], n))
-					tvprod <- drop(crossprod(vj[[k]], tvprod))
-					dim(tvprod) <- c(pj[k+1], length(tvprod) / pj[k+1])	
-				} else {
-					iprod[j,] <- crossprod(vj[[k]], tvprod)
-				}				
-			}
-		}
+		for (j in idxj) 
+			score[, j] <- tnsr.vec.prod(x[[j]], v[[j]], 1:d[j]) 
 		lastidx <- idxi[m]
 		
 		## Set up linear program
-		w <- crossprod(iprod[-i,, drop = FALSE], c[-i, i] / n)
-		if (d[i] == 1) {
-			a <- x[[i]] %*% w	
-		} else {
-			a <- x[[i]]
-			dim(a) <- c(prod(dimx[[i]][-ndimx[i]]), n)
-			a <- a %*% w
-			dim(a) <- dimx[[i]][-ndimx[i]]
-		}
+		a <- tnsr.vec.prod(x = x[[i]], modes = d[i] + 1L,
+			v = list(score[, -i] %*% (w[-i, i] / n)))
 		
 		## Update canonical vectors
-		v[[i]] <- optim.block.cor(v[[i]], a, x[[i]], maxit, tol)				
+		v[[i]] <- optim.block.cor(v[[i]], a, x[[i]], maxit, tol)		
 	}								
 	
-	## Calculate objective value (sum of correlations)
-	objective[it+1] <- objective.internal(x, v, c)	
+	## Calculate objective value
+	objective[it + 1L] <- objective.internal(x, v, w)	
+	if (objective[it + 1L] > objective.best) {
+		vbest <- v
+		objective.best <- objective[it + 1L]
+	}
 
 	if (verbose) 
 		cat("\nIteration",it,"Objective",objective[it+1])
 
-	v <- scale.v(v, cnstr = "block")
+	# v <- scale.v(v, cnstr = "block", check.args = FALSE)
 	
 	## Check convergence 
-	if (it > 1 && abs(objective[it+1]-objective[it]) <= 
-	    	tol * max(1,objective[it])) break
+	if (it > 1 && abs(objective[it + 1L] - objective[it]) <= 
+	    	tol * max(1, objective[it])) break
 }
 
-list(v = v, y = image.scores(x, v), objective = objective[it+1], 
-	iters = it, trace = objective[1:(it+1)])
-
+list(v = vbest, y = canon.scores(x, vbest), 
+	objective = objective.best, iters = it, 
+	trace = objective[1:(it+1)])
 }
 
 

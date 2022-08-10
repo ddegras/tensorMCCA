@@ -1,3 +1,14 @@
+##########################################
+# FUNCTIONS TO APPROXIMATE RANK-1 TENSORS 
+##########################################
+
+
+##############################################
+# Function to approximate a tensor of general 
+# order and rank by a rank-1 tensor
+##############################################
+ 
+
 tnsr.rk1 <- function(x, scale = FALSE, maxit = 100, tol = 1e-6)
 {
 stopifnot(is.numeric(x))
@@ -65,6 +76,11 @@ v
 
 
 
+
+##############################################
+# Function to approximate a general 3D tensor 
+# by a rank-1 tensor
+##############################################
 
 tnsr3d.rk1 <- function(x, scale = FALSE, maxit = 100, tol = 1e-6)
 {
@@ -138,3 +154,56 @@ v
 	
 }
 
+
+
+#################################################
+# Function to approximate several rank-1 tensors
+# under orthogonality constraints 
+#################################################
+
+# Targets: rank-1 tensors v0(1), ..., v0(m)
+# specified as lists of vectors v0(i,k), i=1,...,m, k=1,...,d(i)
+# Orthogonality constraints: rank-1 tensors vl(i), l=1,...,r, i=1,...,m 
+# specified by lists vl(i,1),...,vl(i,d(i))
+ 
+# min sum_i,k || v(i,k) - v0(i,k) ||^2
+# subject to 
+# (1/m) sum_i || v(i) ||^2 = 1
+# and sum_i < v(i), vl(i) > = 0 for l = 1,...,r
+
+
+# min (x-x0)'D(x-x0) s.t. || x ||^2 = 1 and B'x = 0
+
+# replace x by Qz with Q orthogonal basis of complement of B 
+# min (Qz-x0)'D(Qz-x0) s.t. || z ||^2 = 1
+
+# Q'DQz - Q'Dx0 = lambda z
+
+# sum_i w_ik(i)  < v_ik(i) , vll_ik(i) > = 0 for ll = 1, ..., l
+# w_ik(i) = prod_(k!=k(i)) < v_ik , vll_ik > 
+
+# tsnr.rk1.ortho <- function(v, ortho, maxit = 1000L, tol = 1e-6)
+# {
+# m <- length(v)
+# ortho <- as.matrix(ortho)
+# northo <- ncol(ortho)
+# eps <- 1e-14
+# ortho.test <- logical(northo)
+# for (l in 1:northo) {
+	# sumcp <- sum(tnsr.rk1.cp(v, ortho[,l]))
+	# ortho.test[l] <- (abs(sumcp) < sqrt(eps))
+# }
+# if (all(ortho.test)) return(v)
+
+# blocks <- expand.grid(lapply(v, seq_along))
+# nblocks <- nrow(blocks)
+# v0 <- v
+
+
+
+
+
+
+
+	
+# }

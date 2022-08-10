@@ -15,7 +15,9 @@ if (!is.null(v) && scope == "global")
 if (check.args) {
 	test <- check.arguments(x, v) 
 	m <- length(x)
-	n <- tail(dim(x[[1]]), 1)
+	dimx <- lapply(x, dim)
+	d <- sapply(dimx, length) - 1L
+	n <- dimx[[1]][d[1] + 1L]
 	if (is.null(v)  == is.null(score)) 
 		stop(paste("Please specify exactly one of the arguments",
 		"'v' and 'score' and leave the other set to NULL."))
@@ -27,7 +29,16 @@ if (check.args) {
 		if (!((r == 1L && length(ortho.mode) == m) || 
 			(r > 1L) && identical(dim(ortho.mode), c(m, r))))
 			stop(paste("'ortho.mode' must be a matrix of lists",
-			"with dimensions matching those of 'v'"))			
+			"with dimensions matching those of 'v'"))
+		for (i in 1:m) {
+			modes <- unlist(
+				if (r == 1L) { ortho.mode[[i]] 
+				} else ortho.mode[i,])
+			if (!all(modes %in% (1:d[i])))
+				stop(paste("Values in 'ortho.mode[[i]]' or",
+				"'ortho.mode[i,]' not compatible with the",
+				"dimensions of 'x'."))
+		}	
 	}
 	if (!is.null(score)) {
 		stopifnot(is.vector(score) || is.matrix(score))
@@ -52,49 +63,9 @@ eps <- 1e-14
 
 ## Deflate with respect to canonical tensors
 if (!is.null(v)) {
-	r <- NCOL(v)
-	if (r == 1L) {
-		for (i in 1:m) {
-			for (k in ortho.mode[[i]]) {
-				vik <- v[[i]][[k]]
-				nrm <- sqrt(sum(vik^2))
-				if (nrm < eps) next
-				vik <- vik / nrm
-				perm <- 1:(d[i] + 1L)
-				if (k > 1L) {
-					perm[c(1,k)] <- c(k,1)
-					x[[i]] <- aperm(x[[i]], perm)
-				}
-				dim(x[[i]]) <- c(dimx[[i]][k], 
-					prod(dimx[[i]][-k]))
-				x[[i]] <- x[[i]] - vik %*% crossprod(vik, x[[i]])
-				dim(x[[i]]) <- dimx[[i]][perm]
-				if (k > 1L) x[[i]] <- aperm(x[[i]], perm) 	
-			}		
-		}
-	} else {
-		for (i in 1:m) {
-			for (k in 1:d[i]) {
-				idx <- which(sapply(ortho.mode[,i], 
-					is.element, el = k))
-				if (length(idx) == 0) next
-				vik <- sapply(v[i,idx], "[[", k)
-				qrvik <- qr(vik)
-				if (qrvik$rank == 0L) next
-				vik <- qr.Q(qrvik)[, 1:qrvik$rank]
-				perm <- 1:(d[i] + 1L)
-				if (k > 1L) {
-					perm[c(1,k)] <- c(k,1)
-					x[[i]] <- aperm(x[[i]], perm)
-				}
-				dim(x[[i]]) <- c(dimx[[i]][k], 
-					prod(dimx[[i]][-k]))
-				x[[i]] <- x[[i]] - (vik %*% crossprod(vik, x[[i]]))
-				dim(x[[i]]) <- dimx[[i]][perm]
-				if (k > 1L) x[[i]] <- aperm(x[[i]], perm) 		
-			}
-		}		
-	}
+	cnstr <- set.ortho.mat(v = v, modes = ortho.mode)
+	x <- mapply(tnsr.mat.prod, x = x, mat = cnstr$mat,
+		modes = cnstr$modes, SIMPLIFY = FALSE)
 	return(x)
 }
 
@@ -133,6 +104,8 @@ if (!is.null(score)) {
 		if (is.vector(score)) {
 			score <- score - mean(score)
 			nrm <- sqrt(sum(score^2))
+			score <- if (nrm < eps) {
+				numeric(n) } else score / nrm 
 		} else {
 			score <- sweep(score, 2, colMeans(score), "-")
 			qrscore <- qr(score)
@@ -151,78 +124,3 @@ if (!is.null(score)) {
 NULL
 
 }
-
-
-
-
-# if (!is.null(v) && scope == "global") {
-	# nmodes <- sapply(ortho.mode, length)
-	# nvecs <- prod(nmodes)
-	# fn <- function(v, i) 
-	# for (ii in 1:nvecs) {
-		# k <- arrayInd(ii, nmodes)	
-		# vv <- unlist(mapply("[[", v, k, SIMPLIFY = FALSE))
-		# for (i in 1:m) {
-			
-			
-		# }
-		# for (k in 1:d[i]) {
-			# if (is.null(v[[i]][[k]])) next
-			# ## Basis of orthogonal space
-			# Q <- qr.Q(qr(v[[i]][[k]])) 
-			# ## Permute data tensor (exchange modes 1 and k)
-			# if (k > 1) {
-				# perm <- 1:(d[i]+1)
-				# perm[c(1,k)] <- perm[c(k,1)]
-				# x[[i]] <- aperm(x[[i]], perm)
-			# }
-			# ## Unfold permuted tensor along mode 1 
-			# ## (original along mode k)
-			# dim(x[[i]]) <- c(dimx[[i]][k], prod(dimx[[i]][-k])) 
-			# ## Orthogonal projection
-			# x[[i]] <- x[[i]] - Q %*% crossprod(Q, x[[i]]) 
-			# ## Reshape x(i) to tensor
-			# dim(x[[i]]) <- if (k == 1) dimx[[i]] else dimx[[i]][perm]
-			# ## Permute modes back
-			# if (k > 1) 
-				# x[[i]] <- aperm(x[[i]], perm)
-		# }
-	# }
-# }
-
-
-
-
-
-
-################################################
-# General function to deflate canonical vectors
-# with respect to other canonical vectors
-################################################
-
-
-# Inputs
-# v:	 list of lists of vectors or matrices (length m)
-# vprev: list of lists of vectors or matrices (length m)
-
-# deflate.v <- function(v, vprev)
-# {
-# stopifnot(is.list(v) && is.list(vprev))
-# stopifnot(length(v) == length(vprev))
-# m <- length(v)
-# for (i in 1:m) {
-	# stopifnot(length(v[[i]]) == length(vprev[[i]]))	
-	# d <- length(v[[i]])
-	# for (k in 1:d) {
-		# if (length(vprev[[i]][[k]]) == 0) next
-		# qrx <- qr(vprev[[i]][[k]])
-		# if (qrx$rank == 0) next
-		# v[[i]][[k]] <- lsfit(x = qr.Q(qrx)[,1:qrx$rank], 
-			# y = v[[i]][[k]], intercept = FALSE)$residuals
-	# }
-# }	
-# v
-# }
-
-
-

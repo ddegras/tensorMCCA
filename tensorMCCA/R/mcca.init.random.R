@@ -55,7 +55,7 @@ if (len.ortho > 0) {
 }
 
 ## Scale and balance canonical vectors 
-v <- scale.v(v, x = x, 
+v <- scale.v(v, x = x, check.args = FALSE,
 	scale = switch(objective, cov = "norm", cor = "var"))
 if (r == 1) dim(v) <- NULL
 

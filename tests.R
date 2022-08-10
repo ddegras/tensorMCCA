@@ -5,43 +5,64 @@ library(tensorMCCA)
 load_all(path)
 
 
+## Generate artificial data
 n <- 10
 m <- 3
 dimx <- list(c(10,n), c(10,15,n), c(10,5,5,n))
 w <- matrix(1, m, m)
 w2 <- w
 diag(w2) <- 0
-
+v <- vector("list", m)
 x <- vector("list", m)
 for (i in 1:m) {
 	x[[i]] <- array(runif(prod(dimx[[i]])), dimx[[i]])
 	v[[i]] <- lapply(dimx[[i]][-length(dimx[[i]])], runif)
 }
-# list(matrix(runif(5*n), 5, n), array(runif(6*n), c(2, 3, n)), 
-	# array(runif(8*n), c(2, 2, 2, n))) 
-# v <- list(list(runif(5)), list(runif(2), runif(3)), 
-	# list(runif(2), runif(2), runif(2)))
-# control <- list(ortho = 1:3)
 
-# options(error = NULL)
-# debug(mcca.cov)
-# undebug(mcca.cov)	
-test <- mcca.cov(x, r = 10, init = "cca", verbose = TRUE)
-test <- mcca.cov(x, r = 10, init = "svd", verbose = TRUE)
-test <- mcca.cov(x, r = 10, init = "random", verbose = TRUE)
-test <- mcca.cov(x, r = 10, init = v, verbose = TRUE)
 
-test <- mcca.cov(x, r = 10, ortho = "canon", init = "cca", verbose = TRUE)
-test <- mcca.cov(x, r = 10, ortho = "canon", init = v, verbose = TRUE)
+## Make sure that the main functions run without errors
+combs <- expand.grid(
+	init = c("cca", "svd", "random", "custom"), 
+	norm = c("block", "global"), 
+	ortho = c("score", "canon.tnsr"), 
+	sweep = c("cyclical", "random"),
+	stringsAsFactors = FALSE)
+ncombs <- nrow(combs)
+# Test mcca.cov (test 1)
+for (i in 1:ncombs) {
+init. <- if (combs[i,"init"] == "custom") {
+	v } else combs[i,"init"] 
+test <- mcca.cov(x, r = 5, w = w, init = init., 
+	norm = combs[i, "norm"], 
+	ortho = combs[i, "ortho"],
+	sweep = combs[i, "sweep"], verbose = FALSE)
+}
+# Test mcca.cov (test 2)
+for (i in 1:ncombs) {
+init. <- if (combs[i,"init"] == "custom") {
+	v } else combs[i,"init"] 
+test <- mcca.cov(x, r = 5, w = w2, init = init., 
+	norm = combs[i, "norm"], 
+	ortho = combs[i, "ortho"],
+	sweep = combs[i, "sweep"], verbose = FALSE)
+}
+# Test mcca.cor (test 1)
+idx <- which(combs$norm == "block" | combs$ortho == "score")
+for (i in idx) {
+init. <- if (combs[i,"init"] == "custom") {
+	v } else combs[i,"init"] 
+test <- mcca.cor(x, r = 5, w = w2, init = init., 
+	norm = combs[i, "norm"], 
+	ortho = combs[i, "ortho"],
+	sweep = combs[i, "sweep"], verbose = TRUE)
+}
 
-undebug(mcca.single.global.cov)
-test <- mcca.cov(x, r = 10, w = w2, norm = "global", ortho = "canon.tnsr", verbose = TRUE)
-test <- mcca.cov(x, r = 10, init = "svd", verbose = TRUE)
-test <- mcca.cov(x, r = 10, init = "random", verbose = TRUE)
-test <- mcca.cov(x, r = 10, init = v, verbose = TRUE)
 
-# debug(tnsr.vec.prod)
-# debug(objective.gradient)
+
+
+
+
+
 
 objective.cov(x, v)
 objective.gradient(x, v, w)

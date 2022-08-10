@@ -1,3 +1,21 @@
+tnsr.rk1.nrm  <- function(v, norm = c("block", "global"))
+{
+stopifnot(is.list(v))
+stopifnot(is.vector(v) || is.matrix(v))
+norm <- match.arg(norm)
+lenv <- length(v) 
+out <- numeric(lenv)
+sqnrmfun <- function(x) sum(x^2)
+for (i in 1:lenv) 
+	out[i] <- prod(sapply(v[[i]], sqnrmfun))
+dim(out) <- dim(v)
+if (norm == "block") return(sqrt(out))
+if (is.vector(out)) return(sqrt(mean(out))) 
+sqrt(rowMeans(out))
+}
+
+
+
 tnsr.rk1.cp <- function(x, y = NULL)
 {
 cpfun <- function(x, y) sum(x * y)

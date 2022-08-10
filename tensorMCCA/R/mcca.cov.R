@@ -33,10 +33,9 @@ sweep <- match.arg(sweep)
 if (is.character(init)) init <- match.arg(init)
 
 ## Set initialization method
-mcca.init <- if (is.character(init)) {
-	switch(init, cca = mcca.init.cca, 
+if (is.character(init)) 
+	mcca.init <- switch(init, cca = mcca.init.cca, 
 		svd = mcca.init.svd, random = mcca.init.random)
-} else NULL
 
 ## Center data
 for(i in 1:m) {
@@ -64,7 +63,6 @@ if (ortho == "canon.tnsr" && norm == "block" && r > 1)
 		cnstr = control$ortho$cnstr, 
 		method = control$ortho$method)
 
-
 ## Set up initialization parameters
 test <- (is.list(control) && !is.null(control$init))
 if (identical(init, "cca")) {
@@ -90,48 +88,35 @@ if (identical(init, "cca")) {
 ## Create output objects 
 v <- vector("list", m * r) # canonical vectors
 dim(v) <- c(m, r)
-block.score <- array(dim = c(n, m, r)) # canonical scores
-global.score <- matrix(nrow = n, ncol = r) 
+block.score <- array(0, c(n, m, r)) # canonical scores
+global.score <- matrix(0, n, r) 
 objective <- iters <- numeric(r)
 input <- list(objective = "covariance", r = r0, w = w, 
-	init = init, ortho = ortho, maxit = maxit, tol = tol, 
-	sweep = sweep) 
+	norm = norm, ortho = ortho, init = init, maxit = maxit, 
+	tol = tol, sweep = sweep, control = control) 
 
-## Trivial case: constant datasets  
-test <- sapply(x, function(a) all(abs(a) <= eps))
-test <- outer(test, test, "&")
-if (all(test | w == 0)) {
-	r <- 1
-	input$r <- r
-	v <- vector("list", m)
-	for (i in 1:m) 
-		v[[i]] <- lapply(p[[i]], function(len) matrix(0, len, r))
-	return(list(v = v, block.score = array(0, c(n, m, r)), 
-		global.score = matrix(0, n, r), objective = 0, 
-		iters = 0, input = input))
-}
 
 
 ## MAIN LOOP
 for (l in 1:r) {	
 	
-	## Deflate data as needed
+	## Deflate data as required
 	if (l > 1) { 	
 		if (ortho == "score" && norm == "block") { 
 			x <- deflate.x(x, score = block.score[,,l-1], 
-				check.args = FALSE)
+				scope = "block", check.args = FALSE)
 		} else if (ortho == "score" && norm == "global") { 
 			x <- deflate.x(x, score = global.score[,l-1], 
-				check.args = FALSE)
+				scope = "global", check.args = FALSE)
 		} else if (ortho == "canon.tnsr" && norm == "block") {
-			cnstr <- set.ortho.mat(v = v[, 1:(l-1)], 
+			cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
-			for(i in 1:m) 
-				x[[i]] <- tnsr.mat.prod(x = x0[[i]], 
-					mat = cnstr$mat[[i]], modes = cnstr$modes[[i]])
+			x <- deflate.x(x0, v = v[, 1:(l-1)], 
+				ortho.mode = ortho.mode[, 1:(l-1), l], 
+				check.args = FALSE)	
 		} 
 	}
-	
+
 	## Initialize canonical vectors
 	if (is.character(init)) {
 		init.args$x <- x
@@ -143,7 +128,8 @@ for (l in 1:r) {
 			v0 <- tnsr.rk1.mat.prod(v0, 	mat = cnstr$mat, 
 				modes = cnstr$modes, transpose.mat = FALSE)
 		}
-		v0 <- scale.v(v0, scale = "norm", cnstr = norm)
+		v0 <- scale.v(v0, scale = "norm", cnstr = norm, 
+			check.args = FALSE)
 	}
 	
 	## Run MCCA and store results
@@ -157,19 +143,18 @@ for (l in 1:r) {
 			sweep = sweep, maxit = maxit, tol = tol, 
 			verbose = verbose)
 	}
+	v[,l] <- out$v 
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y 
 	global.score[,l] <- rowMeans(block.score[,,l]) 
 	iters[l] <- out$iters
 
+	## Transform back canonical tensors to original search space 
+	## if needed
 	if (l > 1 && ortho == "canon.tnsr" && norm == "block") {
-		v[,l] <- tnsr.rk1.mat.prod(v = out$v, 
+		v[,l] <- tnsr.rk1.mat.prod(v = v[,l], 
 			mat = cnstr$mat, modes = cnstr$modes, 
 			transpose.mat = TRUE)
-		for (i in which(cnstr$vzero)) 
-			v[[i,l]] <- lapply(p[[i]], numeric)
-	} else { 
-		v[,l] <- out$v 
 	}
 
 	## Monitor objective value

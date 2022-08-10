@@ -19,6 +19,8 @@ if (length(v) == 1L) {
 	optim2D.cor(v, a, b, maxit, tol)
 } else if (length(v) == 3L) {
 	optim3D.cor(v, a, b, maxit, tol)
+} else {
+	optim.gen.cor(v, a, b, maxit, tol)
 }
 }
 
@@ -86,7 +88,7 @@ for (it in 1:maxit) {
 	} else {	
 		aa <- a %*% v[[2]]
 		dim(b) <- c(p[1] * n, p[2])
-		bb <- v %*% v[[2]]
+		bb <- b %*% v[[2]]
 		dim(bb) <- c(p[1], n)
 	}	
 	v[1] <- optim1D.cor(aa, bb)
@@ -180,7 +182,7 @@ for (it in 1:maxit) {
 			bb <- bb %*% v[[i2]]
 		}
 		dim(bb) <- c(p[k], n)	
-		v[k] <- optim1D.cov(aa, bb)
+		v[k] <- optim1D.cor(aa, bb)
 	}
 		
 	## Calculate objective

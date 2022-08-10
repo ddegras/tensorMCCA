@@ -115,7 +115,7 @@ for (i in 1:m) {
 	grad[[i]] <- if (d[i] == 1L) {
 		list(x[[i]] %*% yy)
 	} else {
-		lapply(tvprod[[i]], 	"%*%", y = yy)
+		lapply(tvprod[[i]], "%*%", y = yy)
 	}
 }
 grad
