@@ -9,12 +9,13 @@ Initialize Canonical Tensors Randomly
 Generate random rank-1 tensors of given size under scaling constraints and optional orthogonality constraints.}
 
 \usage{
-mcca.init.random(x, r = 1L, objective = c("cov", "cor"), ortho.mode = NULL)}
+mcca.init.random(x, r = 1L, objective = c("cov", "cor"), ortho.mode = NULL)
+}
 
 \arguments{
-\item{x}{list of data arrays. All arrays must have the same number of dimensions in their last mode (= individual or object).}
-\item{r}{number of sets of canonical tensors to generate.}
-\item{objective}{character to indicate the objective function: sum of covariances (\code{cov}) or sum of correlations (\code{cor}).}
+\item{x}{list of data arrays. All arrays must have the same last dimension (= individual or object).}
+\item{r}{integer number of sets of canonical tensors to calculate.}
+\item{objective}{character indicating the objective function: sum of covariances (\code{cov}) or sum of correlations (\code{cor}).}
 \item{ortho.mode}{integer or list indicating in which mode(s) -if any- to orthogonalize the canonical tensors of each dataset. This argument is recycled as needed to a list of same length as \code{x}.}
 
 }
