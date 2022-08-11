@@ -28,7 +28,8 @@ combs <- expand.grid(
 	sweep = c("cyclical", "random"),
 	stringsAsFactors = FALSE)
 ncombs <- nrow(combs)
-# Test mcca.cov (test 1)
+
+# Test mcca.cov
 for (i in 1:ncombs) {
 init. <- if (combs[i,"init"] == "custom") {
 	v } else combs[i,"init"] 
@@ -37,42 +38,16 @@ test <- mcca.cov(x, r = 5, w = w, init = init.,
 	ortho = combs[i, "ortho"],
 	sweep = combs[i, "sweep"], verbose = FALSE)
 }
-# Test mcca.cov (test 2)
-for (i in 1:ncombs) {
-init. <- if (combs[i,"init"] == "custom") {
-	v } else combs[i,"init"] 
-test <- mcca.cov(x, r = 5, w = w2, init = init., 
-	norm = combs[i, "norm"], 
-	ortho = combs[i, "ortho"],
-	sweep = combs[i, "sweep"], verbose = FALSE)
-}
-# Test mcca.cor (test 1)
+
+# Test mcca.cor
 idx <- which(combs$norm == "block" | combs$ortho == "score")
 for (i in idx) {
 init. <- if (combs[i,"init"] == "custom") {
 	v } else combs[i,"init"] 
-test <- mcca.cor(x, r = 5, w = w2, init = init., 
+test <- mcca.cor(x, r = 5, w = w, init = init., 
 	norm = combs[i, "norm"], 
 	ortho = combs[i, "ortho"],
 	sweep = combs[i, "sweep"], verbose = TRUE)
 }
 
 
-
-
-
-
-
-
-objective.cov(x, v)
-objective.gradient(x, v, w)
-
-vv <- cbind(v, v)
-dimnames(vv) <- NULL
-test <- scale.v(vv, scale = "norm", cnstr == "block")
-test <- scale.v(vv, scale = "norm", cnstr = "global")
-test <- scale.v(v, x, scale = "var")
-test <- mcca.init.random(x, r = 2, ortho.mode = 1:2)
-i <- 2; k <- 2; crossprod(sapply(test[i,], "[[", k))
-
-<x, v1> ortho <x, v2>
