@@ -25,7 +25,7 @@ for (i in 1:m) {
 ## Make sure that the main functions run without errors
 combs <- expand.grid(
 	init = c("cca", "svd", "random", "custom"), 
-	norm = c("block", "global"), 
+	scale = c("block", "global"), 
 	ortho = c("score", "canon.tnsr"), 
 	sweep = c("cyclical", "random"),
 	stringsAsFactors = FALSE)
@@ -35,21 +35,26 @@ ncombs <- nrow(combs)
 for (i in 1:ncombs) {
 init. <- if (combs[i,"init"] == "custom") {
 	v } else combs[i,"init"] 
-test <- mcca.cov(x, r = 5, w = w, init = init., 
-	norm = combs[i, "norm"], 
+test <- mcca.cov(x, r = 5, w = w,  
+	scale = combs[i, "scale"], 
 	ortho = combs[i, "ortho"],
-	sweep = combs[i, "sweep"], verbose = FALSE)
+	optim = "bca",
+	init = init.,
+	sweep = combs[i, "sweep"], 
+	verbose = TRUE)
 }
 
 # Test mcca.cor
-idx <- which(combs$norm == "block" | combs$ortho == "score")
+idx <- which(combs$scale == "block")
 for (i in idx) {
 init. <- if (combs[i,"init"] == "custom") {
 	v } else combs[i,"init"] 
-test <- mcca.cor(x, r = 5, w = w, init = init., 
-	norm = combs[i, "norm"], 
+test <- mcca.cor(x, r = 5, w = w, 
 	ortho = combs[i, "ortho"],
-	sweep = combs[i, "sweep"], verbose = TRUE)
+	optim = "bca",
+	init = init., 
+	sweep = combs[i, "sweep"], 
+	verbose = TRUE)
 }
 
 # Test gradient-based optimization functions

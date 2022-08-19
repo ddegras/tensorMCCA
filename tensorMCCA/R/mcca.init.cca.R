@@ -7,7 +7,7 @@
 
 
 mcca.init.cca <- function(x, k = NULL, w = 1, 
-	objective = c("cov", "cor"), norm = c("block", "global"), 
+	objective = c("cov", "cor"), scale = c("block", "global"), 
 	center = TRUE, search = c("exhaustive", "approximate"))
 {
 	
@@ -48,10 +48,10 @@ if (is.null(k)) { k <- n } else { k <- min(k, n) }
 
 ## Scaling constraints
 objective.type <- match.arg(objective)   
-if (objective.type == "cor" && norm == "global")
+if (objective.type == "cor" && scale == "global")
 	stop(paste("Argument values 'objective = cor'", 
-		"and 'norm = global' are incompatible."))
-norm <- match.arg(norm) # block or global constraints
+		"and 'scale = global' are incompatible."))
+scale <- match.arg(scale) # block or global constraints
 
 ## Search method in optimization
 search <- if (identical(search, 
@@ -125,7 +125,7 @@ if (any(reducex)) rm(xmat, svdx)
 #####################################
 
 
-if (objective.type == "cov" && norm == "global") { 
+if (objective.type == "cov" && scale == "global") { 
 	## Calculate rank of objective weight matrix
 	const <- all(w == w[1])
 	if (const) { 
@@ -192,7 +192,7 @@ if (objective.type == "cov" && norm == "global") {
 # the canonical vectors are expressed up to scale factors. 
 # Only their directions matter at this stage, not their scale.   
 
-if (norm == "block") {
+if (scale == "block") {
 	v <- lapply(pp, function(nr) matrix(0, nr, m)) 
 	# canonical vectors
 	for (i in 1:m) {
@@ -328,7 +328,7 @@ if (objective.type == "cor") {
 # tensor one dataset at a time while keeping the 
 # other canonical tensors fixed
  
-if (norm == "block" && search == "approximate") {
+if (scale == "block" && search == "approximate") {
 	## Initialization @@@@ does not do what it's supposed to do. FIX IT
 	objective <- 0
 	part <- matrix(0, m, m) # partial objective values
@@ -372,7 +372,7 @@ if (norm == "block" && search == "approximate") {
 ######################################
 
 
-if (norm == "block" && search == "exhaustive") {
+if (scale == "block" && search == "exhaustive") {
 	part <- array(dim = rep(m, 4))
 	for (i in 1:m) 
 	for (j in 1:i) 

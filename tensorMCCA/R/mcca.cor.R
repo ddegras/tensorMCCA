@@ -63,7 +63,7 @@ if (ortho == "canon.tnsr" && r > 1) {
 test <- (is.list(control) && !is.null(control$init))
 if (identical(init, "cca")) {
 	init.args <- list(k = NULL, w = w, 
-		objective = "cor", norm = "block", center = FALSE, 
+		objective = "cor", scale = "block", center = FALSE, 
 		search = ifelse(m <= 5, "exhaustive", "approximate"))
 	if (test) {
 		names. <- intersect(names(control), 
@@ -71,14 +71,13 @@ if (identical(init, "cca")) {
 		init.args[names.] <- control[names.]
 	}
 } else if (identical(init, "svd")) {
-	init.args <- list(objective = "cor", 
-		norm = "block", center = FALSE)
+	init.args <- list(objective = "cor", center = FALSE)
 	# if (test) {
 		# names. <- intersect(names(control), c("norm"))
 		# init.args[names.] <- control[names.]
 	# }
 } else if (identical(init, "random")) { 
-	init.args <- list(r = 1, objective = "cor")
+	init.args <- list(objective = "cor")
 }
 
 ## Create output objects 

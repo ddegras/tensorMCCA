@@ -1,6 +1,6 @@
-mcca.cov <- function(x, r = 1, w = 1, optim = c("bca", "grad.scale", 
-	"grad.rotate"), scale = c("block", "global"), ortho = c("score", 
-	"canon.tnsr"), init = c("cca", "svd", "random"), maxit = 1000, 
+mcca.cov <- function(x, r = 1, w = 1, scale = c("block", "global"), 
+	ortho = c("score", "canon.tnsr"), optim = c("bca", "grad.scale", 
+	"grad.rotate"), init = c("cca", "svd", "random"), maxit = 1000, 
 	tol = 1e-6, sweep = c("cyclical", "random"), control = list(), 
 	verbose = FALSE)
 {
@@ -28,9 +28,9 @@ w <- if (length(w) == 1) {
 }
 
 ## Match other arguments
-optim <- match(optim)
 scale <- match.arg(scale)
 ortho <- match.arg(ortho)
+optim <- match.arg(optim)
 sweep <- match.arg(sweep)
 if (is.character(init)) init <- match.arg(init)
 if (optim == "grad.rotate" && scale == "global")
@@ -80,14 +80,9 @@ if (identical(init, "cca")) {
 		init.args[names.] <- control$init[names.]
 	}
 } else if (identical(init, "svd")) {
-	init.args <- list(objective = "cov", 
-		scale = "block", center = FALSE)
-	if (test) {
-		names. <- intersect(names(control$init), c("scale"))
-		init.args[names.] <- control$init[names.]
-	}
+	init.args <- list(objective = "cov", center = FALSE)
 } else if (identical(init, "random")) {
-	init.args <- list(r = 1L, objective = "cov")
+	init.args <- list(objective = "cov")
 }
 
 ## Create output objects 
@@ -130,7 +125,7 @@ for (l in 1:r) {
 		v0 <- if (is.vector(init)) {
 			init } else { init[, min(l, ncol(init))] }
 		if (l > 1 && ortho == "canon.tnsr" && scale == "block") {
-			v0 <- tnsr.rk1.mat.prod(v0, 	mat = cnstr$mat, 
+			v0 <- tnsr.rk1.mat.prod(v0, mat = cnstr$mat, 
 				modes = cnstr$modes, transpose.mat = FALSE)
 		}
 		v0 <- scale.v(v0, type = "norm", scale = scale, 
@@ -149,7 +144,7 @@ for (l in 1:r) {
 			verbose = verbose)
 	} else if (optim == "grad.scale") {
 		mcca.gradient.scale(x = x, v = v, w = w, scale = scale, 
-			cnstr = cnstr, maxit = maxit, tol = tol, 
+			type = "norm", maxit = maxit, tol = tol, 
 			verbose = verbose)
 	} else { 
 		mcca.gradient.rotate(x = x, v = v, w = w, 
