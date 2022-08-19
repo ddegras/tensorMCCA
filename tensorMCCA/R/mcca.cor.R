@@ -1,6 +1,6 @@
 
-mcca.cor <- function(x, r, w = 1, norm = c("block", "global"), 
-	ortho = c("score", "canon.tnsr"), init = c("cca", "svd", "random"), 
+mcca.cor <- function(x, r, w = 1, ortho = c("score", "canon.tnsr"), 
+	optim = c("bca", "grad.scale"), init = c("cca", "svd", "random"), 
 	maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), 
 	control = list(), verbose = FALSE)
 {
@@ -28,14 +28,10 @@ w <- if (length(w) == 1) {
 }
 
 ## Match other arguments
-norm <- match.arg(norm)
 ortho <- match.arg(ortho)
 sweep <- match.arg(sweep)
+optim <- match.arg(optim)
 if (is.character(init)) init <- match.arg(init)
-if (norm == "global" && ortho == "canon.tnsr")
-	stop(paste("Argument values 'norm = global'",
-	"and ortho = 'canon.tnsr' are not compatible", 
-	"in function 'mcca.cor'"))
 
 ## Set initialization method
 if (is.character(init)) 
@@ -52,13 +48,8 @@ if (ortho == "canon.tnsr") x0 <- x
 ## Adjust number of canonical components as needed
 r0 <- as.integer(r)
 pp <- sapply(p, prod)
-r <- if (ortho == "score" && norm == "block") { 
-	min(n - 1, max(pp), r0)
-} else if (ortho == "score" && norm == "global") {
-	min(n - 1, sum(pp), r0)
-} else if (ortho == "canon.tnsr") {
-	min(max(pp), r0) 
-}
+r <- switch(ortho, score = min(n - 1, max(pp), r0),
+	canon.tnsr = min(max(pp), r0)) 
 
 ## Set orthogonality constraints on canonical tensors
 if (ortho == "canon.tnsr" && r > 1) {
@@ -96,8 +87,8 @@ dim(v) <- c(m, r)
 block.score <- array(0, c(n, m, r)) 
 global.score <- matrix(0, n, r) 
 objective <- iters <- numeric(r)
-input <- list(objective = "correlation", r = r0, w = w, 
-	norm = norm, ortho = ortho, init = init, maxit = maxit, 
+input <- list(objective = "cor", r = r0, w = w, 
+	ortho = ortho, init = init, maxit = maxit, 
 	tol = tol, sweep = sweep, control = control)
 
 
@@ -107,13 +98,10 @@ for (l in 1:r) {
 	
 	## Deflate data as required
 	if (l > 1) { 	
-		if (ortho == "score" && norm == "block") { 
+		if (ortho == "score") { 
 			x <- deflate.x(x, score = block.score[,,l-1], 
 				scope = "block", check.args = FALSE)
-		} else if (ortho == "score" && norm == "global") { 
-			x <- deflate.x(x, score = global.score[,l-1], 
-				scope = "global", check.args = FALSE)
-		} else if (ortho == "canon.tnsr") {
+		} else { # if (ortho == "canon.tnsr") {
 			cnstr <- set.ortho.mat(v = v[, 1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
 			x <- deflate.x(x = x0, v = v[,1:(l-1)],  
@@ -133,7 +121,7 @@ for (l in 1:r) {
 			v0 <- tnsr.rk1.mat.prod(v0, 	mat = cnstr$mat, 
 				modes = cnstr$modes, transpose.mat = FALSE)
 		}
-		v0 <- scale.v(v0, scale = "var", x = x, check.args = FALSE)
+		v0 <- scale.v(v0, type = "var", x = x, check.args = FALSE)
 	} 
 	
 	## Run MCCA and store results

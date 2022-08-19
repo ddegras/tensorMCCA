@@ -16,6 +16,8 @@ v <- vector("list", m)
 x <- vector("list", m)
 for (i in 1:m) {
 	x[[i]] <- array(runif(prod(dimx[[i]])), dimx[[i]])
+	xbar <- rowMeans(x[[i]], dims = length(dimx[[i]]) - 1)
+	x[[i]] <- x[[i]] - as.vector(xbar)
 	v[[i]] <- lapply(dimx[[i]][-length(dimx[[i]])], runif)
 }
 
@@ -50,4 +52,10 @@ test <- mcca.cor(x, r = 5, w = w, init = init.,
 	sweep = combs[i, "sweep"], verbose = TRUE)
 }
 
+# Test gradient-based optimization functions
+test <- tensorMCCA:::mcca.gradient.scaling(x, v, w / 9, scale = "norm",
+	cnstr = "block", maxit = 100, tol = 1e-6, verbose = TRUE)
+
+test <- tensorMCCA:::mcca.gradient.rotation(x, v, w / 9,
+	cnstr = "norm", maxit = 100, tol = 1e-6, verbose = TRUE)
 

@@ -320,7 +320,8 @@ for (it in 1:maxit) {
 	}
 									
 	## Balance canonical vectors  
-	v <- scale.v(v, cnstr = "global", check.args = FALSE)
+	v <- scale.v(v, type = "norm", scale = "global", 
+		check.args = FALSE)
 	objective[it+1] <- objective.internal(x, v, w)
 	if (verbose) 
 		cat("\nIteration", it, "Objective", objective[it+1])

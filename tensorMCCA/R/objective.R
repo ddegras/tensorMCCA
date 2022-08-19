@@ -117,8 +117,10 @@ for (i in 1:m) {
 	} else {
 		lapply(tvprod[[i]], "%*%", y = yy)
 	}
+	grad[[i]] <- lapply(grad[[i]], as.vector)
 }
 grad
+# list(gradient = grad, score = score)
 }
 
 

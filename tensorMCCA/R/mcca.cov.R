@@ -1,7 +1,8 @@
-mcca.cov <- function(x, r = 1, w = 1, norm = c("block", "global"), 
-	ortho = c("score", "canon.tnsr"), init = c("cca", "svd", "random"), 
-	maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), 
-	control = list(), verbose = FALSE)
+mcca.cov <- function(x, r = 1, w = 1, optim = c("bca", "grad.scale", 
+	"grad.rotate"), scale = c("block", "global"), ortho = c("score", 
+	"canon.tnsr"), init = c("cca", "svd", "random"), maxit = 1000, 
+	tol = 1e-6, sweep = c("cyclical", "random"), control = list(), 
+	verbose = FALSE)
 {
 
 ## Check arguments
@@ -27,10 +28,14 @@ w <- if (length(w) == 1) {
 }
 
 ## Match other arguments
+optim <- match(optim)
+scale <- match.arg(scale)
 ortho <- match.arg(ortho)
-norm <- match.arg(norm)
 sweep <- match.arg(sweep)
 if (is.character(init)) init <- match.arg(init)
+if (optim == "grad.rotate" && scale == "global")
+	stop(paste("If argument 'optim' is equal to 'grad.rotate',",
+	"'scale' must be equal to 'block'."))
 
 ## Set initialization method
 if (is.character(init)) 
@@ -47,18 +52,18 @@ if (ortho == "canon.tnsr") x0 <- x
 ## Adjust number of canonical components 
 r0 <- r
 pp <- sapply(p, prod)
-r <- if (ortho == "score" && norm == "block") { 
+r <- if (ortho == "score" && scale == "block") { 
 	min(n - 1, max(pp), r0)
-} else if (ortho == "score" && norm == "global") {
+} else if (ortho == "score" && scale == "global") {
 	min(n - 1, sum(pp), r0)
-} else if (ortho == "canon.tnsr" && norm == "block") {
+} else if (ortho == "canon.tnsr" && scale == "block") {
 	min(max(pp), r0)
 } else {
 	min(sum(pp), r0)
 }
 
 ## Set orthogonality constraints on canonical tensors
-if (ortho == "canon.tnsr" && norm == "block" && r > 1) 
+if (ortho == "canon.tnsr" && scale == "block" && r > 1) 
 	ortho.mode <- set.ortho.mode(x, r, 
 		cnstr = control$ortho$cnstr, 
 		method = control$ortho$method)
@@ -67,18 +72,18 @@ if (ortho == "canon.tnsr" && norm == "block" && r > 1)
 test <- (is.list(control) && !is.null(control$init))
 if (identical(init, "cca")) {
 	init.args <- list(k = NULL, w = w, 
-		objective = "cov", norm = "block", center = FALSE, 
+		objective = "cov", scale = "block", center = FALSE, 
 		search = ifelse(m <= 5, "exhaustive", "approximate"))
 	if (test) {
 		names. <- intersect(names(control$init), 
-			c("k", "norm", "search"))
+			c("k", "scale", "search"))
 		init.args[names.] <- control$init[names.]
 	}
 } else if (identical(init, "svd")) {
 	init.args <- list(objective = "cov", 
-		norm = "block", center = FALSE)
+		scale = "block", center = FALSE)
 	if (test) {
-		names. <- intersect(names(control$init), c("norm"))
+		names. <- intersect(names(control$init), c("scale"))
 		init.args[names.] <- control$init[names.]
 	}
 } else if (identical(init, "random")) {
@@ -92,7 +97,7 @@ block.score <- array(0, c(n, m, r)) # canonical scores
 global.score <- matrix(0, n, r) 
 objective <- iters <- numeric(r)
 input <- list(objective = "covariance", r = r0, w = w, 
-	norm = norm, ortho = ortho, init = init, maxit = maxit, 
+	scale = scale, ortho = ortho, init = init, maxit = maxit, 
 	tol = tol, sweep = sweep, control = control) 
 
 
@@ -102,13 +107,13 @@ for (l in 1:r) {
 	
 	## Deflate data as required
 	if (l > 1) { 	
-		if (ortho == "score" && norm == "block") { 
+		if (ortho == "score" && scale == "block") { 
 			x <- deflate.x(x, score = block.score[,,l-1], 
 				scope = "block", check.args = FALSE)
-		} else if (ortho == "score" && norm == "global") { 
+		} else if (ortho == "score" && scale == "global") { 
 			x <- deflate.x(x, score = global.score[,l-1], 
 				scope = "global", check.args = FALSE)
-		} else if (ortho == "canon.tnsr" && norm == "block") {
+		} else if (ortho == "canon.tnsr" && scale == "block") {
 			cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
 			x <- deflate.x(x0, v = v[, 1:(l-1)], 
@@ -124,25 +129,33 @@ for (l in 1:r) {
 	} else if (is.list(init)) {
 		v0 <- if (is.vector(init)) {
 			init } else { init[, min(l, ncol(init))] }
-		if (l > 1 && ortho == "canon.tnsr" && norm == "block") {
+		if (l > 1 && ortho == "canon.tnsr" && scale == "block") {
 			v0 <- tnsr.rk1.mat.prod(v0, 	mat = cnstr$mat, 
 				modes = cnstr$modes, transpose.mat = FALSE)
 		}
-		v0 <- scale.v(v0, scale = "norm", cnstr = norm, 
+		v0 <- scale.v(v0, type = "norm", scale = scale, 
 			check.args = FALSE)
 	}
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
-	out <- if (norm == "block") {
+	out <- if (optim == "bca" && scale == "block") {
 		mcca.single.block.cov(x = x, v = v0, w = w, sweep = sweep, 
 			maxit = maxit, tol = tol, verbose = verbose)
-	} else {
+	} else if (optim == "bca" && scale == "global") {
 		mcca.single.global.cov(x = x, v = v0, w = w, 
 			ortho = if (l > 1L) v[, 1:(l-1)] else NULL, 
 			sweep = sweep, maxit = maxit, tol = tol, 
 			verbose = verbose)
+	} else if (optim == "grad.scale") {
+		mcca.gradient.scale(x = x, v = v, w = w, scale = scale, 
+			cnstr = cnstr, maxit = maxit, tol = tol, 
+			verbose = verbose)
+	} else { 
+		mcca.gradient.rotate(x = x, v = v, w = w, 
+			maxit = maxit, tol = tol, verbose = verbose)
 	}
+	
 	v[,l] <- out$v 
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y 
@@ -151,7 +164,7 @@ for (l in 1:r) {
 
 	## Transform back canonical tensors to original search space 
 	## if needed
-	if (l > 1 && ortho == "canon.tnsr" && norm == "block") {
+	if (l > 1 && ortho == "canon.tnsr" && scale == "block") {
 		v[,l] <- tnsr.rk1.mat.prod(v = v[,l], 
 			mat = cnstr$mat, modes = cnstr$modes, 
 			transpose.mat = TRUE)

@@ -5,12 +5,12 @@
 # Function for scaling canonical vectors
 #########################################
 
-scale.v <- function(v, scale = c("norm", "var"), 
-	cnstr = c("block", "global"), x = NULL, check.args = TRUE)
+scale.v <- function(v, type = c("norm", "var"), 
+	scale = c("block", "global"), x = NULL, check.args = TRUE)
 {
-scale <- match.arg(scale) 
-cnstr <- match.arg(cnstr)
-stopifnot(scale == "norm" || !is.null(x))
+type <- match.arg(type) 
+scale <- match.arg(scale)
+stopifnot(type == "norm" || !is.null(x))
 m <- NROW(v)
 r <- NCOL(v)
 isvec.v <- is.null(dim(v))
@@ -34,7 +34,7 @@ for (i in 1:m) {
 	}
 }
 
-if (scale == "norm" && cnstr == "block") {
+if (type == "norm" && scale == "block") {
 	## rescale each canonical vector by its norm
 	zero <- (nrmt < eps)
 	for (i in 1:m) {
@@ -45,7 +45,7 @@ if (scale == "norm" && cnstr == "block") {
 				SIMPLIFY = FALSE) }
 		}
 	}
-} else if (scale == "norm" && cnstr == "global") {
+} else if (type == "norm" && scale == "global") {
 	## rescale each canonical tensor by the same factor 
 	## in a way that its canonical vectors are balanced 
 	sl <- sqrt(colMeans(nrmt^2)) # grand scaling factor

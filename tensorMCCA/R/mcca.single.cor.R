@@ -1,7 +1,5 @@
-
-
 ###################################################
-# Internal function for MCCA with mixed 2D/3D data
+# Internal function for MCCA with tensor data
 # (maximize sum of correlations one block at a time)
 ###################################################
 
@@ -70,8 +68,6 @@ for (it in 1:maxit) {
 
 	if (verbose) 
 		cat("\nIteration",it,"Objective",objective[it+1])
-
-	# v <- scale.v(v, cnstr = "block", check.args = FALSE)
 	
 	## Check convergence 
 	if (it > 1 && abs(objective[it + 1L] - objective[it]) <= 
