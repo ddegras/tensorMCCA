@@ -26,7 +26,7 @@ args0 <- list(x = x, r = 5, w = w, verbose = FALSE)
 combs <- expand.grid(
 	init = c("cca", "svd", "random", "custom"), 
 	scale = c("block", "global"), 
-	ortho = c("score", "canon.tnsr"), 
+	ortho = c("score", "weight"), 
 	sweep = c("cyclical", "random"),
 	optim = c("bca", "grad.scale", "grad.rotate"),
 	stringsAsFactors = FALSE)
