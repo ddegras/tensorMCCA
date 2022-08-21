@@ -7,7 +7,7 @@
 
 \usage{
 mcca.cov(x, r = 1, w = 1, scale = c("block", "global"), 
-	ortho = c("score", "canon.tnsr"), optim = c("bca", "grad.scale", 
+	ortho = c("score", "weight"), optim = c("bca", "grad.scale", 
 	"grad.rotate"), init = c("cca", "svd", "random"), maxit = 1000, 
 	tol = 1e-6, sweep = c("cyclical", "random"), control = list(), 
 	verbose = FALSE)
@@ -35,7 +35,7 @@ For each dataset, the number \code{r} of canonical components cannot exceed the 
 
 The scaling constraint \code{scale} can take the value \code{block} (each canonical tensor must have norm equal to 1) or \code{global} (on average across datasets, the canonical tensors have squared norm equal to 1). (at each stage \eqn{1,...,r} of the MCCA). 
 
-The orthogonality constraints \code{ortho} for estimating higher order canonical components (\eqn{2,...,r}) can apply either to canonical scores (\code{score}, defined as \eqn{m} data block-specific scores for each case if \code{scale=block} or as a single global score if \code{scale=global}) or to canonical tensors (\code{canon.tnsr}). Either way, the constraints are enforced by deflating the data arrays/tensors.  
+The orthogonality constraints \code{ortho} for estimating higher order canonical components (\eqn{2,...,r}) can apply either to canonical scores (\code{score}, defined as \eqn{m} data block-specific scores for each case if \code{scale=block} or as a single global score if \code{scale=global}) or to canonical tensors (\code{weight}). Either way, the constraints are enforced by deflating the data arrays/tensors.  
 
 The optimization method \code{optim} can be set to \code{bca}: block coordinate ascent, \code{grade.scale}: gradient-based with retraction by scaling, or 	\code{grade.rotate}: gradient-based with retraction by rotation.
 	

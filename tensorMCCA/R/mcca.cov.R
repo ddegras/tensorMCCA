@@ -1,5 +1,5 @@
 mcca.cov <- function(x, r = 1, w = 1, scale = c("block", "global"), 
-	ortho = c("score", "canon.tnsr"), optim = c("bca", "grad.scale", 
+	ortho = c("score", "weight"), optim = c("bca", "grad.scale", 
 	"grad.rotate"), init = c("cca", "svd", "random"), maxit = 1000, 
 	tol = 1e-6, sweep = c("cyclical", "random"), control = list(), 
 	verbose = FALSE)
@@ -47,7 +47,7 @@ for(i in 1:m) {
     xbar <- rowMeans(x[[i]], dims = d[i])
     x[[i]] <- x[[i]] - as.vector(xbar)
 }
-if (ortho == "canon.tnsr") x0 <- x
+if (ortho == "weight") x0 <- x
 
 ## Adjust number of canonical components 
 r0 <- r
@@ -56,14 +56,14 @@ r <- if (ortho == "score" && scale == "block") {
 	min(n - 1, max(pp), r0)
 } else if (ortho == "score" && scale == "global") {
 	min(n - 1, sum(pp), r0)
-} else if (ortho == "canon.tnsr" && scale == "block") {
+} else if (ortho == "weight" && scale == "block") {
 	min(max(pp), r0)
 } else {
 	min(sum(pp), r0)
 }
 
 ## Set orthogonality constraints on canonical tensors
-if (ortho == "canon.tnsr" && scale == "block" && r > 1) 
+if (ortho == "weight" && scale == "block" && r > 1) 
 	ortho.mode <- set.ortho.mode(x, r, 
 		cnstr = control$ortho$cnstr, 
 		method = control$ortho$method)
@@ -108,7 +108,7 @@ for (l in 1:r) {
 		} else if (ortho == "score" && scale == "global") { 
 			x <- deflate.x(x, score = global.score[,l-1], 
 				scope = "global", check.args = FALSE)
-		} else if (ortho == "canon.tnsr" && scale == "block") {
+		} else if (ortho == "weight" && scale == "block") {
 			cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
 			x <- deflate.x(x0, v = v[, 1:(l-1)], 
@@ -124,7 +124,7 @@ for (l in 1:r) {
 	} else if (is.list(init)) {
 		v0 <- if (is.vector(init)) {
 			init } else { init[, min(l, ncol(init))] }
-		if (l > 1 && ortho == "canon.tnsr" && scale == "block") {
+		if (l > 1 && ortho == "weight" && scale == "block") {
 			v0 <- tnsr.rk1.mat.prod(v0, mat = cnstr$mat, 
 				modes = cnstr$modes, transpose.mat = FALSE)
 		}
@@ -159,7 +159,7 @@ for (l in 1:r) {
 
 	## Transform back canonical tensors to original search space 
 	## if needed
-	if (l > 1 && ortho == "canon.tnsr" && scale == "block") {
+	if (l > 1 && ortho == "weight" && scale == "block") {
 		v[,l] <- tnsr.rk1.mat.prod(v = v[,l], 
 			mat = cnstr$mat, modes = cnstr$modes, 
 			transpose.mat = TRUE)

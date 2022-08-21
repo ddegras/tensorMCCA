@@ -7,7 +7,7 @@
 
 \usage{
 mcca.cor(x, r, w = 1, norm = c("block", "global"), 
-	ortho = c("score", "canon.tnsr"), init = c("cca", "svd", "random"), 
+	ortho = c("score", "weight"), init = c("cca", "svd", "random"), 
 	maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), 
 	control = list(), verbose = FALSE)
 }
@@ -17,7 +17,7 @@ mcca.cor(x, r, w = 1, norm = c("block", "global"),
 \item{r}{integer number of sets of canonical components to calculate.}
 \item{w}{weight matrix for pairs of datasets. Can be specified as a single number (recycled) or as a square matrix with numbers of rows and columns equal to the length of \code{x}.}
 \item{norm}{character specifying the scope of orthogonality constraints for higher-order canonical components: within datasets (\code{block}) or across datasets (\code{global}).}
-\item{ortho}{character specifying whether orthogonality constraints for higher-order canonical components apply to canonical scores (\code{score}) or canonical tensors (\code{canon.tnsr}).}
+\item{ortho}{character specifying whether orthogonality constraints for higher-order canonical components apply to canonical scores (\code{score}) or canonical tensors (\code{weight}).}
 \item{init}{character describing the initialization method or list of starting points for the optimization.}
 \item{maxit}{maximum number of algorithm iterations.}
 \item{tol}{numerical (relative and absolute) tolerance for algorithm convergence.}
