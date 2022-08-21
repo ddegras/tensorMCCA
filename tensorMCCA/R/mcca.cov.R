@@ -143,11 +143,11 @@ for (l in 1:r) {
 			sweep = sweep, maxit = maxit, tol = tol, 
 			verbose = verbose)
 	} else if (optim == "grad.scale") {
-		mcca.gradient.scale(x = x, v = v, w = w, scale = scale, 
+		mcca.gradient.scale(x = x, v = v0, w = w, scale = scale, 
 			type = "norm", maxit = maxit, tol = tol, 
 			verbose = verbose)
 	} else { 
-		mcca.gradient.rotate(x = x, v = v, w = w, 
+		mcca.gradient.rotate(x = x, v = v0, w = w, 
 			maxit = maxit, tol = tol, verbose = verbose)
 	}
 	

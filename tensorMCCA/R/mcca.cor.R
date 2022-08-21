@@ -72,10 +72,6 @@ if (identical(init, "cca")) {
 	}
 } else if (identical(init, "svd")) {
 	init.args <- list(objective = "cor", center = FALSE)
-	# if (test) {
-		# names. <- intersect(names(control), c("norm"))
-		# init.args[names.] <- control[names.]
-	# }
 } else if (identical(init, "random")) { 
 	init.args <- list(objective = "cor")
 }

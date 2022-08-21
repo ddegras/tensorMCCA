@@ -21,46 +21,60 @@ for (i in 1:m) {
 	v[[i]] <- lapply(dimx[[i]][-length(dimx[[i]])], runif)
 }
 
-
 ## Make sure that the main functions run without errors
+args0 <- list(x = x, r = 5, w = w, verbose = FALSE)
 combs <- expand.grid(
 	init = c("cca", "svd", "random", "custom"), 
 	scale = c("block", "global"), 
 	ortho = c("score", "canon.tnsr"), 
 	sweep = c("cyclical", "random"),
+	optim = c("bca", "grad.scale", "grad.rotate"),
 	stringsAsFactors = FALSE)
-ncombs <- nrow(combs)
 
-# Test mcca.cov
-for (i in 1:ncombs) {
-init. <- if (combs[i,"init"] == "custom") {
-	v } else combs[i,"init"] 
-test <- mcca.cov(x, r = 5, w = w,  
-	scale = combs[i, "scale"], 
-	ortho = combs[i, "ortho"],
-	optim = "bca",
-	init = init.,
-	sweep = combs[i, "sweep"], 
-	verbose = TRUE)
+# Test mcca.cov 
+idx <- which(combs$optim == "bca")
+for (i in idx) {
+args <- c(args0, as.list(combs[i,]))
+if (combs[i,"init"] == "custom") args$init <- v
+test <- do.call(mcca.cov, args)
 }
+
+idx <- which(combs$optim == "grad.scale" & 
+	combs$init == "cca")
+for (i in idx) {
+args <- c(args0, as.list(combs[i,]))
+test <- do.call(mcca.cov, args)
+}
+
+idx <- which(combs$optim == "grad.rotate" & 
+	combs$init == "cca" & combs$scale == "block")
+for (i in idx) {
+args <- c(args0, as.list(combs[i,]))
+test <- do.call(mcca.cov, args)
+}
+
 
 # Test mcca.cor
-idx <- which(combs$scale == "block")
-for (i in idx) {
-init. <- if (combs[i,"init"] == "custom") {
-	v } else combs[i,"init"] 
-test <- mcca.cor(x, r = 5, w = w, 
-	ortho = combs[i, "ortho"],
-	optim = "bca",
-	init = init., 
-	sweep = combs[i, "sweep"], 
-	verbose = TRUE)
+idxr <- which(combs$optim == "bca" & 
+	combs$scale == "block")
+idxc <- which(colnames(combs) != "scale")
+for (i in idxr) {
+args <- c(args0, as.list(combs[i,idxc]))
+if (combs[i,"init"] == "custom") args$init <- v
+test <- do.call(mcca.cor, args)
+}
+idx <- which(combs$optim == "grad.scale" & 
+	combs$init == "cca")
+for (i in idxr) {
+args <- c(args0, as.list(combs[i,idxc]))
+test <- do.call(mcca.cov, args)
 }
 
-# Test gradient-based optimization functions
-test <- tensorMCCA:::mcca.gradient.scaling(x, v, w / 9, scale = "norm",
-	cnstr = "block", maxit = 100, tol = 1e-6, verbose = TRUE)
+idxr <- which(combs$optim == "grad.rotate" & 
+	combs$init == "cca" & combs$scale == "block")
+for (i in idxr) {
+args <- c(args0, as.list(combs[i,idxc]))
+test <- do.call(mcca.cov, args)
+}
 
-test <- tensorMCCA:::mcca.gradient.rotation(x, v, w / 9,
-	cnstr = "norm", maxit = 100, tol = 1e-6, verbose = TRUE)
 

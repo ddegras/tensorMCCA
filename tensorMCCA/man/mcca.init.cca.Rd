@@ -32,6 +32,10 @@ Type of search in a (possibly large) space of candidate solutions: \code{exhaust
 }
 
 \details{
+It can be useful to set \code{k} to a small-to-moderate value if one or several datasets are very big.
+
+By default, \code{search} is set to \code{exhaustive} if \eqn{m \le 5} and to 
+\code{approximate} otherwise.
 }
 
 
