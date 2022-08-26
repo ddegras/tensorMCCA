@@ -161,43 +161,51 @@ v
 # under orthogonality constraints 
 #################################################
 
+# Internal function
+
 # Targets: rank-1 tensors v0(1), ..., v0(m)
 # specified as lists of vectors v0(i,k), i=1,...,m, k=1,...,d(i)
-# Orthogonality constraints: rank-1 tensors vl(i), l=1,...,r, i=1,...,m 
-# specified by lists vl(i,1),...,vl(i,d(i))
+# Orthogonality constraints: tensors vl(i), l=1,...,r, i=1,...,m 
  
-# min sum_i,k || v(i,k) - v0(i,k) ||^2
-# subject to 
-# (1/m) sum_i || v(i) ||^2 = 1
-# and sum_i < v(i), vl(i) > = 0 for l = 1,...,r
 
+tsnr.rk1.ortho <- function(v0, ortho, maxit, tol)
+{
+m <- length(v0)
+d <- sapply(v0, length)
+v <- v0
+cpfun <- function(x, y) sum(x * y) 
 
-# min (x-x0)'D(x-x0) s.t. || x ||^2 = 1 and B'x = 0
+for (i in 1:m) {
+objective <- Inf
+cp.v0v <- mapply(cpfun, v0, v)
+cp.vv <- mapply(cpfun, v, v)
 
-# replace x by Qz with Q orthogonal basis of complement of B 
-# min (Qz-x0)'D(Qz-x0) s.t. || z ||^2 = 1
+	for (it in 1:maxit) {
+		objective.old <- objective
+		## Block coordinate descent
 
-# Q'DQz - Q'Dx0 = lambda z
-
-# sum_i w_ik(i)  < v_ik(i) , vll_ik(i) > = 0 for ll = 1, ..., l
-# w_ik(i) = prod_(k!=k(i)) < v_ik , vll_ik > 
-
-# tsnr.rk1.ortho <- function(v, ortho, maxit = 1000L, tol = 1e-6)
-# {
-# m <- length(v)
-# ortho <- as.matrix(ortho)
-# northo <- ncol(ortho)
-# eps <- 1e-14
-# ortho.test <- logical(northo)
-# for (l in 1:northo) {
-	# sumcp <- sum(tnsr.rk1.cp(v, ortho[,l]))
-	# ortho.test[l] <- (abs(sumcp) < sqrt(eps))
-# }
-# if (all(ortho.test)) return(v)
-
-# blocks <- expand.grid(lapply(v, seq_along))
-# nblocks <- nrow(blocks)
-# v0 <- v
+		for (k in 1:d[i]) {
+			## Calculate matrix of orthogonal constraints for v(i,k)
+			M <- sapply(ortho[i,], tnsr.vec.prod, 
+				v = v[[i]], modes = (1:d[i])[-k])
+			## Apply orthogonal constraints to target vector
+			qrM <- qr(M)
+			rkM <- qrM$rank
+			Qv0k <- if (rkM > 0) {
+				v0[[i]][[k]] - qr.Q(qrM)[,1:rkM] %*% v0[[i]][[k]]
+			} else { v0[[i]][[k]] }
+			## Update v(i,k) and cross-products
+			v[[i]][[k]] <- prod(cp.v0v[-k]) / prod(cp.vv[-k]) * Qv0k
+			cp.v0v[k] <- cpfun(v0[[i]][[k]], v[[i]][[k]])
+			cp.vv[k] <- sum(v[[i]][[k]]^2)
+		}	
+		objective <- sum((unlist(v0[[i]]) - unlist(v[[i]]))^2)
+		delta <- abs(objective - objective.old)
+		if (it > 1 && delta <= tol * max(1, objective.old) ) break
+	}	
+}
+v
+}
 
 
 
@@ -206,4 +214,4 @@ v
 
 
 	
-# }
+
