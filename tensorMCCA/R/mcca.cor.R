@@ -51,12 +51,17 @@ pp <- sapply(p, prod)
 r <- switch(ortho, score = min(n - 1, max(pp), r0),
 	weight = min(max(pp), r0)) 
 
-## Set orthogonality constraints on canonical tensors
-if (ortho == "weight" && r > 1) {
-	## Set tensor modes on which constraints apply
-	ortho.mode <- set.ortho.mode(x, r, 
-		cnstr = control$ortho$cnstr, 
-		method = control$ortho$method)
+## Set orthogonality constraints
+if (r > 1) {
+	if (ortho == "weight") {
+		## Set tensor modes on which constraints apply
+		ortho.mode <- set.ortho.mode(x, r, 
+			cnstr = control$ortho$cnstr, 
+			method = control$ortho$method)
+	} else {
+		ortho.cnstr <- vector("list", m * r)
+		dim(ortho.cnstr) <- c(m, r)
+	}
 }
 
 ## Set up initialization parameters
@@ -88,21 +93,24 @@ input <- list(objective = "cor", r = r0, w = w,
 
 
 ## MAIN LOOP
-vprev <- vector("list", m)
+
 for (l in 1:r) {	
 	
-	## Deflate data as required
-	if (l > 1) { 	
-		if (ortho == "score") { 
-			x <- deflate.x(x, score = block.score[,,l-1], 
-				scope = "block", check.args = FALSE)
-		} else { # if (ortho == "weight") {
-			cnstr <- set.ortho.mat(v = v[, 1:(l-1)], 
+	## Prepare orthogonality constraints after first round
+	if (l > 1) {
+		if (ortho == "weight") {
+			## Deflate data
+			ortho.cnstr <- set.ortho.mat(v = v[, 1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
 			x <- deflate.x(x = x0, v = v[,1:(l-1)],  
-					ortho.mode = ortho.mode[,1:(l-1),l],
-					check.args = FALSE)
-		} 
+				ortho.mode = ortho.mode[,1:(l-1),l], 
+				check.args = FALSE)
+		} else { # ortho == "score"
+			## Calculate tensors that form orthogonality constraints		
+			for (i in 1:m)
+				ortho.cnstr[[i,l-1]] <- tnsr.vec.prod(x[[i]], 
+					block.score[,i,l-1], d[i]+1)
+		}
 	}
 		
 	## Initialize canonical vectors
@@ -112,16 +120,23 @@ for (l in 1:r) {
 	} else if (is.list(init)) {
 		v0 <- if (is.vector(init)) {
 			init } else { init[, min(l, ncol(init))] }
-		if (l > 1 && ortho == "weight") {
-			v0 <- tnsr.rk1.mat.prod(v0, 	mat = cnstr$mat, 
-				modes = cnstr$modes, transpose.mat = FALSE)
+		if (l > 1) {
+			v0 <- if (ortho == "weight") {
+				tnsr.rk1.mat.prod(v0, mat = ortho.cnstr$mat, 
+					modes = ortho.cnstr$modes, transpose.mat = FALSE)
+			} else {
+				tnsr.rk1.ortho(v0, ortho.cnstr[,1:(l-1)], 
+					maxit = 100L, tol = 1e-6)
+			}
 		}
 		v0 <- scale.v(v0, type = "var", x = x, check.args = FALSE)
-	} 
+	}
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component",l,"\n")
-	out <- mcca.single.cor(x, v0, w, sweep, maxit, tol, verbose)
+	out <- mcca.single.cor(x = x, v = v0, w = w, 
+		ortho = if (ortho == "weight") ortho.cnstr[,1:(l-1)] else NULL,
+		sweep = sweep, maxit = maxit, tol = tol, verbose = verbose)
 	v[,l] <- out$v
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y 
@@ -132,7 +147,7 @@ for (l in 1:r) {
 	## if needed	
 	if (l > 1 && ortho == "weight") {
 		v[,l] <- tnsr.rk1.mat.prod(v = v[,l], 
-			mat = cnstr$mat, modes = cnstr$modes, 
+			mat = ortho.cnstr$mat, modes = ortho.cnstr$modes, 
 			transpose.mat = TRUE)
 	}
 
