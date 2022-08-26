@@ -7,7 +7,7 @@
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-mcca.single.cor <- function(x, v, w, sweep, maxit, tol, verbose)
+mcca.single.cor <- function(x, v, w, ortho, sweep, maxit, tol, verbose)
 {
 	
 ## Data dimensions
@@ -56,8 +56,10 @@ for (it in 1:maxit) {
 			v = list(score[, -i] %*% (w[-i, i] / n)))
 		
 		## Update canonical vectors
-		v[[i]] <- optim.block.cor(v[[i]], a, x[[i]], maxit, tol)		
-	}								
+		v[[i]] <- optim.block.cor(v = v[[i]], obj = a, 
+			scale = x[[i]], maxit = maxit, tol = tol,
+			ortho = if (is.null(ortho)) NULL else ortho[i,])		
+	}	
 	
 	## Calculate objective value
 	objective[it + 1L] <- objective.internal(x, v, w)	
