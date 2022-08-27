@@ -168,7 +168,7 @@ v
 # Orthogonality constraints: tensors vl(i), l=1,...,r, i=1,...,m 
  
 
-tsnr.rk1.ortho <- function(v0, ortho, maxit, tol)
+tnsr.rk1.ortho <- function(v0, ortho, maxit, tol)
 {
 m <- length(v0)
 d <- sapply(v0, length)
@@ -177,8 +177,8 @@ cpfun <- function(x, y) sum(x * y)
 
 for (i in 1:m) {
 objective <- Inf
-cp.v0v <- mapply(cpfun, v0, v)
-cp.vv <- mapply(cpfun, v, v)
+cp.v0v <- mapply(cpfun, v0[[i]], v[[i]])
+cp.vv <- mapply(cpfun, v[[i]], v[[i]])
 
 	for (it in 1:maxit) {
 		objective.old <- objective
@@ -186,16 +186,19 @@ cp.vv <- mapply(cpfun, v, v)
 
 		for (k in 1:d[i]) {
 			## Calculate matrix of orthogonal constraints for v(i,k)
-			M <- sapply(ortho[i,], tnsr.vec.prod, 
-				v = v[[i]], modes = (1:d[i])[-k])
+			Mik <- if (d[i] == 1) {
+				matrix(unlist(ortho[i,]), ncol = ncol(ortho))
+			} else { sapply(ortho[i,], tnsr.vec.prod, 
+				v = v[[i]][-k], modes = (1:d[i])[-k]) }
 			## Apply orthogonal constraints to target vector
-			qrM <- qr(M)
+			qrM <- qr(Mik)
 			rkM <- qrM$rank
-			Qv0k <- if (rkM > 0) {
-				v0[[i]][[k]] - qr.Q(qrM)[,1:rkM] %*% v0[[i]][[k]]
+			Qik <- qr.Q(qrM)[,1:rkM]
+			projv0ik <- if (rkM > 0) {
+				v0[[i]][[k]] - Qik %*% crossprod(Qik, v0[[i]][[k]])
 			} else { v0[[i]][[k]] }
 			## Update v(i,k) and cross-products
-			v[[i]][[k]] <- prod(cp.v0v[-k]) / prod(cp.vv[-k]) * Qv0k
+			v[[i]][[k]] <- prod(cp.v0v[-k]) / prod(cp.vv[-k]) * projv0ik
 			cp.v0v[k] <- cpfun(v0[[i]][[k]], v[[i]][[k]])
 			cp.vv[k] <- sum(v[[i]][[k]]^2)
 		}	

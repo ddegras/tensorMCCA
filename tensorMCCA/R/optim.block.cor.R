@@ -95,7 +95,7 @@ if (!is.matrix(a)) dim(a) <- p
 if (!is.null(cc)) {
 	if (is.list(cc)) 
 		cc <- array(unlist(cc), c(p, length(cc)))
-	if all(abs(cc) <= 1e-14) {
+	if (all(abs(cc) <= 1e-14)) {
 		cc <- NULL
 	} else if (any(p == 1)) {
 		 return(lapply(p, numeric))
@@ -185,7 +185,7 @@ if (!is.null(cc)) {
 	if (is.list(cc)) 
 		cc <- array(unlist(cc), c(p, length(cc)))
 	northo <- dim(cc)[4]
-	if all(abs(cc) <= 1e-14) {
+	if (all(abs(cc) <= 1e-14)) {
 		cc <- NULL
 	} else if (any(p == 1)) {
 		 return(lapply(p, numeric)) } 

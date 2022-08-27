@@ -61,7 +61,7 @@ p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 n <- tail(dimx[[1]], 1)
 eps <- 1e-14
 
-## Deflate with respect to canonical tensors
+## Deflate with respect to canonical weight tensors
 if (!is.null(v)) {
 	cnstr <- set.ortho.mat(v = v, modes = ortho.mode)
 	x <- mapply(tnsr.mat.prod, x = x, mat = cnstr$mat,

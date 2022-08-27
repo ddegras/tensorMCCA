@@ -82,7 +82,7 @@ if (identical(init, "cca")) {
 }
 
 ## Create output objects 
-v <- vector("list", m * r) # canonical vectors
+v <- vector("list", m * r) # canonical weights
 dim(v) <- c(m, r)
 block.score <- array(0, c(n, m, r)) 
 global.score <- matrix(0, n, r) 
@@ -96,7 +96,7 @@ input <- list(objective = "cor", r = r0, w = w,
 
 for (l in 1:r) {	
 	
-	## Prepare orthogonality constraints after first round
+	## Prepare orthogonality constraints
 	if (l > 1) {
 		if (ortho == "weight") {
 			## Deflate data
@@ -106,36 +106,39 @@ for (l in 1:r) {
 				ortho.mode = ortho.mode[,1:(l-1),l], 
 				check.args = FALSE)
 		} else { # ortho == "score"
-			## Calculate tensors that form orthogonality constraints		
+			## Calculate orthogonality constraints explicitly	
 			for (i in 1:m)
 				ortho.cnstr[[i,l-1]] <- tnsr.vec.prod(x[[i]], 
 					block.score[,i,l-1], d[i]+1)
 		}
 	}
 		
-	## Initialize canonical vectors
+	## Initialize canonical weights
 	if (is.character(init)) {
-		init.args$x <- x
+		init.args$x <- if (ortho == "score" && l > 1) {
+			deflate.x(x, score = block.score[,,1:(l-1)], 
+				scope = "block", check.args = FALSE)
+			} else x
 		v0 <- do.call(mcca.init, init.args)
-	} else if (is.list(init)) {
+	} else { # case: 'init' is a list
 		v0 <- if (is.vector(init)) {
 			init } else { init[, min(l, ncol(init))] }
-		if (l > 1) {
-			v0 <- if (ortho == "weight") {
-				tnsr.rk1.mat.prod(v0, mat = ortho.cnstr$mat, 
-					modes = ortho.cnstr$modes, transpose.mat = FALSE)
-			} else {
-				tnsr.rk1.ortho(v0, ortho.cnstr[,1:(l-1)], 
-					maxit = 100L, tol = 1e-6)
-			}
-		}
+		if (ortho == "weight" && l > 1) 
+			v0 <- tnsr.rk1.mat.prod(v0, mat = ortho.cnstr$mat, 
+				modes = ortho.cnstr$modes, transpose.mat = FALSE)
 		v0 <- scale.v(v0, type = "var", x = x, check.args = FALSE)
 	}
-	
-	## Run MCCA and store results
+	if (ortho == "score" && l > 1) {
+		v0 <- tnsr.rk1.ortho(v0, ortho.cnstr[, 1:(l-1), drop = FALSE], 
+			maxit = 100L, tol = 1e-6)
+		v0 <- scale.v(v0, type = "var", x = x, check.args = FALSE)
+	}
+
+	## Run MCCA
 	if (verbose) cat("\n\nMCCA: Component",l,"\n")
 	out <- mcca.single.cor(x = x, v = v0, w = w, 
-		ortho = if (ortho == "weight") ortho.cnstr[,1:(l-1)] else NULL,
+		ortho = if (ortho == "score" && l > 1) {
+			ortho.cnstr[, 1:(l-1), drop = FALSE] } else NULL,
 		sweep = sweep, maxit = maxit, tol = tol, verbose = verbose)
 	v[,l] <- out$v
 	objective[l] <- out$objective
@@ -143,9 +146,9 @@ for (l in 1:r) {
 	global.score[,l] <- rowMeans(block.score[,,l])	
 	iters[l] <- out$iters	
 	
-	## Transform back canonical tensors to original search space 
+	## Transform back canonical weights to original search space 
 	## if needed	
-	if (l > 1 && ortho == "weight") {
+	if (ortho == "weight" && l > 1) {
 		v[,l] <- tnsr.rk1.mat.prod(v = v[,l], 
 			mat = ortho.cnstr$mat, modes = ortho.cnstr$modes, 
 			transpose.mat = TRUE)

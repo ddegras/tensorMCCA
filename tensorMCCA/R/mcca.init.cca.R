@@ -279,28 +279,18 @@ rm(vcopy)
 
 
 
-####################################
-# Calculate image scores associated 
-# with each canonical tensor
-####################################
+#############################
+# Calculate canonical scores 
+#############################
 
 
 score <- canon.scores(x, v)
-# score <- array(dim = c(n, m, m))
-# for (i in 1:m)
-# for (j in 1:m)
-# {
-	# vij <- if (d[i] == 1) { unlist(v[[i,j]]) 
-		# } else { Reduce(kronecker, rev(v[[i,j]])) }
-	# dim(vij) <- NULL
-	# score[,i,j] <- colSums(vij * x[[i]], dims = d[i])
-	# if (center) score[,i,j] <- score[,i,j] - sum(vij * xbar[[i]])
-# }
+
 
 
 
 ####################################
-# Rescale canonical vectors 
+# Rescale canonical weights 
 # if maximizing sum of correlations
 ####################################
 
