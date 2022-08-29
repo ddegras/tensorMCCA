@@ -18,6 +18,7 @@ export(
 "tnsr3d.rk1",
 "tnsr.rk1",
 "tnsr.rk1.cp",
+"tnsr.rk1.expand",
 "tnsr.rk1.nrm"
 )
 importFrom("MASS", "ginv")

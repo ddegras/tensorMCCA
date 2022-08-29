@@ -103,11 +103,9 @@ for (l in 1:r) {
 	## Deflate data as required
 	if (l > 1) { 	
 		if (ortho == "score" && scale == "block") { 
-			x <- deflate.x(x, score = block.score[,,l-1], 
-				scope = "block", check.args = FALSE)
+			score <- block.score[,,1:(l-1)]
 		} else if (ortho == "score" && scale == "global") { 
-			x <- deflate.x(x, score = global.score[,l-1], 
-				scope = "global", check.args = FALSE)
+			score <- global.score[,1:(l-1)]
 		} else if (ortho == "weight" && scale == "block") {
 			cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
@@ -119,7 +117,9 @@ for (l in 1:r) {
 
 	## Initialize canonical vectors
 	if (is.character(init)) {
-		init.args$x <- x
+		init.args$x <- if (ortho == "score") {
+			deflate.x(x, score = score, scope = scale, 
+				check.args = FALSE) } else x
 		v0 <- do.call(mcca.init, init.args)
 	} else if (is.list(init)) {
 		v0 <- if (is.vector(init)) {
@@ -173,6 +173,7 @@ for (l in 1:r) {
 ## Re-order results according to objective values if needed
 o <- order(objective, decreasing = TRUE)
 o <- o[objective[o] > eps]
+if (length(o) == 0) o <- 1
 if (!identical(o, 1:r)) {
 	v <- v[,o]
 	block.score <- block.score[,,o]

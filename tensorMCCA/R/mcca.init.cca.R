@@ -29,7 +29,7 @@ cnst.set <- sapply(x, function(xx) all(abs(xx - xx[1]) < eps))
 if (all(cnst.set)) {
 	v <- vector("list", m)
 	for (i in 1:m) 
-		v[[i]] <- lapply(p[[i]], numeric)
+		v[[i]] <- lapply(p[[i]], function(len) rep(1/sqrt(len), len))
 	return(v)
 } else if (any(cnst.set)) {
 	m0 <- m
@@ -419,7 +419,7 @@ if (any(cnst.set)) {
 	vv <- vector("list", m0)
 	vv[!cnst.set] <- v
 	for (i in which(cnst.set))
-		vv[[i]] <- lapply(p0[[i]], numeric)
+		vv[[i]] <- lapply(p0[[i]], function(len) rep(1/sqrt(len), len))
 	v <- vv
 }
 
