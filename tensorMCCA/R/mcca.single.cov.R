@@ -96,7 +96,7 @@ list(v = vbest, y = canon.scores(x, vbest),
 # Maximize sum of covariances 
 # under global norm constraints
 # and orthogonality constraints
-# on canonical vectors 
+# on canonical weights 
 ################################
 
 # This function is not meant to be called by the user
