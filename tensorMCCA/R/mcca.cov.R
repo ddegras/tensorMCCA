@@ -70,10 +70,10 @@ if (r > 1) {
 			cnstr = control$ortho$cnstr, 
 			method = control$ortho$method)
 	} else if (ortho == "score" && scale == "block") {
-		ortho.cnstr <- vector("list", m * r)
+		ortho.cnstr <- vector("list", m * (r - 1))
 		dim(ortho.cnstr) <- c(m, r)
 	} else if (ortho == "score" && scale == "global") {
-		ortho.cnstr <- vector("list", r) 
+		ortho.cnstr <- vector("list", r - 1) 
 	}
 }
 
@@ -122,7 +122,7 @@ for (l in 1:r) {
 			ortho.cnstr[[l-1]] <- tnsr.vec.prod(x[[i]], 
 				score[,l-1], d[i]+1)
 		} else if (ortho == "weight" && scale == "block") {
-			cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
+			ortho.cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
 			x <- deflate.x(x0, v = v[, 1:(l-1)], 
 				ortho.mode = ortho.mode[, 1:(l-1), l], 
@@ -130,7 +130,7 @@ for (l in 1:r) {
 		} 
 	}
 
-	## Initialize canonical vectors
+	## Initialize canonical weights
 	if (is.character(init)) {
 		init.args$x <- if (ortho == "score") {
 			deflate.x(x, score = score, scope = scale, 
@@ -140,8 +140,8 @@ for (l in 1:r) {
 		v0 <- if (is.vector(init)) {
 			init } else { init[, min(l, ncol(init))] }
 		if (l > 1 && ortho == "weight" && scale == "block") {
-			v0 <- tnsr.rk1.mat.prod(v0, mat = cnstr$mat, 
-				modes = cnstr$modes, transpose.mat = FALSE)
+			v0 <- tnsr.rk1.mat.prod(v0, mat = ortho.cnstr$mat, 
+				modes = ortho.cnstr$modes, transpose.mat = FALSE)
 		}
 		v0 <- scale.v(v0, type = "norm", scale = scale, 
 			check.args = FALSE)
@@ -150,12 +150,13 @@ for (l in 1:r) {
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
 	out <- if (optim == "bca" && scale == "block") {
-		mcca.single.block.cov(x = x, v = v0, w = w, sweep = sweep,
-		 
+		mcca.single.block.cov(x = x, v = v0, w = w, 
+			ortho = if (ortho == "score" && l > 1) {
+			ortho.cnstr[,1:(l-1)] } else NULL, sweep = sweep, 
 			maxit = maxit, tol = tol, verbose = verbose)
 	} else if (optim == "bca" && scale == "global") {
 		mcca.single.global.cov(x = x, v = v0, w = w, 
-			ortho = if (l > 1L) v[, 1:(l-1)] else NULL, 
+			ortho = if (l > 1) v[, 1:(l-1)] else NULL, 
 			sweep = sweep, maxit = maxit, tol = tol, 
 			verbose = verbose)
 	} else if (optim == "grad.scale") {
@@ -177,7 +178,7 @@ for (l in 1:r) {
 	## if needed
 	if (l > 1 && ortho == "weight" && scale == "block") {
 		v[,l] <- tnsr.rk1.mat.prod(v = v[,l], 
-			mat = cnstr$mat, modes = cnstr$modes, 
+			mat = ortho.cnstr$mat, modes = ortho.cnstr$modes, 
 			transpose.mat = TRUE)
 	}
 
