@@ -62,11 +62,20 @@ r <- if (ortho == "score" && scale == "block") {
 	min(sum(pp), r0)
 }
 
-## Set orthogonality constraints on canonical tensors
-if (ortho == "weight" && scale == "block" && r > 1) 
-	ortho.mode <- set.ortho.mode(x, r, 
-		cnstr = control$ortho$cnstr, 
-		method = control$ortho$method)
+## Set orthogonality constraints
+ortho.cnstr <- NULL
+if (r > 1) {
+	if (ortho == "weight" && scale == "block") {
+		ortho.mode <- set.ortho.mode(x, r, 
+			cnstr = control$ortho$cnstr, 
+			method = control$ortho$method)
+	} else if (ortho == "score" && scale == "block") {
+		ortho.cnstr <- vector("list", m * r)
+		dim(ortho.cnstr) <- c(m, r)
+	} else if (ortho == "score" && scale == "global") {
+		ortho.cnstr <- vector("list", r) 
+	}
+}
 
 ## Set up initialization parameters
 test <- (is.list(control) && !is.null(control$init))
@@ -103,9 +112,15 @@ for (l in 1:r) {
 	## Deflate data as required
 	if (l > 1) { 	
 		if (ortho == "score" && scale == "block") { 
-			score <- block.score[,,1:(l-1)]
+			score <- block.score[,, 1:(l-1), drop = FALSE]
+			## Calculate orthogonality constraints explicitly	
+			for (i in 1:m)
+				ortho.cnstr[[i,l-1]] <- tnsr.vec.prod(x[[i]], 
+					score[,i,l-1], d[i]+1)
 		} else if (ortho == "score" && scale == "global") { 
 			score <- global.score[,1:(l-1)]
+			ortho.cnstr[[l-1]] <- tnsr.vec.prod(x[[i]], 
+				score[,l-1], d[i]+1)
 		} else if (ortho == "weight" && scale == "block") {
 			cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
@@ -135,7 +150,8 @@ for (l in 1:r) {
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
 	out <- if (optim == "bca" && scale == "block") {
-		mcca.single.block.cov(x = x, v = v0, w = w, sweep = sweep, 
+		mcca.single.block.cov(x = x, v = v0, w = w, sweep = sweep,
+		 
 			maxit = maxit, tol = tol, verbose = verbose)
 	} else if (optim == "bca" && scale == "global") {
 		mcca.single.global.cov(x = x, v = v0, w = w, 
