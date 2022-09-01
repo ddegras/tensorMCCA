@@ -1,4 +1,3 @@
-
 mcca.cor <- function(x, r, w = 1, ortho = c("score", "weight"), 
 	optim = c("bca", "grad.scale"), init = c("cca", "svd", "random"), 
 	maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), 
