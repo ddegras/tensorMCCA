@@ -10,7 +10,7 @@
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-mcca.single.block.cov <- function(x, v, w, sweep, maxit, tol, verbose)
+mcca.single.block.cov <- function(x, v, w, ortho, sweep, maxit, tol, verbose)
 {
 	
 ## Data dimensions
@@ -272,20 +272,8 @@ for (it in 1:maxit) {
 			} else { eigen(xv, TRUE) }
 			vg <- eigxv$vectors[,1]
 		}
-		
-		## Debugging
-		# vv <- list()
-		# for (ii in 1:groupsize) {
-			# i <- idxg[ii]
-			# k <- group[i,g]
-			# vv[[ii]] <- v[[i]][[k]]	* nrmt.mk[i] / sqrt(m) 
-		# }
-		# vv <- unlist(vv)
-		# print(paste("Norm v (before update):", sum(vv^2)))
-		# objective.implicit <- crossprod(vv, xv %*% vv)
-		# print(paste("Objective (before update):", objective.implicit))
-					
-		## Update canonical vectors
+							
+		## Update canonical weight vectors
 		for (ii in 1:groupsize) {
 			i <- idxg[ii]
 			k <- group[i,g]
@@ -294,32 +282,9 @@ for (it in 1:maxit) {
 			nrm2v[[i]][k] <- sum(v[[i]][[k]]^2)
 		}
 		
-		## Debugging
-		# nrm2t <- sapply(nrm2v, prod)
-		# norm.test <- (abs(mean(nrm2t) - 1) < 1e-10)
-		# print(paste("Test: norm v", norm.test))
-		# if (northo > 0) {
-			# ortho.test <- logical(northo)
-			# acc <- numeric(m)
-			# for (l in 1:northo) {
-				# for (i in 1:m) 
-					# acc[i] <- prod(mapply(cpfun, v[[i]], ortho[[i,l]]))
-				# ortho.test[l] <- (abs(sum(acc)) < 1e-7)
-			# }
-		# } else ortho.test <- TRUE
-		# print(paste("Test: ortho v", ortho.test))
-
-		# objective.implicit <- if (separable.w) {
-			# svdxv$d[1]^2 } else eigxv$values[1]
-		# objective.explicit <- objective.internal(x, v, w)
-		# objective.test.2 <- (abs(objective.implicit - 
-			# objective.explicit) < 1e-6)
-		# print(paste("Test: objective (after ortho)", objective.test.2))
-		# print(paste("Objective:", objective.explicit))
-	
 	}
 									
-	## Balance canonical vectors  
+	## Balance canonical weight vectors  
 	v <- scale.v(v, type = "norm", scale = "global", 
 		check.args = FALSE)
 	objective[it+1] <- objective.internal(x, v, w)
