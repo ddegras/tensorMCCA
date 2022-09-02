@@ -16,66 +16,78 @@
 # a:	 entire data tensor for quadratic term
 # b:	 reduced data tensor (weighted average over individuals) for linear term
 
-optim.block.cov <- function(v, a, b, maxit = 1000, tol = 1e-6)
+optim.block.cov <- function(v, a, b, ortho, maxit = 1000, tol = 1e-6)
 {
-if (length(v) == 1L) { return(optim1D.cov(a, b)) }
-if (length(v) == 2L) { return(optim2D.cov(v, a, b, maxit, tol)) }
-if (length(v) == 3L) { return(optim3D.cov(v, a, b, maxit, tol)) }
-return(optim.gen.cov(v, a, b, maxit, tol))
+if (length(v) == 1L) { return(optim1D.cov(a, b, ortho)) }
+if (length(v) == 2L) { return(optim2D.cov(v, a, b, ortho, maxit, tol)) }
+if (length(v) == 3L) { return(optim3D.cov(v, a, b, ortho, maxit, tol)) }
+return(optim.gen.cov(v, a, b, ortho, maxit, tol))
 }
 
 
 
 
 #####################################
-# Maximize { v'AA'v + 2 b'v } 
-# subject to v'v = 1 
+# Maximize { v'AA'v + 2 v'b } 
+# subject to v'v = 1 and C'v = 0
 #####################################
 
 ## Inputs
 # a: matrix of dimensions p-by-n
 # b: vector of length p
+# cc: matrix with p rows
 
-
-optim1D.cov <- function(a, b)
+optim1D.cov <- function(a, b, cc)
 {
 eps <- 1e-14
 n <- NCOL(a)
 p <- length(b)
 dim(b) <- NULL
 
+## Handle orthogonality constraints 
+## by change of variable
+if (!is.null(cc)) {
+	qrc <- qr(cc)
+	if (qrc$rank == p) 
+		return(list(numeric(p)))
+	qq <- qr.Q(qrc)[,-(1:qrc$rank)]
+	a <- crossprod(qq, a)
+	b <- crossprod(qq, b)
+}
+
 ## Trivial case: b scalar
 if (p == 1L) 
 	return(if (b >= 0) 1 else -1)
 
 ## Trivial case: A = 0
-if (all(a == 0)) {
+if (all(abs(a) <= eps)) {
 	nrm <- sqrt(sum(b^2))
 	if (nrm > eps) {
-		return(list(b/nrm))
+		v <- if (is.null(cc)) {
+			b / nrm } else {
+			as.vector(qq %*% b) / nrm }
+		return(list(v))
 	} 
 	return(list(numeric(p)))
 }
 
 ## SVD of A
-svdA <- svd(a, nu = p, nv = 0)
-P <- svdA$u
-delta <- (svdA$d)^2 
-if (n < p) delta[(n+1):p] <- 0
+svda <- svd(a, nv = 0)
+pos <- (svda$d >= 1e-8 * svda$d[1])
+P <- svda$u[,pos]
+delta <- (svda$d[pos])^2 
+pp <- sum(pos) 
+# pp = number of optimization variables in transformed problem 
 
-## Trivial case: no linear term in objective
-if (all(abs(b) <= eps)) {
-	return(list(as.vector(P[,1])))
-}
-## Trivial case: AA' proportional to identity matrix
-if (abs(delta[p] - delta[1]) <= eps) {
-	return(list(b / sqrt(sum(b^2))))
-}
 ## Change of variables
 b <- as.vector(crossprod(P, b))
+
+## Trivial case: no linear term in objective
 bzero <- (abs(b) <= eps)
 if (all(bzero)) {
-	return(list(as.vector(P[,1])))
+	v <- if (is.null(cc)) {
+		P[,1] } else { as.vector(qq %*% P[,1]) }
+	return(list(v))
 }
 b[bzero] <- 0
 
@@ -86,7 +98,7 @@ objective.best <- -Inf
 if (any(bzero)) {	
 	diff.delta <- outer(-delta, delta[bzero], "+")
 	equal.delta <- abs(diff.delta) <= eps
-	test <- (colSums((!bzero) | equal.delta) == p)
+	test <- (colSums((!bzero) | equal.delta) == pp)
 	if (any(test)) {
 		diff.delta <- diff.delta[, test, drop = FALSE]
 		equal.delta <- equal.delta[, test, drop = FALSE]
@@ -118,7 +130,7 @@ if (any(bzero)) {
 i <- 1
 count <- 1
 bplus <- dplus <- numeric(0)
-while(i <= p) {
+while(i <= pp) {
 	idx <- which(abs(delta - delta[i]) <= eps)
 	dplus[count] <- delta[i]
 	bplus[count] <- sqrt(sum(b[idx]^2))
@@ -176,6 +188,7 @@ idx <- which.max(objective)
 if (objective[idx] > objective.best) { v <- P %*% z[,idx] }
 dim(v) <- NULL
 v <- v / sqrt(sum(v^2))
+if (!is.null(cc)) v <- qq %*% v
 list(v)
 }
 
