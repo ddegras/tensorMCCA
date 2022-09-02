@@ -1,10 +1,10 @@
 
 
-###############################
+###########################################################
 # Internal function for MCCA 
-# Maximize sum of covariances 
-# under block norm constraints 
-###############################
+# Maximize sum of covariances under block norm constraints 
+# and orthogonality constraints on (block) score 
+###########################################################
 
 # This function is not meant to be called by the user
 # It calculates a single set of canonical vectors
@@ -38,7 +38,8 @@ xzero <- logical(m)
 for (i in 1:m) {
 	xzero[i] <- all(abs(range(x[[i]])) <= eps)
 	if (xzero[i])
-		v[[i]] <- lapply(p[[i]], numeric)
+		v[[i]] <- lapply(p[[i]], 
+			function(len) rep(1/sqrt(len), len))
 }
 
 ## Block Coordinate Ascent 
