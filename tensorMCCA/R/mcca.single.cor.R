@@ -33,7 +33,8 @@ xzero <- logical(m)
 for (i in 1:m) {
 	xzero[i] <- all(abs(range(x[[i]])) <= eps)
 	if (xzero[i])
-		v[[i]] <- lapply(p[[i]], numeric)
+		v[[i]] <- lapply(p[[i]], 
+			function(len) rep(1/sqrt(len), len))
 }
 
 
