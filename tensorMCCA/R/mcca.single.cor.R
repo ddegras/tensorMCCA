@@ -7,7 +7,8 @@
 # It calculates a single set of canonical vectors
 # The optimization is conducted one data block at a time
 	
-mcca.single.cor <- function(x, v, w, ortho, sweep, maxit, tol, verbose)
+mcca.single.cor <- function(x, v, w, ortho, sweep, maxit, 
+	tol, verbose)
 {
 	
 ## Data dimensions
