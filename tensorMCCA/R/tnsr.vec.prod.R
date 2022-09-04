@@ -3,10 +3,10 @@ tnsr.vec.prod <- function(x, v, modes = NULL)
 if (length(v) == 0) return(x)
 p <- dim(x) 
 d <- length(p)
+if (!is.list(v)) v <- list(v)
 if (is.null(modes) && length(v) == d) modes <- 1:d
 modes <- as.integer(modes)
 nmodes <- length(modes)
-if (!is.list(v)) v <- list(v)
 if (nmodes > 1 && any(diff(modes) < 0)) {
 	ord <- order(modes)
 	v <- v[ord]

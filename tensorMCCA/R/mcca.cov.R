@@ -70,10 +70,10 @@ if (r > 1) {
 			cnstr = control$ortho$cnstr, 
 			method = control$ortho$method)
 	} else if (ortho == "score" && scale == "block") {
-		ortho.cnstr <- vector("list", m * (r - 1))
-		dim(ortho.cnstr) <- c(m, r)
+		ortho.cnstr <- vector("list", m * (r-1))
+		dim(ortho.cnstr) <- c(m, r-1)
 	} else if (ortho == "score" && scale == "global") {
-		ortho.cnstr <- vector("list", r - 1) 
+		ortho.cnstr <- vector("list", r-1) 
 	}
 }
 
@@ -119,8 +119,9 @@ for (l in 1:r) {
 					score[,i,l-1], d[i]+1)
 		} else if (ortho == "score" && scale == "global") { 
 			score <- global.score[,1:(l-1)]
-			ortho.cnstr[[l-1]] <- tnsr.vec.prod(x[[i]], 
-				score[,l-1], d[i]+1)
+			for (i in 1:m)
+				ortho.cnstr[[i,l-1]] <- tnsr.vec.prod(x[[i]], 
+					score[,l-1], d[i]+1)
 		} else if (ortho == "weight" && scale == "block") {
 			ortho.cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
@@ -132,9 +133,11 @@ for (l in 1:r) {
 
 	## Initialize canonical weights
 	if (is.character(init)) {
-		init.args$x <- if (ortho == "score") {
+		init.args$x <- if (l == 1 || ortho == "weight") {
+			x } else { 
 			deflate.x(x, score = score, scope = scale, 
-				check.args = FALSE) } else x
+				check.args = FALSE)
+		} 
 		v0 <- do.call(mcca.init, init.args)
 	} else if (is.list(init)) {
 		v0 <- if (is.vector(init)) {
@@ -149,41 +152,34 @@ for (l in 1:r) {
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
-	if (optim == "bca") {
-		out <- if (scale == "block") {
-			mcca.cov.block(x = x, v = v0, w = w, 
-				ortho = if (ortho == "score" && l > 1) {
-				ortho.cnstr[,1:(l-1)] } else NULL, 
-				sweep = sweep, maxit = maxit, tol = tol, 
-				verbose = verbose)
-		} else if (scale == "global" && ortho == "weight") {
-			mcca.cov.global.weight(x = x, v = v0, w = w, 
-				ortho = if (l > 1) v[, 1:(l-1)] else NULL, 
-				sweep = sweep, maxit = maxit, tol = tol, 
-				verbose = verbose)
-		} else { # scale == "global" && 	ortho == "score"
-			mcca.cov.global.score(x = x, v = v0, w = w, 
-				ortho = if (l > 1) {
-				ortho.cnstr[, 1:(l-1)] } else NULL, 
-				sweep = sweep, maxit = maxit, tol = tol, 
-				verbose = verbose)
-		}
+	out <- if (optim == "bca" && scale == "block") {
+		mcca.cov.bca.block(x = x, v = v0, w = w, 
+			ortho = if (ortho == "score" && l > 1) {
+			ortho.cnstr[,1:(l-1)] } else NULL, 
+			sweep = sweep, maxit = maxit, tol = tol, 
+			verbose = verbose)
+	} else if (optim == "bca" && scale == "global") { 
+		mcca.cov.bca.global(x = x, v = v0, w = w, 
+			ortho = if (l == 1) { NULL 
+			} else if (ortho == "weight") { v[, 1:(l-1)] 
+			} else ortho.cnstr[,1:(l-1)], 
+			sweep = sweep, maxit = maxit, tol = tol, 
+			verbose = verbose)
 	} else if (optim == "grad.scale") {
-		out <- mcca.gradient.scale(x = x, v = v0, w = w, 
+		mcca.gradient.scale(x = x, v = v0, w = w, 
 			scale = scale, type = "norm", maxit = maxit, 
 			tol = tol, verbose = verbose)
 	} else { # optim == "grad.rotate"
-		out <- mcca.gradient.rotate(x = x, v = v0, w = w, 
+		mcca.gradient.rotate(x = x, v = v0, w = w, 
 			maxit = maxit, tol = tol, verbose = verbose)
-	}
-	
+	}	
 	v[,l] <- out$v 
 	objective[l] <- out$objective
 	block.score[,,l] <- out$y 
 	global.score[,l] <- rowMeans(block.score[,,l]) 
 	iters[l] <- out$iters
 
-	## Transform back canonical tensors to original search space 
+	## Transform back canonical weights to original search space 
 	## if needed
 	if (l > 1 && ortho == "weight" && scale == "block") {
 		v[,l] <- tnsr.rk1.mat.prod(v = v[,l], 

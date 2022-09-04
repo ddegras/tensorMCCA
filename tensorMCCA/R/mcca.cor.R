@@ -135,7 +135,7 @@ for (l in 1:r) {
 
 	## Run MCCA
 	if (verbose) cat("\n\nMCCA: Component",l,"\n")
-	out <- mcca.single.cor(x = x, v = v0, w = w, 
+	out <- mcca.cor.bca(x = x, v = v0, w = w, 
 		ortho = if (ortho == "score" && l > 1) {
 			ortho.cnstr[, 1:(l-1), drop = FALSE] } else NULL,
 		sweep = sweep, maxit = maxit, tol = tol, verbose = verbose)
