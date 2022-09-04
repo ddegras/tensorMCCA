@@ -44,20 +44,25 @@ n <- NCOL(a)
 p <- length(b)
 dim(b) <- NULL
 
-## Handle orthogonality constraints 
-## by change of variable
+## Handle orthogonality constraints by changing variables
 if (!is.null(cc)) {
+	if (is.list(cc)) 
+		cc <- matrix(unlist(cc), p, length(cc))	
 	qrc <- qr(cc)
-	if (qrc$rank == p) 
-		return(list(numeric(p)))
-	qq <- qr.Q(qrc)[,-(1:qrc$rank)]
+	if (qrc$rank == p) return(list(numeric(p)))
+	qq <- qr.Q(qrc, complete = TRUE)[,(qrc$rank + 1):p]
 	a <- crossprod(qq, a)
-	b <- crossprod(qq, b)
+	b <- as.vector(crossprod(qq, b))
 }
 
 ## Trivial case: b scalar
-if (p == 1L) 
-	return(if (b >= 0) 1 else -1)
+if (length(b) == 1L) {
+	v <- if (is.null(cc) && b >= 0) { 1
+	} else if (is.null(cc) && b < 0) { -1
+	} else if (b >= 0) { qq[,1] 
+	} else { -qq[,1] }
+	return(list(v))
+}
 
 ## Trivial case: A = 0
 if (all(abs(a) <= eps)) {
@@ -67,8 +72,10 @@ if (all(abs(a) <= eps)) {
 			b / nrm } else {
 			as.vector(qq %*% b) / nrm }
 		return(list(v))
-	} 
-	return(list(numeric(p)))
+	}
+	v <- if (is.null(cc)) {
+		rep(1/sqrt(p), p) } else { qq[,1] }
+	return(list(v))
 }
 
 ## SVD of A
@@ -79,7 +86,7 @@ delta <- (svda$d[pos])^2
 pp <- sum(pos) 
 # pp = number of optimization variables in transformed problem 
 
-## Change of variables
+## Change variables
 b <- as.vector(crossprod(P, b))
 
 ## Trivial case: no linear term in objective
@@ -195,18 +202,20 @@ list(v)
 
 	
 
-######################################################
-# Maximize (1/n) sum_{t=1:n} < v,a(t) >^2 + 2 < v,b > 
-# subject to < v,v > = 1  with a(t), b, v 2nd order 
-# tensors (v of rank 1)
-######################################################
+##########################################################
+# Maximize (1/n) sum_{t=1:n} (v1' A(t) v2)^2 + 2 v1' B v2  
+# subject to || v1 ||^2 = || v2 ||^2 = 1 
+# and v1' C(l) v2 = 0 for l = 1,2,... 
+# with A(t), B, C(l) matrices and v1, v2 vectors
+##########################################################
 
 ## Inputs: 
-# a:	3D array
-# b:	matrix
-# v:	list of 2 vectors
+# v:	list of 2 vectors (initial solution)
+# a:	3D array (quadratic component of objective)
+# b:	matrix (linear component)
+# cc:	list of matrices or NULL (orthogonality constraints)
 
-optim2D.cov <- function(v, a, b, maxit = 1000, tol = 1e-6)
+optim2D.cov <- function(v, a, b, cc, maxit = 1000, tol = 1e-6)
 {
 ## Data dimensions
 p <- c(length(v[[1]]), length(v[[2]]))
@@ -218,10 +227,16 @@ if (length(dim(a)) == 3L) {
 
 ## Trivial case
 if (all(a == 0)) {
-	svdb <- if (max(p) > 2) svds(b, 1) else svd(b, 1, 1)
+	svdb <- if (min(p) > 2) svds(b, 1) else svd(b, 1, 1)
 	return(list(as.numeric(svdb$u), as.numeric(svdb$v)))
 } 
 
+## Reshape orthogonality constraints if any
+if (!is.null(cc)) {
+	northo <- length(cc)
+	cc <- array(unlist(cc), c(p, northo))
+}
+ccmat <- NULL
 
 ## MAIN LOOP
 objective <- numeric(maxit)
@@ -238,7 +253,12 @@ for (it in 1:maxit) {
 		dim(a) <- dima
 		bb <- b %*% v[[2]]
 	}
-	v[1] <- optim1D.cov(aa, bb)
+	if (!is.null(cc)) {
+		dim(cc) <- c(p[1] * northo, p[2])
+		ccmat <- cc %*% v[[2]]
+		dim(ccmat) <- c(p[1], northo)
+	}
+	v[1] <- optim1D.cov(aa, bb, ccmat)
 		
 	## Update canonical vector in dimension 2
 	if (p[1] == 1L) {
@@ -252,7 +272,13 @@ for (it in 1:maxit) {
 		dim(a) <- dima
 		bb <- crossprod(b, v[[1]])
 	}
-	v[2] <- optim1D.cov(aa, bb)
+	if (!is.null(cc)) {
+		dim(cc) <- c(p[1], northo * p[2])
+		ccmat <- crossprod(v[[1]], cc)
+		dim(ccmat) <- c(northo, p[2])
+		ccmat <- t(ccmat)
+	}
+	v[2] <- optim1D.cov(aa, bb, ccmat)
 	
 	## Calculate objective
 	objective[it] <- if (p[2] == 1) {
@@ -272,18 +298,19 @@ return(v)
 	
 
 ######################################################
-# Maximize (1/n) sum_{t=1:n} < v,a(t) >^2 + 2 < v,b > 
-# subject to < v,v > = 1  with a(t), b, v 3rd order 
-# tensors (v of rank 1)
+# Maximize (1/n) sum_{t=1:n} < v,A(t) >^2 + 2 < v,B > 
+# subject to < v,v > = 1 and < C(l),v > = 0 for l=1,2,...
+# with A(t), B, v 3rd order tensor arrays, v rank-1
 ######################################################
 
 
 ## Inputs: 
-# v:	 list of 3 vectors
-# a:	 4D array 
-# b:	 3D array
+# v:	list of 3 vectors (initial solution)
+# a:	4D array (quadratic component of objective)
+# b:	3D array (linear component of objective)
+# cc: 	list of 3D arrays (orthogonality constraints)
 
-optim3D.cov <- function(v, a, b, maxit = 1000, tol = 1e-6)
+optim3D.cov <- function(v, a, b, cc, maxit = 1000, tol = 1e-6)
 {
 	
 ## Data dimensions
@@ -292,12 +319,22 @@ p <- dima[1:3]
 n <- dima[4]
 
 ## Trivial case
-if (all(a == 0))
-	return(tnsr3d.rk1(b, maxit, tol))
+if (all(a == 0) && is.null(cc)) {
+	v <- scale.v(tnsr3d.rk1(b, maxit, tol))
+	return(v)
+}
 
+## Reshape orthogonality constraints
+if (!is.null(cc)) {
+	if (is.list(cc)) 
+		cc <- array(unlist(cc), c(p, length(cc)))
+	northo <- dim(cc)[4]
+	if (all(abs(cc) <= 1e-14)) cc <- NULL
+}
+ 
 ## MAIN LOOP
 objective <- numeric(maxit)
-
+ccmat <- NULL
 for (it in 1:maxit) {
 	
 	## Update canonical vector in dimension k = 1,2,3
@@ -337,7 +374,15 @@ for (it in 1:maxit) {
 			bb <- bb %*% v[[i2]]
 		}
 		dim(aa) <- c(p[k], n)	
-		v[[k]] <- unlist(optim1D.cov(aa, bb))
+		if (!is.null(cc)) {
+			ccmat <- aperm(cc, c(i1, k, 4, i2))
+			dim(ccmat) <- c(p[i1], p[k] * northo * p[i2])
+			ccmat <- crossprod(v[[i1]], ccmat)
+			dim(ccmat) <- c(p[k] * northo, p[i2])
+			ccmat <- ccmat %*% v[[i2]]
+			dim(ccmat) <- c(p[k], northo)
+		}
+		v[k] <- optim1D.cov(aa, bb, ccmat)
 	}
 	
 	## Calculate objective
@@ -356,18 +401,20 @@ return(v)
 
 
 ######################################################
-# Maximize (1/n) sum_{t=1:n} < v,a(t) >^2 + 2 < v,b > 
-# subject to < v,v > = 1  with a(t), b, v general order 
-# tensors (v of rank 1)
+# max_v (1/n) sum_{t=1:n} < v,a(t) >^2 + 2 < v,b > 
+# subject to < v,v > = 1  and < c(l),v > = 0, l=1,2,...
+# with a(t), b, c(l), and v tensors of same dimensions
+# (v of rank 1)
 ######################################################
 
 
 ## Inputs: 
 # v:	list of d vectors
-# a:	array with (d+1) dimensions 
-# b:	array with d dimensions
+# a:	(d+1)-dimensional array  
+# b:	d-dimensional array 
+# cc:	list of d-dimensional arrays
 
-optim.gen.cov <- function(v, a, b, maxit = 1000, tol = 1e-6)
+optim.gen.cov <- function(v, a, b, cc, maxit = 1000, tol = 1e-6)
 {
 	
 ## Data dimensions
@@ -375,11 +422,12 @@ dima <- dim(a)
 d <- length(v)
 
 ## Trivial case
-if (all(a == 0))
+if (all(a == 0) && is.null(cc))
 	return(tnsr.rk1(b, maxit, tol))
 
 ## MAIN LOOP
 objective <- -Inf
+ccmat <- NULL
 
 for (it in 1:maxit) {
 
@@ -389,7 +437,10 @@ for (it in 1:maxit) {
 	for (k in 1:d) { 
 		aa <- tnsr.vec.prod(a, v[-k], (1:d)[-k])
 		bb <- tnsr.vec.prod(b, v[-k], (1:d)[-k])
-		v[k] <- optim1D.cov(aa, bb)
+		if (!is.null(cc)) 
+			ccmat <- sapply(cc, tnsr.vec.prod, 
+				v = v[-k], modes = (1:d)[-k])
+		v[k] <- optim1D.cov(aa, bb, ccmat)
 	}
 
 	## Calculate objective

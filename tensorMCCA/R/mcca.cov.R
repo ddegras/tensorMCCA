@@ -149,22 +149,31 @@ for (l in 1:r) {
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
-	out <- if (optim == "bca" && scale == "block") {
-		mcca.single.block.cov(x = x, v = v0, w = w, 
-			ortho = if (ortho == "score" && l > 1) {
-			ortho.cnstr[,1:(l-1)] } else NULL, sweep = sweep, 
-			maxit = maxit, tol = tol, verbose = verbose)
-	} else if (optim == "bca" && scale == "global") {
-		mcca.single.global.cov(x = x, v = v0, w = w, 
-			ortho = if (l > 1) v[, 1:(l-1)] else NULL, 
-			sweep = sweep, maxit = maxit, tol = tol, 
-			verbose = verbose)
+	if (optim == "bca") {
+		out <- if (scale == "block") {
+			mcca.cov.block(x = x, v = v0, w = w, 
+				ortho = if (ortho == "score" && l > 1) {
+				ortho.cnstr[,1:(l-1)] } else NULL, 
+				sweep = sweep, maxit = maxit, tol = tol, 
+				verbose = verbose)
+		} else if (scale == "global" && ortho == "weight") {
+			mcca.cov.global.weight(x = x, v = v0, w = w, 
+				ortho = if (l > 1) v[, 1:(l-1)] else NULL, 
+				sweep = sweep, maxit = maxit, tol = tol, 
+				verbose = verbose)
+		} else { # scale == "global" && 	ortho == "score"
+			mcca.cov.global.score(x = x, v = v0, w = w, 
+				ortho = if (l > 1) {
+				ortho.cnstr[, 1:(l-1)] } else NULL, 
+				sweep = sweep, maxit = maxit, tol = tol, 
+				verbose = verbose)
+		}
 	} else if (optim == "grad.scale") {
-		mcca.gradient.scale(x = x, v = v0, w = w, scale = scale, 
-			type = "norm", maxit = maxit, tol = tol, 
-			verbose = verbose)
-	} else { 
-		mcca.gradient.rotate(x = x, v = v0, w = w, 
+		out <- mcca.gradient.scale(x = x, v = v0, w = w, 
+			scale = scale, type = "norm", maxit = maxit, 
+			tol = tol, verbose = verbose)
+	} else { # optim == "grad.rotate"
+		out <- mcca.gradient.rotate(x = x, v = v0, w = w, 
 			maxit = maxit, tol = tol, verbose = verbose)
 	}
 	

@@ -1,7 +1,4 @@
-##########################################
-# FUNCTIONS TO APPROXIMATE RANK-1 TENSORS 
-##########################################
-
+## INTERNAL FUNCTIONS
 
 ##############################################
 # Function to approximate a tensor of general 
@@ -156,16 +153,19 @@ v
 
 
 
-#################################################
-# Function to approximate several rank-1 tensors
+#########################################
+# Function to approximate rank-1 tensors
 # under orthogonality constraints 
-#################################################
+#########################################
 
-# Internal function
 
-# Targets: rank-1 tensors v0(1), ..., v0(m)
-# specified as lists of vectors v0(i,k), i=1,...,m, k=1,...,d(i)
-# Orthogonality constraints: tensors vl(i), l=1,...,r, i=1,...,m 
+## Inputs
+# v0:	list of rank-1 tensors (targets) each specified as a list of vectors
+# ortho: list of tensors or NULL (orthogonality constraints) 
+
+# Calling m the length of 'v0', 'ortho' should be a matrix (of lists) 
+# with m rows. The entry ortho[[i,l]] should be an array with same dimensions
+# as those specified by v0[[i]], which is a list of vectors.  
  
 
 tnsr.rk1.ortho <- function(v0, ortho, maxit, tol)

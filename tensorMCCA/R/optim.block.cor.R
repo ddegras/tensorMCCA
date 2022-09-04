@@ -46,7 +46,6 @@ p <- length(a)
 if (!is.null(cc)) {
 	if (is.list(cc)) 
 		cc <- matrix(unlist(cc), p, length(cc))
-	ncc <- ncol(cc)
 	qrc <- qr(cc)
 	if (qrc$rank == p) return(list(numeric(p)))
 	Q <- qr.Q(qrc, complete = TRUE)[, (qrc$rank + 1):p]
@@ -162,10 +161,12 @@ v
 
 ###################################################
 # Maximize inner product of rank-1 3D tensor 
-# with fixed 3D tensor under quadratic constraints
-# max < v,a > subject to (1/n) sum_t (< v,b(t) >)^2 = 1
+# with fixed 3D tensor under quadratic scaling 
+# constraints and orthogonality constraints
+# max_v < v,a > with v rank 1 subject to 
+# (1/n) sum_t (< v,b(t) >)^2 = 1
+# and < C(l), v > = 0 for l = 1, 2, ...
 ###################################################
-
 
 ## Inputs: 
 ## v:	initial solution (list of 3 vectors)
@@ -181,14 +182,12 @@ dimb <- dim(b)
 p <- dimb[1:3]
 n <- dimb[4]
 
+## Reshape orthogonality constraints
 if (!is.null(cc)) {
 	if (is.list(cc)) 
 		cc <- array(unlist(cc), c(p, length(cc)))
 	northo <- dim(cc)[4]
-	if (all(abs(cc) <= 1e-14)) {
-		cc <- NULL
-	} else if (any(p == 1)) {
-		 return(lapply(p, numeric)) } 
+	if (all(abs(cc) <= 1e-14)) cc <- NULL
 }
 
 ## MAIN LOOP
@@ -259,16 +258,18 @@ v
 
 ########################################################
 # Maximize inner product of rank-1 tensor 
-# with fixed tensor under quadratic constraints
-# max < v,a > subject to (1/n) sum_t (< v,b(t) >)^2 = 1
+# with fixed tensor under quadratic scaling constraints
+# and orthogonality constraints
+# max_v < v,a > subject to (1/n) sum_t (< v,b(t) >)^2 = 1
+# and < c(l),v > = 0 for l = 1, 2, ...
 ########################################################
 
 
 ## Inputs: 
-# v:	 list of d vectors
-# a:	 array with d dimensions 
-# b:	 array with (d+1) dimensions
-
+# v:	list of d vectors
+# a:	array with d dimensions 
+# b:	array with (d+1) dimensions
+# cc:	list of d-dimensional arrays
 # The lengths of the vectors in v, the dimensions of a, 
 # and the first d dimensions of b must all match
 
