@@ -50,7 +50,7 @@ if (!is.null(cc)) {
 		cc <- matrix(unlist(cc), p, length(cc))	
 	qrc <- qr(cc)
 	if (qrc$rank == p) return(list(numeric(p)))
-	qq <- qr.Q(qrc, complete = TRUE)[,(qrc$rank + 1):p]
+	qq <- qr.Q(qrc, complete = TRUE)[, -(1:qrc$rank), drop = FALSE]
 	a <- crossprod(qq, a)
 	b <- as.vector(crossprod(qq, b))
 }

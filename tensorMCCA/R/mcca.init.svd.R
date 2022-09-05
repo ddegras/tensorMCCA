@@ -28,30 +28,31 @@ xmat <- do.call(rbind, xmat)
 if (center) 
 	xmat <- xmat - rowMeans(xmat)
 
+## Catch trivial case
+if (all(xmat == 0)) {
+	for (i in 1:m) 
+		v[[i]] <- lapply(p[[i]], 
+			function(len) rep(1/sqrt(len), len))
+	return(v)
+}
+
 ## Initial SVD
 xmat <- if (all(dim(xmat) > 2)) {
 	svds(xmat, k = 1, nv = 0)$u 
 } else svd(xmat, nu = 1, nv = 0)$u
+dim(xmat) <- NULL
+
 
 ## Iteratively unfold singular vectors and recalculate SVD
 lenx <- sapply(p, prod)
 start <- c(0, cumsum(lenx[-m])) + 1
 end <- cumsum(lenx)
 for (i in 1:m) {
-	pi <- p[[i]]
 	xi <- xmat[start[i]:end[i]]
-	for (k in 1:d[i]) {	
-		if (k < d[i]) {
-			dim(xi) <- c(pi[k], length(xi) / pi[k])
-			svdx <- if (all(dim(xi) > 2)) {
-				svds(xi, k = 1)
-			} else svd(xi, nu = 1, nv = 1)
-			v[[i]][[k]] <- svdx$u
-			xi <- svdx$v
-		} else {
-			v[[i]][[k]] <- xi 
-		}	
-	}
+	if (d[i] > 1) dim(xi) <- p[[i]]
+	v[[i]] <- if (all(xi == 0)) {
+		lapply(p[[i]], function(len) rep(1/sqrt(len), len))
+	} else { hosvd(xi, 1)$vectors }
 }
 
 ## Scale initial canonical vectors as needed	

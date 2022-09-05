@@ -48,21 +48,25 @@ if (!is.null(cc)) {
 		cc <- matrix(unlist(cc), p, length(cc))
 	qrc <- qr(cc)
 	if (qrc$rank == p) return(list(numeric(p)))
-	Q <- qr.Q(qrc, complete = TRUE)[, (qrc$rank + 1):p]
+	Q <- qr.Q(qrc, complete = TRUE)[, -(1:qrc$rank), drop = FALSE]
 	a <- crossprod(Q, a)
 	b <- crossprod(Q, b)
 }
-if (length(a) == 1) 
-	return(sign(a) / sqrt(mean(b^2)))
+if (length(a) == 1) {
+	v <- as.numeric(sign(a)) / sqrt(mean(b^2))
+	if (is.nan(v)) v <- 0
+	if (!is.null(cc)) v <- v * Q
+	return(list(as.vector(v)))
+}
 eps <- 1e-14
 n <- ncol(b)
 sigma <- tcrossprod(b) / n
 v <- tryCatch(solve(sigma, a), error = function(e) numeric(0))
 if (length(v) == 0) v <- ginv(sigma) %*% a
-dim(v) <- NULL
 s <- sum(a * v)
 v <- if (s > eps) v / sqrt(s) else numeric(length(v))
 if (!is.null(cc)) v <- Q %*% v
+dim(v) <- NULL
 list(v)
 }
 

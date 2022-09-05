@@ -31,6 +31,8 @@ score <- matrix(0, n, m) # canonical scores <X_it, v_i>
 wiizero <- (diag(w) == 0)
 s <- ifelse(wiizero, rep(1,m), diag(w)) # scaling term 
 if (sweep == "cyclical") idxi <- 1:m
+if (!is.null(ortho) && !is.matrix(ortho)) 
+	dim(ortho) <- c(m, 1)
 
 ## Check if some datasets are zero
 eps <- 1e-14
@@ -41,7 +43,10 @@ for (i in 1:m) {
 		v[[i]] <- lapply(p[[i]], 
 			function(len) rep(1/sqrt(len), len))
 }
-
+if (all(xzero))
+	return(list(v = v, score = score, objective = 0, iters = 1, 
+		trace = 0))
+	
 ## Block coordinate ascent 
 for (it in 1:maxit) {
 	if (sweep == "random") idxi <- sample(m)
@@ -80,7 +85,7 @@ for (it in 1:maxit) {
 	    	tol * max(1, objective[it])) break
 }
 
-list(v = vbest, y = canon.scores(x, vbest), 
+list(v = vbest, score = canon.scores(x, vbest), 
 	objective = objective.best, iters = it, 
 	trace = objective[1:(it+1)])
 }
@@ -120,6 +125,13 @@ objective[1] <- objective.internal(x, v, w)
 if (verbose) 
 	cat("\nIteration", 0, "Objective", objective[1])
 
+## Catch trivial case
+if (all(unlist(x) == 0)) {
+	p <- unlist(p)
+	return(list(v = relist(rep(1/sqrt(p), p), v), 
+		score = matrix(0, n, m), objective = 0, iters = 1, trace = 0))
+}
+
 ## Identify type of orthogonality constraints
 ortho.type <- if (is.numeric(ortho[[1]])) { "score" 
 	} else if (is.list(ortho[[1]])) { "weight"
@@ -148,10 +160,9 @@ nrmt.mk <- numeric(m) # products of norms of canonical vectors
 csumw <- colSums(w)
 separable.w <- isTRUE(all.equal(w, tcrossprod(csumw)))
 
-
-## Ensure that orthogonality constraints are in a matrix
+## Ensure that orthogonality constraints are in matrix format
 if (!is.null(ortho)) {
-	if (!is.matrix(ortho)) ortho <- as.matrix(ortho)
+	if (!is.matrix(ortho)) dim(ortho) <- c(m,1)
 	northo <- ncol(ortho)
 	cpfun <- function(x, y) sum(x * y)
 }
@@ -191,7 +202,8 @@ for (it in 1:maxit) {
 		start <- cumsum(c(0, pg[-groupsize])) + 1
 		end <- cumsum(pg)
 		xv <- matrix(0, sum(pg), n)
-		vortho <- matrix(0, sum(pg), northo)	
+		if (!is.null(ortho)) 
+			vortho <- matrix(0, sum(pg), northo)	
 		for (ii in 1:groupsize) {
 			i <- idxg[ii]
 			k <- group[i,g] # selected mode for optimization
@@ -238,6 +250,8 @@ for (it in 1:maxit) {
 				svds(xv, k = 1, nu = 1, nv = 0)
 			} else { svd(xv, nu = 1, nv = 0) }
 			vg <- svdxv$u
+			if (all(is.nan(vg))) 
+				vg <- rep(1/sqrt(length(vg)), length(vg))
 		} else {
 			# Case: objective weight matrix nonseparable (EVD)
 			xv <- tcrossprod(xv)
@@ -271,6 +285,8 @@ for (it in 1:maxit) {
 				eigs_sym(xv, k = 1, which = "LA") 
 			} else { eigen(xv, TRUE) }
 			vg <- eigxv$vectors[,1]
+			if (all(is.nan(vg)))
+				vg <- rep(1/sqrt(length(vg)), length(vg))
 		}
 							
 		## Update canonical weight vectors
@@ -296,7 +312,7 @@ for (it in 1:maxit) {
 		max(1, tol) * abs(objective[it])) break
 }
 
-list(v = v, y = canon.scores(x, v), objective = objective[it+1], 
+list(v = v, score = canon.scores(x, v), objective = objective[it+1], 
 	iters = it, trace = objective[1:(it+1)])
 
 }

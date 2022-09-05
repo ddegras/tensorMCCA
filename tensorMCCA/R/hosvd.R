@@ -2,14 +2,13 @@
 hosvd <- function(x, r = NULL)
 {
 stopifnot(is.numeric(x))
-if (is.vector(x)) {
-	d <- 1L
+if (length(dim(x)) <= 1) {
 	p <- length(x) 
 	r <- 1L
 } else {
-	d <- length(p) 
 	p <- dim(x)
 }
+d <- length(p) 
 if (is.null(r)) {
 	r <- p 
 } else {
@@ -22,9 +21,10 @@ if (is.null(r)) {
 if (d == 1L) {
 	nrm <- sqrt(sum(x^2))
 	if (nrm == 0) {
-		return(list(vectors = rep.int(1/sqrt(p), p), core = 0))
+		return(list(vectors = list(rep.int(1/sqrt(p), p)), 
+			core = 0))
 	} else {
-		return(list(vectors = x / nrm, core = nrm))
+		return(list(vectors = list(x/nrm), core = nrm))
 	}
 }
 if (d == 2L) {

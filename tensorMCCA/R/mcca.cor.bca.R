@@ -78,7 +78,7 @@ for (it in 1:maxit) {
 	    	tol * max(1, objective[it])) break
 }
 
-list(v = vbest, y = canon.scores(x, vbest), 
+list(v = vbest, score = canon.scores(x, vbest), 
 	objective = objective.best, iters = it, 
 	trace = objective[1:(it+1)])
 }

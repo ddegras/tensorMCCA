@@ -63,18 +63,16 @@ r <- if (ortho == "score" && scale == "block") {
 }
 
 ## Set orthogonality constraints
-ortho.cnstr <- NULL
+# ortho.cnstr <- NULL
 if (r > 1) {
 	if (ortho == "weight" && scale == "block") {
 		ortho.mode <- set.ortho.mode(x, r, 
 			cnstr = control$ortho$cnstr, 
 			method = control$ortho$method)
-	} else if (ortho == "score" && scale == "block") {
+	} else if (ortho == "score") {
 		ortho.cnstr <- vector("list", m * (r-1))
 		dim(ortho.cnstr) <- c(m, r-1)
-	} else if (ortho == "score" && scale == "global") {
-		ortho.cnstr <- vector("list", r-1) 
-	}
+	} 
 }
 
 ## Set up initialization parameters
@@ -118,7 +116,7 @@ for (l in 1:r) {
 				ortho.cnstr[[i,l-1]] <- tnsr.vec.prod(x[[i]], 
 					score[,i,l-1], d[i]+1)
 		} else if (ortho == "score" && scale == "global") { 
-			score <- global.score[,1:(l-1)]
+			score <- global.score[,1:(l-1), drop = FALSE]
 			for (i in 1:m)
 				ortho.cnstr[[i,l-1]] <- tnsr.vec.prod(x[[i]], 
 					score[,l-1], d[i]+1)
@@ -175,7 +173,7 @@ for (l in 1:r) {
 	}	
 	v[,l] <- out$v 
 	objective[l] <- out$objective
-	block.score[,,l] <- out$y 
+	block.score[,,l] <- out$score
 	global.score[,l] <- rowMeans(block.score[,,l]) 
 	iters[l] <- out$iters
 

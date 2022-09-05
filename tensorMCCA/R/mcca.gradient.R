@@ -71,7 +71,7 @@ for (it in 1:maxit) {
 	if (it > 1 && increase <= tol * max(1, abs(objective[it]))) break	
 }								
 
-list(v = v, y = canon.scores(x, v), objective = objective[it + 1L], 
+list(v = v, score = canon.scores(x, v), objective = objective[it + 1L], 
 	iters = it, trace = objective[1:(it+1)])
 }
 
@@ -163,7 +163,7 @@ for (it in 1:maxit) {
 	
 }								
 
-list(v = v, y = canon.scores(x, v), objective = objective[it + 1L], 
+list(v = v, score = canon.scores(x, v), objective = objective[it + 1L], 
 	iters = it, trace = objective[1:(it+1)])
 }
 

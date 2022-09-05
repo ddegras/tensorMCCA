@@ -141,7 +141,7 @@ for (l in 1:r) {
 		sweep = sweep, maxit = maxit, tol = tol, verbose = verbose)
 	v[,l] <- out$v
 	objective[l] <- out$objective
-	block.score[,,l] <- out$y 
+	block.score[,,l] <- out$score
 	global.score[,l] <- rowMeans(block.score[,,l])	
 	iters[l] <- out$iters	
 	
