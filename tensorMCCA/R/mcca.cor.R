@@ -30,6 +30,10 @@ w <- if (length(w) == 1) {
 ortho <- match.arg(ortho)
 sweep <- match.arg(sweep)
 optim <- match.arg(optim)
+if (optim == "gradient.scale" && ortho == "score" && r > 1)
+	stop(paste("The gradient-based optimization method", 
+	"cannot handle orthogonality constraints on scores.",
+	"To use this method, set 'ortho' to 'weight' or 'r' to 1."))
 if (is.character(init)) init <- match.arg(init)
 
 ## Set initialization method
@@ -86,9 +90,17 @@ dim(v) <- c(m, r)
 block.score <- array(0, c(n, m, r)) 
 global.score <- matrix(0, n, r) 
 objective <- iters <- numeric(r)
-input <- list(objective = "cor", r = r0, w = w, 
-	ortho = ortho, init = init, maxit = maxit, 
-	tol = tol, sweep = sweep, control = control)
+call.args <- list(objective = "cor", r = NULL, w = w, 
+	scale = "block", ortho.type = ortho, ortho.cnstr = NULL, 
+	init.method = NULL, init.args = init.args, init.val = NULL,
+	maxit = maxit, tol = tol, sweep = sweep, control = control) 
+if (ortho == "weight" && scale == "block")
+	call.args$ortho.cnstr <- ortho.mode
+if (is.character(init)) { 
+	call.args$init.method <- init
+} else {
+	call.args$init.val <- init
+}
 
 
 ## MAIN LOOP
@@ -135,10 +147,16 @@ for (l in 1:r) {
 
 	## Run MCCA
 	if (verbose) cat("\n\nMCCA: Component",l,"\n")
-	out <- mcca.cor.bca(x = x, v = v0, w = w, 
+	out <- if (optim == "bca") {
+		mcca.cor.bca(x = x, v = v0, w = w, 
 		ortho = if (ortho == "score" && l > 1) {
 			ortho.cnstr[, 1:(l-1), drop = FALSE] } else NULL,
 		sweep = sweep, maxit = maxit, tol = tol, verbose = verbose)
+	} else { 
+		mcca.gradient.scale(x = x, v = v0, w = w, 
+			scale = "block", type = "var", maxit = maxit, 
+			tol = tol, verbose = verbose)
+	}
 	v[,l] <- out$v
 	objective[l] <- out$objective
 	block.score[,,l] <- out$score
