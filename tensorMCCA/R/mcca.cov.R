@@ -63,7 +63,6 @@ r <- if (ortho == "score" && scale == "block") {
 }
 
 ## Set orthogonality constraints
-# ortho.cnstr <- NULL
 if (r > 1) {
 	if (ortho == "weight" && scale == "block") {
 		ortho.mode <- set.ortho.mode(x, r, 
@@ -77,6 +76,7 @@ if (r > 1) {
 
 ## Set up initialization parameters
 test <- (is.list(control) && !is.null(control$init))
+init.args <- NULL
 if (identical(init, "cca")) {
 	init.args <- list(k = NULL, w = w, 
 		objective = "cov", scale = "block", center = FALSE, 
@@ -98,11 +98,17 @@ dim(v) <- c(m, r)
 block.score <- array(0, c(n, m, r)) # canonical scores
 global.score <- matrix(0, n, r) 
 objective <- iters <- numeric(r)
-input <- list(objective = "covariance", r = r0, w = w, 
-	scale = scale, ortho = ortho, init = init, maxit = maxit, 
-	tol = tol, sweep = sweep, control = control) 
-
-
+call.args <- list(objective = "cov", r = NULL, w = w, 
+	scale = scale, ortho.type = ortho, ortho.cnstr = NULL, 
+	init.method = NULL, init.args = init.args, init.val = NULL,
+	maxit = maxit, tol = tol, sweep = sweep, control = control) 
+if (ortho == "weight" && scale == "block")
+	call.args$ortho.cnstr <- ortho.mode
+if (is.character(init)) { 
+	call.args$init.method <- init
+} else {
+	call.args$init.val <- init
+}
 
 ## MAIN LOOP
 for (l in 1:r) {	
@@ -131,22 +137,24 @@ for (l in 1:r) {
 
 	## Initialize canonical weights
 	if (is.character(init)) {
-		init.args$x <- if (l == 1 || ortho == "weight") {
-			x } else { 
+		init.args$x <- if (ortho == "score" && l > 1) {
 			deflate.x(x, score = score, scope = scale, 
-				check.args = FALSE)
-		} 
+				check.args = FALSE) } else x 
 		v0 <- do.call(mcca.init, init.args)
 	} else if (is.list(init)) {
 		v0 <- if (is.vector(init)) {
 			init } else { init[, min(l, ncol(init))] }
-		if (l > 1 && ortho == "weight" && scale == "block") {
+		if (ortho == "weight" && scale == "block" && l > 1) 
 			v0 <- tnsr.rk1.mat.prod(v0, mat = ortho.cnstr$mat, 
 				modes = ortho.cnstr$modes, transpose.mat = FALSE)
-		}
 		v0 <- scale.v(v0, type = "norm", scale = scale, 
 			check.args = FALSE)
 	}
+	if (ortho == "score" && l > 1) {
+		v0 <- tnsr.rk1.ortho(v0, ortho.cnstr[, 1:(l-1), drop = FALSE], 
+			maxit = 100L, tol = 1e-6)
+		v0 <- scale.v(v0, type = "norm", x = x, check.args = FALSE)
+	}	
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
@@ -203,6 +211,9 @@ if (!identical(o, 1:r)) {
 }
 
 r <- length(o)
+call.args$r <- r
+if (ortho == "score") 
+	call.args$ortho.cnstr <- ortho.cnstr
 if (r == 1) {
 	dim(block.score) <- c(n, m)
 	dim(global.score) <- NULL
@@ -213,7 +224,7 @@ block.score[abs(block.score) < eps] <- 0
 global.score[abs(global.score) < eps] <- 0
 
 list(v = v, block.score = block.score, global.score = global.score,
-	objective = objective, iters = iters, input = input)
+	objective = objective, iters = iters, call.args = args)
 }
 
 
