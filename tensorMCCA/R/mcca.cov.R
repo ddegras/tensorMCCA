@@ -129,9 +129,12 @@ for (l in 1:r) {
 		} else if (ortho == "weight" && scale == "block") {
 			ortho.cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
-			x <- deflate.x(x0, v = v[, 1:(l-1)], 
-				ortho.mode = ortho.mode[, 1:(l-1), l], 
-				check.args = FALSE)	
+			x <- mapply(tnsr.mat.prod, x = x0, 
+				mat = ortho.cnstr$mat, modes = ortho.cnstr$modes, 
+				SIMPLIFY = FALSE)			
+			# x <- deflate.x(x0, v = v[, 1:(l-1)], 
+				# ortho.mode = ortho.mode[, 1:(l-1), l], 
+				# check.args = FALSE)	
 		} 
 	}
 
@@ -168,9 +171,8 @@ for (l in 1:r) {
 		mcca.cov.bca.global(x = x, v = v0, w = w, 
 			ortho = if (l == 1) { NULL 
 			} else if (ortho == "weight") { v[, 1:(l-1)] 
-			} else ortho.cnstr[,1:(l-1)], 
-			sweep = sweep, maxit = maxit, tol = tol, 
-			verbose = verbose)
+			} else ortho.cnstr[,1:(l-1)], sweep = sweep, 
+			maxit = maxit, tol = tol, verbose = verbose)
 	} else if (optim == "grad.scale") {
 		mcca.gradient.scale(x = x, v = v0, w = w, 
 			scale = scale, type = "norm", maxit = maxit, 
@@ -224,7 +226,7 @@ block.score[abs(block.score) < eps] <- 0
 global.score[abs(global.score) < eps] <- 0
 
 list(v = v, block.score = block.score, global.score = global.score,
-	objective = objective, iters = iters, call.args = args)
+	objective = objective, iters = iters, call.args = call.args)
 }
 
 
