@@ -1,8 +1,8 @@
-mcca.perm <- function(x, obj, call.args, l)
+mcca.perm <- function(x, obj, l)
 {
 ## Define variables with shorter names for easier handling
-for (name in names(call.args))
-	assign(call.args[[name]], name)
+for (name in names(obj$call.args))
+	assign(obj$call.args[[name]], name)
 v <- obj$v
 normvar <- switch(objective, cov = "norm", cor = "var")
 
