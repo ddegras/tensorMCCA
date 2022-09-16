@@ -90,7 +90,7 @@ dim(v) <- c(m, r)
 block.score <- array(0, c(n, m, r)) 
 global.score <- matrix(0, n, r) 
 objective <- iters <- numeric(r)
-call.args <- list(objective = "cor", r = NULL, w = w, 
+call.args <- list(objective.type = "cor", r = NULL, w = w, 
 	scale = "block", ortho.type = ortho, ortho.cnstr = NULL, 
 	init.method = NULL, init.args = init.args, init.val = NULL,
 	maxit = maxit, tol = tol, sweep = sweep, control = control) 
