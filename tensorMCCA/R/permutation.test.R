@@ -8,16 +8,17 @@ dimx <- lapply(x, dim)
 d <- sapply(dimx, length) - 1
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 r <- obj$call.args$r
-rhohat <- obj$objective
-fields <- c("ortho.type", "ortho.cnstr", "scope")
+fields <- c("init.val", "objective.type", "ortho.type", 
+	"ortho.cnstr", "scale", "scope")
 for (name in fields) 
 	assign(obj$call.args[[name]], name)
+if ((!is.null(init.val)) && (!is.matrix(init.val))) 
+	dim(init.val) <- c(m, 1)
 v <- obj$v
 
 ## Center data
 for(i in 1:m) {
-	d <- length(dim(x[[i]])) - 1
-    xbar <- rowMeans(x[[i]], dims = d)
+    xbar <- rowMeans(x[[i]], dims = d[i])
     x[[i]] <- x[[i]] - as.vector(xbar)
 }
 
@@ -29,34 +30,45 @@ if (r > 1) {
 		if (ortho.type == "weight" && scope == "block") {
 			ortho.cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
-			xfltd[,l-1] <- mapply(tnsr.mat.prod, x = x, 
+			xdfl[,l-1] <- mapply(tnsr.mat.prod, x = x, 
 				mat = ortho.cnstr$mat, modes = ortho.cnstr$modes, 
 				SIMPLIFY = FALSE) 
-			# if (is.list(obj$init)) { ... }
+			if ((!is.null(init.val)) && l <= ncol(init.val)) 
+				init.val[,l] <- tnsr.rk1.mat.prod(init.val[,l], 
+					mat = ortho.cnstr$mat, modes = ortho.cnstr$modes, 
+					transpose.mat = FALSE)
 		} else if (ortho.type == "weight" && scope == "global") {
 			xdfl[,l-1] <- deflate.x(x, v = v[, 1:(l-1)], 
 				check.args = FALSE)
-			# if (is.list(obj$init)) { ... }
 		} else if (ortho.type == "score" && scope == "block") {
 			xdfl[,l-1] <- deflate.x(x, 
 				score = obj$block.score[,,1:(l-1)],
 				scope = "block", check.args = FALSE)	
-			# if (is.list(obj$init)) { ... }
 		} else if (ortho.type == "score" && scope == "global") {
 			xdfl[,l-1] <- deflate.x(x, 
 				score = obj$global.score[,1:(l-1)],
 				scope = "global", check.args = FALSE)			
-			# if (is.list(obj$init)) { ... }
 		}
 	}	
 }
 
+## Scale initial canonical weights if provided
+objective.cov <- (objective.type == "cov")
+if (!is.null(init.val)) {
+	for (l in 1:ncol(init.val)) 
+		obj$call.args$init.val[,l] <- scale.v(init.val[,l], 
+			type = if (objective.cov) "norm" else "var",
+			scale = scale, x = if (objective.cov) NULL else x,
+			check.args = FALSE)
+}
+
+
 ## MAIN LOOP
 if (parallel && require(foreach) && getDoParRegistered()) {
-	rhostar <- foreach(j = 1:nperm, .combine = rbind) %dopar% {
+	rhoperm <- foreach(j = 1:nperm, .combine = rbind) %dopar% {
 		set.seed(j)
 		perm <- sample(n)
-		rho <- numeric(r) # canonical correlations
+		rhopermj <- numeric(r) # canonical correlations
 		for (l in 1:r) {
 			xx <- if (l == 1) x else xdfl[,l-1]
 			for (i in 1:m) {
@@ -64,14 +76,12 @@ if (parallel && require(foreach) && getDoParRegistered()) {
 				xx[[i]] <- xx[[i]][, perm]
 				dim(x[[i]]) <- dimx[[i]]
 			}
-			
-			# ...
-			# rho[l] <- mcca.perm()
+			rhopermj[l] <- mcca.perm(xx, obj, l)
 		}
-		rho
+		rhopermj
 	}
 } else {
-	rhostar <- matrix(, nperm, r)
+	rhoperm <- matrix(, nperm, r)
 	for(j in 1:nperm) {
 		set.seed(j)
 		perm <- sample(n)
@@ -81,17 +91,18 @@ if (parallel && require(foreach) && getDoParRegistered()) {
 				dim(xx[[i]]) <- c(prod(p[[i]]), n)
 				xx[[i]] <- xx[[i]][, perm]
 				dim(x[[i]]) <- dimx[[i]]
-			}
-			
-			# ...
-			# rhostar[j,l] <- mcca.perm()
+			}	
+			rhoperm[j, l] <- mcca.perm(xx, obj, l)
 		}
+	}
 }
 
-uncorrected.pval <- rowMeans(t(abs(rhostar)) > abs(rho))
-corrected.pval <- uncorrected.pval
+## p-values
+pval.uncorrected <- rowMeans(t(abs(rhoperm)) > abs(obj$objective))
+pval.corrected <- Reduce(max, uncorrected.pval, accumulate = TRUE)
 
-
-
-list(pvals = pvals, perm.objective = t(perm.objective))
+list(pval.corrected = pval.corrected, 
+	pval.uncorrected = pval.uncorrected,
+	objective = obj$objective, 
+	objective.perm = t(rhoperm))
 }
