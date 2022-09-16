@@ -98,7 +98,7 @@ dim(v) <- c(m, r)
 block.score <- array(0, c(n, m, r)) # canonical scores
 global.score <- matrix(0, n, r) 
 objective <- iters <- numeric(r)
-call.args <- list(objective = "cov", r = NULL, w = w, 
+call.args <- list(objective.type = "cov", r = NULL, w = w, 
 	scale = scale, ortho.type = ortho, ortho.cnstr = NULL, 
 	init.method = NULL, init.args = init.args, init.val = NULL,
 	maxit = maxit, tol = tol, sweep = sweep, control = control) 
@@ -156,7 +156,8 @@ for (l in 1:r) {
 	if (ortho == "score" && l > 1) {
 		v0 <- tnsr.rk1.ortho(v0, ortho.cnstr[, 1:(l-1), drop = FALSE], 
 			maxit = 100L, tol = 1e-6)
-		v0 <- scale.v(v0, type = "norm", x = x, check.args = FALSE)
+		v0 <- scale.v(v0, type = "norm", scale = scale, 
+			check.args = FALSE)
 	}	
 	
 	## Run MCCA and store results
