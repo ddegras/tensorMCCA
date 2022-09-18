@@ -8,29 +8,23 @@
 
 tnsr.rk1 <- function(x, scale = FALSE, maxit = 100, tol = 1e-6)
 {
-stopifnot(is.numeric(x))
-stopifnot(maxit >= 0 && tol >= 0)
-eps <- 1e-14
+# stopifnot(is.numeric(x))
+# stopifnot(maxit > 0 && tol >= 0)
 if (is.vector(x)) {
 	if (scale) {
 		nrm <- sqrt(sum(x^2))
-		if (nrm > eps) {
+		if (nrm > 0) {
 			return(list(x / nrm))
 		} else {
-			return(list(rep.int(1 / sqrt(length(x)), length(x))))
+			return(list(rep.int(0, length(x))))
 		}
 	} else {
 		return(list(x))
 	}
 }
-if (all(x == 0)) {
-	if (scale) {
-		return(lapply(dim(x), 
-			function(xx) rep.int(1/sqrt(length(x)), length(x))))		
-	} else {
-		return(lapply(dim(x), numeric))
-	}
-}
+if (all(x == 0))
+	return(lapply(dim(x), numeric))
+
 d <- length(dim(x)) 
 if (d == 3L) { return(tnsr3d.rk1(x, scale, maxit, tol)) }
 svdx <- hosvd(x, 1) 
@@ -49,13 +43,9 @@ for (it in 1:maxit) {
 	nrmv.old <- nrmv
 	kronv.old <- kronv
 	for (k in 1:d) {
-		v[[k]] <- tvec.prod(x, v[-k], (1:d)[-k])
-		if (k < d) v[[k]] <- v[[k]] / sqrt(sum(v[[k]]^2))
-	}
-	if (scale) {
-		v[[d]] <- v[[d]] / sqrt(sum(v[[d]]^2))
-	} else {
-		nrmv <- sqrt(sum(v[[d]]^2))
+		v[[k]] <- tnsr.vec.prod(x, v[-k], (1:d)[-k])
+		nrmv <- sqrt(sum(v[[k]]^2))
+		if (k < d || scale) v[[k]] <- v[[k]] / nrmv
 	}
 	kronv <- Reduce(kronecker, v)
 	e <- sqrt(sum((kronv - kronv.old)^2))
@@ -73,10 +63,85 @@ v
 
 
 
+##############################################
+# Function to approximate a tensor of general 
+# order and rank by a rank-1 tensor under 
+# variance constraints on scores
+##############################################
+ 
+
+tnsr.rk1.score <- function(x, cnstr, maxit = 100, tol = 1e-6)
+{
+if (all(x == 0)) {
+	dimx <- if (is.vector(x)) length(x) else dim(x)
+	return(lapply(dimx, numeric))
+}
+
+d <- if (is.vector(x)) 1L else length(dim(x))
+
+gradfun <- function(v, x) {
+	d <- length(v)
+	if (d == 1)	return(list(v[[1]] - x))
+	out <- vector("list", d)
+	nrmv <- sapply(v, function(vv) sum(vv^2)) 
+	for (k in 1:d) 
+		out[[k]] <- prod(nrmv[-k]) * v[[k]] - 
+			tnsr.vec.prod(x, v[-k], (1:d)[-k])
+	out	
+}
+
+objfun <- function(a, v, grad, x, cnstr, returnv = FALSE) {
+	d <- length(v)
+	vnew <- vector("list", d)
+	for (k in 1:d) 
+		vnew[[k]] <- v[[k]] - a * grad[[k]]
+	vnew <- scale.v(list(vnew), "var", x = cnstr, 
+			check.args = FALSE)
+	vnew <- unlist(vnew, recursive = FALSE)
+	kronv <- if (d == 1) { 
+		vnew 
+	} else {
+		as.vector(Reduce(kronecker, rev(vnew))) 
+	}
+	out <- if (returnv) {
+		list(objective = sum((x - kronv)^2), v = vnew)
+	} else {
+		sum((x - kronv)^2)
+	}
+	out
+}
+
+v <- tnsr.rk1(x)
+objective <- objfun(0, v, numeric(d), x, cnstr, TRUE)
+v <- objective$v
+objective <- objective$objective
+agrid <- c(10^seq(-4, 1))
+for (it in 1:maxit) {
+	objective.old <- objective
+	grad <- gradfun(v, x)
+	objective.best <- objective
+	vbest <- v
+	for (a in agrid) {
+		objective <- objfun(a, v, grad, x, cnstr, TRUE)
+		if (objective$objective < objective.best) {
+			objective.best <- objective$objective
+			vbest <- objective$v
+		}
+ 	}	
+ 	objective <- objective.best
+ 	v <- vbest
+ 	progress <- objective.old - objective 
+ 	if (progress <= (tol * max(1, objective.old))) break
+ }
+	
+list(v)
+}
+
+
 
 ##############################################
 # Function to approximate a general 3D tensor 
-# by a rank-1 tensor
+# by a rank-1 3D tensor
 ##############################################
 
 tnsr3d.rk1 <- function(x, scale = FALSE, maxit = 100, tol = 1e-6)
