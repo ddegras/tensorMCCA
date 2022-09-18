@@ -81,7 +81,7 @@ if (all(abs(a) <= eps)) {
 ## SVD of A
 svda <- svd(a, nv = 0)
 pos <- (svda$d >= 1e-8 * svda$d[1])
-P <- svda$u[,pos]
+P <- svda$u[, pos, drop = FALSE]
 delta <- (svda$d[pos])^2 
 pp <- sum(pos) 
 # pp = number of optimization variables in transformed problem 
