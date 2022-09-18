@@ -98,9 +98,9 @@ for (i in 1:m) {
 			svd(xmat, nu = k[i], nv = k[i]) }
 	if (objective.type == "cov") {
 		u[[i]] <- svdx$u
-		v[[i]] <- sweep(svdx$v, 2, svdx$d, "/")
+		v[[i]] <- sweep(svdx$v, 2, svdx$d[1:rankx[i]], "/")
 	} else if (objective.type == "cor") {
-		u[[i]] <- sweep(svdx$u, 2, svdx$d, "*")
+		u[[i]] <- sweep(svdx$u, 2, svdx$d[1:rankx[i]], "*")
 		v[[i]] <- svdx$v		
 	}
 }
