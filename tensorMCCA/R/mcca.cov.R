@@ -10,7 +10,6 @@ test <- if (is.list(init)) {
 	check.arguments(x, init, w)
 } else check.arguments(x, NULL, w)
 eps <- 1e-14
-r0 <- r 
 r <- as.integer(r)
 
 ## Data dimensions
@@ -50,16 +49,15 @@ for(i in 1:m) {
 if (ortho == "weight") x0 <- x
 
 ## Adjust number of canonical components 
-r0 <- r
 pp <- sapply(p, prod)
 r <- if (ortho == "score" && scale == "block") { 
-	min(n - 1, max(pp), r0)
+	min(n - 1, max(pp), r)
 } else if (ortho == "score" && scale == "global") {
-	min(n - 1, sum(pp), r0)
+	min(n - 1, sum(pp), r)
 } else if (ortho == "weight" && scale == "block") {
-	min(max(pp), r0)
+	min(max(pp), r)
 } else {
-	min(sum(pp), r0)
+	min(sum(pp), r)
 }
 
 ## Set orthogonality constraints
@@ -201,7 +199,7 @@ for (l in 1:r) {
 		
 } 
 
-## Re-order results according to objective values if needed
+## Re-order results according to objective values
 o <- order(objective, decreasing = TRUE)
 o <- o[objective[o] > eps]
 if (length(o) == 0) o <- 1
@@ -215,7 +213,7 @@ if (!identical(o, 1:r)) {
 
 r <- length(o)
 call.args$r <- r
-if (ortho == "score") 
+if (ortho == "score" && r > 1) 
 	call.args$ortho.cnstr <- ortho.cnstr
 if (r == 1) {
 	dim(block.score) <- c(n, m)
