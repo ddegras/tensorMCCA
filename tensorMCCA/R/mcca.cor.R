@@ -92,14 +92,15 @@ global.score <- matrix(0, n, r)
 objective <- iters <- numeric(r)
 call.args <- list(objective.type = "cor", r = NULL, w = w, 
 	scale = "block", ortho.type = ortho, ortho.cnstr = NULL, 
-	init.method = NULL, init.args = init.args, init.val = NULL,
-	maxit = maxit, tol = tol, sweep = sweep, control = control) 
+	optim = optim, init.method = NULL, init.args = init.args, 
+	init.val = NULL, maxit = maxit, tol = tol, sweep = sweep, 
+	control = control) 
 if (ortho == "weight" && scale == "block")
 	call.args$ortho.cnstr <- ortho.mode
 if (is.character(init)) { 
 	call.args$init.method <- init
 } else {
-	call.args$init.val <- init
+	call.args$init.val <- as.matrix(init)
 }
 
 
