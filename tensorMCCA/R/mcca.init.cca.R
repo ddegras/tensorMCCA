@@ -8,7 +8,7 @@ mcca.init.cca <- function(x, k = NULL, w = 1,
 # Preprocessing
 ################
 
-### Check argument x
+## Check argument x
 test <- check.arguments(x, w = w)
 eps <- 1e-14
 
