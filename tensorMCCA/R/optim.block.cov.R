@@ -320,8 +320,7 @@ n <- dima[4]
 
 ## Trivial case
 if (all(a == 0) && is.null(cc)) {
-	v <- scale.v(tnsr3d.rk1(b, maxit, tol))
-	return(v)
+	return(tnsr3d.rk1(b, scale = TRUE, maxit, tol))
 }
 
 ## Reshape orthogonality constraints
