@@ -66,13 +66,13 @@ if (!is.null(init.val)) {
 if (parallel && require(foreach) && getDoParRegistered()) {
 	rhoperm <- foreach(j = 1:nperm, .combine = rbind) %dopar% {
 		set.seed(j)
-		perm <- sample(n)
+		perm <- replicate(m, sample(n))
 		rhopermj <- numeric(r) # canonical correlations
 		for (l in 1:r) {
 			xx <- if (l == 1) x else xdfl[,l-1]
 			for (i in 1:m) {
 				dim(xx[[i]]) <- c(prod(p[[i]]), n)
-				xx[[i]] <- xx[[i]][, perm]
+				xx[[i]] <- xx[[i]][, perm[,i]]
 				dim(xx[[i]]) <- dimx[[i]]
 			}
 			rhopermj[l] <- mcca.perm(xx, obj, l)
@@ -84,12 +84,12 @@ if (parallel && require(foreach) && getDoParRegistered()) {
 	rhoperm <- matrix(, nperm, r)
 	for(j in 1:nperm) {
 		set.seed(j)
-		perm <- sample(n)
+		perm <- replicate(m, sample(n))
 		for (l in 1:r) {
 			xx <- if (l == 1) x else xdfl[,l-1]
 			for (i in 1:m) {
 				dim(xx[[i]]) <- c(prod(p[[i]]), n)
-				xx[[i]] <- xx[[i]][, perm]
+				xx[[i]] <- xx[[i]][, perm[,i]]
 				dim(xx[[i]]) <- dimx[[i]]
 			}	
 			rhoperm[j, l] <- mcca.perm(xx, obj, l)
