@@ -15,7 +15,7 @@ m <- NROW(v)
 r <- NCOL(v)
 isvec.v <- is.null(dim(v))
 if (isvec.v) dim(v) <- c(m, r)
-if (check.args) test <- check.arguments(x, v)
+if (check.args && !is.null(x)) test <- check.arguments(x, v)
 d <- sapply(v[, 1], length)
 eps <- 1e-15 # numerical tolerance for zero
 p <- vector("list", m)

@@ -35,7 +35,7 @@ if (all(cnst.set)) {
 }
 pp <- sapply(p, prod)
 d <- sapply(p, length)
-if (is.null(k)) k <- pmin(pp, n)
+k <- if (is.null(k)) pmin(pp, n) else rep_len(k, m)
 
 ## Scaling constraints
 objective.type <- match.arg(objective)   
@@ -79,8 +79,14 @@ if (center) {
 ## Find the ranks of unfolded datasets
 rankx <- integer(m)
 for (i in 1:m) {
-	rankx[i] <- if (center) {
+	transpose <- (pp[i] < n)
+	rankx[i] <- if (center && transpose) {
+		qr(sweep(matrix(x[[i]], n, pp[i], byrow = TRUE), 
+			MARGIN = 2, STATS = xbar[[i]]))$rank			
+	} else if (center && !transpose) {
 		qr(matrix(x[[i]], pp[i], n) - xbar[[i]])$rank	
+	} else if (transpose) {
+		qr(matrix(x[[i]], n, pp[i], byrow = TRUE))$rank
 	} else { qr(matrix(x[[i]], pp[i], n))$rank }
 }
 
@@ -141,7 +147,7 @@ for (i in 1:m) {
 #####################################
 
 
-
+# browser()
 v <- vector("list", m^2)
 dim(v) <- c(m, m)
 for (i in 1:m) {
@@ -227,6 +233,8 @@ if (scale == "block" && search == "approximate") {
 
 if (scale == "block" && search == "exhaustive") {
 	part <- array(dim = rep(m, 4))
+	# Indices: 1 = dataset 1, 2 = dataset 2, 
+	# 3 = candidate for dataset 1, 4 = candidate for dataset 2
 	for (i in 1:m) 
 	for (j in 1:i) 
 	{			
@@ -234,36 +242,89 @@ if (scale == "block" && search == "exhaustive") {
 			crossprod(score[,i,], score[,j,])
 		part[j, i, , ] <- t(part[i, j, , ])
 	}
-	objective <- array(0, dim = rep(m, m))
+	# objective <- array(0, dim = rep(m, m))
+	# for (i in 1:m)
+	# for (j in 1:m)
+	# {
+		# if (i == j) { 
+			# # self-contribution c(i,i) sum_t <v_i, x_it >^2
+			# perm <- 1:m
+			# perm[c(1,i)] <- c(i,1)
+			# objective <- aperm(objective, perm)
+			# dim(objective) <- c(m, m^(m-1))
+			# objective <- objective + diag(part[i,i,,])
+			# dim(objective) <- rep(m, m)
+			# objective <- aperm(objective, perm)
+		# } else { 
+			# # c(i,j) sum_t <v_i, x_it> <v_j, x_jt>  for i != j 
+			# perm <- 1:m
+			# perm[1:2] <- c(i,j)
+			# perm[-(1:2)] <- setdiff(1:m, c(i,j))
+			# objective <- aperm(objective, perm)
+			# dim(objective) <- c(m^2, m^(m-2))
+			# objective <- objective + as.vector(part[i,j,,])
+			# dim(objective) <- rep(m, m)
+			# iperm <- integer(m)
+			# iperm[perm] <- 1:m
+			# objective <- aperm(objective, iperm)
+		# }
+	# }
+	
+	objective <- array(0, dim = rep(m, m + 2))	
 	for (i in 1:m)
 	for (j in 1:m)
 	{
 		if (i == j) { 
 			# self-contribution c(i,i) sum_t <v_i, x_it >^2
-			perm <- 1:m
-			perm[c(1,i)] <- c(i,1)
+			perm <- 1:(m+2)
+			perm[c(3,2+i)] <- c(2+i,3)
 			objective <- aperm(objective, perm)
-			dim(objective) <- c(m, m^(m-1))
-			objective <- objective + diag(part[i,i,,])
-			dim(objective) <- rep(m, m)
+			dim(objective) <- c(m, m, m^m)
+			objective[i,i,] <- diag(part[i,i,,])
+			dim(objective) <- rep(m, m + 2)
 			objective <- aperm(objective, perm)
 		} else { 
 			# c(i,j) sum_t <v_i, x_it> <v_j, x_jt>  for i != j 
-			perm <- 1:m
-			perm[1:2] <- c(i,j)
-			perm[-(1:2)] <- setdiff(1:m, c(i,j))
+			perm <- 1:(m+2)
+			perm[3:4] <- c(2+i,2+j)
+			perm[-(1:4)] <- setdiff(3:(m+2), c(2+i,2+j))
 			objective <- aperm(objective, perm)
-			dim(objective) <- c(m^2, m^(m-2))
-			objective <- objective + as.vector(part[i,j,,])
-			dim(objective) <- rep(m, m)
+			dim(objective) <- c(m, m, m^m)
+			objective[i,j,] <- as.vector(part[i,j,,])
+			dim(objective) <- rep(m, m + 2)
 			iperm <- integer(m)
-			iperm[perm] <- 1:m
+			iperm[perm] <- 1:(m+2)
 			objective <- aperm(objective, iperm)
 		}
 	}
-	assignment <- arrayInd(which.max(objective), rep(m,m))
+
+	# test <- colSums(objective, dims = 2L)
+	# browser()
+	
+	flip <- lapply(0:floor(m/2), combn, x = m, simplify = FALSE)
+	flip <- unlist(flip, FALSE)
+	nflip <- length(flip)
+	dim(objective) <- c(m^2, m^m)
+	objective.best <- numeric(nflip)
+	idx.best <- integer(nflip)	
+	for (k in 1:nflip) {
+		vec <- rep(1, m)
+		vec[flip[[k]]] <- -1
+		mask <- as.numeric(tcrossprod(vec))
+		vals <- crossprod(mask, objective)
+		idx.best[k] <- which.max(vals)
+		objective.best[k] <- vals[idx.best[k]]
+	}
+	k <- which.max(objective.best)
+	assignment <- arrayInd(idx.best[k], rep(m,m))
+		
+		
+	# browser()
+	# assignment <- arrayInd(which.max(objective), rep(m,m))
 	dim(assignment) <- NULL
 	v <- v[cbind(1:m, assignment)]
+	for (i in flip[[k]]) 
+		v[[i]][[1]] <- - v[[i]][[1]]
 }
 
 
