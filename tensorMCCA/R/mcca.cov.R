@@ -6,9 +6,8 @@ mcca.cov <- function(x, r = 1, w = 1, scale = c("block", "global"),
 {
 
 ## Check arguments
-test <- if (is.list(init)) { 
-	check.arguments(x, init, w)
-} else check.arguments(x, NULL, w)
+test <- check.arguments(x = x, w = w, 
+	v = if (is.list(init)) init else NULL)
 eps <- 1e-14
 r <- as.integer(r)
 
@@ -32,9 +31,11 @@ ortho <- match.arg(ortho)
 optim <- match.arg(optim)
 sweep <- match.arg(sweep)
 if (is.character(init)) init <- match.arg(init)
-if (optim == "grad.rotate" && scale == "global")
-	stop(paste("If argument 'optim' is equal to 'grad.rotate',",
-	"'scale' must be equal to 'block'."))
+if (optim %in% c("grad.scale", "grad.rotate") && 
+	ortho == "score" && r > 1)
+	stop("The gradient-based methods do not support orthogonality ",
+	"constraints on canonical scores. If 'optim' is set to 'grad.scale' ",
+	"or 'grad.rotate', 'ortho' must be set to 'weight' or 'r' to 1.")
 
 ## Set initialization method
 if (is.character(init)) 
