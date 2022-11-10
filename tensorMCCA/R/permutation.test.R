@@ -2,48 +2,59 @@ permutation.test <- function(x, obj, nperm = 100, parallel = TRUE)
 {
 ## Prepare MCCA
 test <- check.arguments(x)
+eps <- 1e-14
 m <- length(x)
 n <- tail(dim(x[[1]]), 1)
 dimx <- lapply(x, dim)
 d <- sapply(dimx, length) - 1
-p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 fields <- c("init.val", "objective.type", "ortho.type", 
 	"ortho.cnstr", "r", "scale")
 for (name in fields) 
 	assign(name, obj$call.args[[name]])
-if ((!is.null(init.val)) && (!is.matrix(init.val))) 
-	dim(init.val) <- c(m, 1)
+ortho <- ortho.type
+if (ortho == "weight" && scale == "block") {
+	ortho.mode <- ortho.cnstr
+	if (!is.null(init.val)) {
+		if (length(init.val) < m * r) 
+			obj$call.args$init.val <- rep_len(init.val, m * r)
+		dim(obj$call.args$init.val) <- c(m, r)
+	}
+}
 v <- obj$v
 
 ## Center data
 for(i in 1:m) {
     xbar <- rowMeans(x[[i]], dims = d[i])
-    x[[i]] <- x[[i]] - as.vector(xbar)
+    if (all(abs(xbar) < eps))
+	    x[[i]] <- x[[i]] - as.vector(xbar)
 }
 
 ## Build deflated datasets
+# Note: deflation is not strictly needed if orthogonality constraints
+# are on weights: it's already explicitly enforced during optimization.
+# However, it helps finding better starting points. 
 if (r > 1) {
 	xdfl <- vector("list", m * (r - 1))
 	dim(xdfl) <- c(m, r - 1)
 	for (l in 2:r) {
-		if (ortho.type == "weight" && scale == "block") {
+		if (ortho == "weight" && scale == "block") {
 			ortho.cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
 			xdfl[,l-1] <- mapply(tnsr.mat.prod, x = x, 
 				mat = ortho.cnstr$mat, modes = ortho.cnstr$modes, 
 				SIMPLIFY = FALSE) 
-			if ((!is.null(init.val)) && l <= ncol(init.val)) 
-				init.val[,l] <- tnsr.rk1.mat.prod(init.val[,l], 
-					mat = ortho.cnstr$mat, modes = ortho.cnstr$modes, 
-					transpose.mat = FALSE)
-		} else if (ortho.type == "weight" && scale == "global") {
+			if (!is.null(init.val)) 
+				obj$call.args$init.val[,l] <- tnsr.rk1.mat.prod(
+					v = obj$call.args$init.val[,l], transpose.mat = FALSE,
+					mat = ortho.cnstr$mat, modes = ortho.cnstr$modes)
+		} else if (ortho == "weight" && scale == "global") {
 			xdfl[,l-1] <- deflate.x(x, v = v[, 1:(l-1)], 
 				check.args = FALSE)
-		} else if (ortho.type == "score" && scale == "block") {
+		} else if (ortho == "score" && scale == "block") {
 			xdfl[,l-1] <- deflate.x(x, 
 				score = obj$block.score[,,1:(l-1)],
 				scope = "block", check.args = FALSE)	
-		} else if (ortho.type == "score" && scale == "global") {
+		} else if (ortho == "score" && scale == "global") {
 			xdfl[,l-1] <- deflate.x(x, 
 				score = obj$global.score[,1:(l-1)],
 				scope = "global", check.args = FALSE)			
@@ -57,7 +68,8 @@ if (!is.null(init.val)) {
 	for (l in 1:ncol(init.val)) 
 		obj$call.args$init.val[,l] <- scale.v(init.val[,l], 
 			type = if (objective.cov) "norm" else "var",
-			scale = scale, x = if (objective.cov) NULL else x,
+			scale = scale, x = if (objective.cov) { NULL 
+			} else if (l == 1) { x } else { xdfl[,l-1] },
 			check.args = FALSE)
 }
 
@@ -66,14 +78,14 @@ if (!is.null(init.val)) {
 if (parallel && require(foreach) && getDoParRegistered()) {
 	rhoperm <- foreach(j = 1:nperm, .combine = rbind) %dopar% {
 		set.seed(j)
-		perm <- replicate(m, sample(n))
 		rhopermj <- numeric(r) # canonical correlations
 		for (l in 1:r) {
 			xx <- if (l == 1) x else xdfl[,l-1]
 			for (i in 1:m) {
-				dim(xx[[i]]) <- c(prod(p[[i]]), n)
-				xx[[i]] <- xx[[i]][, perm[,i]]
-				dim(xx[[i]]) <- dimx[[i]]
+				p <- head(dim(xx[[i]]), d[i])
+				dim(xx[[i]]) <- c(prod(p), n)
+				xx[[i]] <- xx[[i]][, sample(n)]
+				dim(xx[[i]]) <- c(p, n)
 			}
 			rhopermj[l] <- mcca.perm(xx, obj, l)
 		}
@@ -84,13 +96,13 @@ if (parallel && require(foreach) && getDoParRegistered()) {
 	rhoperm <- matrix(, nperm, r)
 	for(j in 1:nperm) {
 		set.seed(j)
-		perm <- replicate(m, sample(n))
 		for (l in 1:r) {
 			xx <- if (l == 1) x else xdfl[,l-1]
 			for (i in 1:m) {
-				dim(xx[[i]]) <- c(prod(p[[i]]), n)
-				xx[[i]] <- xx[[i]][, perm[,i]]
-				dim(xx[[i]]) <- dimx[[i]]
+				p <- head(dim(xx[[i]]), d[i])
+				dim(xx[[i]]) <- c(prod(p), n)
+				xx[[i]] <- xx[[i]][, sample(n)]
+				dim(xx[[i]]) <- c(p, n)
 			}	
 			rhoperm[j, l] <- mcca.perm(xx, obj, l)
 		}
@@ -119,12 +131,19 @@ for (name in names(obj$call.args))
 	assign(name, obj$call.args[[name]])
 v <- obj$v
 normvar <- switch(objective.type, cov = "norm", cor = "var")
+if (ortho.type == "weight" && scale == "block") 
+	ortho.cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
+		modes = ortho.cnstr[, 1:(l-1), l])
 
 ## Initialize canonical weights
 if (!is.null(init.val)) {
 	v0 <- if (is.matrix(init.val)) {
 		init.val[, min(l, ncol(init.val))]
 	} else init.val
+	# if (ortho.type == "weight" && scale == "block" && l > 1) 
+		# v0 <- tnsr.rk1.mat.prod(v0, mat = ortho.cnstr$mat, 
+			# modes = ortho.cnstr$modes, transpose.mat = FALSE)
+		# v0 <- scale.v(v0, type = "var", x = x, check.args = FALSE)
 } else {
 	mcca.init <- switch(init.method, 
 		cca = mcca.init.cca, 
