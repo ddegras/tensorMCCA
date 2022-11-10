@@ -27,15 +27,6 @@ if (n[1] < 2L)
 	stop(paste("Make sure that the arrays in 'x'",
 		"have their last dimension at least 2 (number of instances)."))
 
-## Check that the data arrays have at most 4 dimensions
-## (i.e. at most 3 image dimensions + 1 dimension for instances)
-p <- lapply(dimx, function(idx) idx[-length(idx)]) 
-d <- sapply(p, length)
-# if (any(ndim.img > 3)) 
-	# stop(paste("Make sure that the arrays in 'x' have",
-		# "at most 4 dimensions: 1, 2, or 3 for images and 1",
-	  	# "for instances/individuals"))
-
 ## Check that the data contain no missing values (NA) or NaN
 test <- sapply(x, function(xx) any(is.na(xx) | is.nan(xx)))
 if (any(test)) 
@@ -45,16 +36,18 @@ if (any(test))
 if (length(v) > 0) {
 	r <- NCOL(v)
 	if (!is.matrix(v)) dim(v) <- c(m, r)
+	p <- lapply(dimx, function(idx) idx[-length(idx)]) 
+	d <- sapply(p, length)
 	for (i in 1:m) {
 		for (l in 1:r) {
 			if (length(v[[i, l]]) != d[i])
-				stop(paste("Each component 'v[[i]]' or 'v[[i,l]]'",
-				"must a list of length the number of dimensions",
-				"in 'x[[i]]' minus 1."))
+				stop("Component v[[", i, ",", l, "]] ",
+				"must a list of length the number of dimensions ",
+				"of x[[", i, "]] minus 1.")
 			if (any(sapply(v[[i,l]], length) != p[[i]]))
-				stop(paste("Each component 'v[[i]][[k]]' or",
-				"v[[i,l]][[k]] must be a numerical vector of length",
-				"'dim(x[[i]])[k]'."))
+				stop("Component v[[", i, ",", l, "]][[", k, "]] ",
+				"must be a numerical vector of length ",
+				"dim(x[[", i, "]])[", k, "].")
 		}
 	}		
 	if (any(is.na(unlist(v))) || any(is.nan(unlist(v))))
