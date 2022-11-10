@@ -99,8 +99,9 @@ for (i in 1:m) {
 	xmat <- if (center) { matrix(x[[i]] - xbar[[i]], pp[i], n)  
 		} else { matrix(x[[i]], pp[i], n) } 
 	test <- (max(3, 2 * k[i]) <= min(pp[i], n))
-	svdx <- if (test) svds(xmat, k[i]) else {
-			svd(xmat, nu = k[i], nv = k[i]) }
+	if (test) svdx <- svds(xmat, k[i]) 
+	if (!test || length(svdx$d) < k[i])
+		svdx <- svd(xmat, nu = k[i], nv = k[i])
 	if (objective.type == "cov") {
 		u[[i]] <- svdx$u
 		v[[i]] <- sweep(svdx$v, 2, svdx$d[1:rankx[i]], "/")
@@ -129,15 +130,14 @@ for (i in 1:m) {
 			a[[i]][,i] <- u[[i]][,1] 
 			next
 		}
-		svdij <- if (all(k[c(i,j)] > 2)) {
-			svds(crossprod(v[[i]], v[[j]]), k = 1)
-		} else {
-			svd(crossprod(v[[i]], v[[j]]), nu = 1, nv = 1)
-		} 		
+		test <- all(k[c(i,j)] > 2)
+		if (test) svdij <- svds(crossprod(v[[i]], v[[j]]), k = 1)
+		if (!test || length(svdij$d) == 0)
+			svdij <- svd(crossprod(v[[i]], v[[j]]), nu = 1, nv = 1)		
 		a[[i]][,j] <- u[[i]] %*% svdij$u
 		a[[j]][,i] <- u[[j]] %*% svdij$v
 	}
-}	
+}
 
 
 
@@ -147,20 +147,20 @@ for (i in 1:m) {
 #####################################
 
 
-# browser()
+
 v <- vector("list", m^2)
 dim(v) <- c(m, m)
 for (i in 1:m) {
 	dim(a[[i]]) <- c(p[[i]], m)
 	v[i,] <- if (objective.type == "cov") {
 		apply(a[[i]], d[i] + 1, tnsr.rk1, scale = TRUE, 
-			maxit = maxit, tol  = tol)
+			maxit = maxit, tol = tol)
 	} else {
-		apply(a[[i]], d[i] + 1, tnsr.rk1.score, cnstr = x, 
+		apply(a[[i]], d[i] + 1, tnsr.rk1.score, cnstr = x[i], 
 			maxit = maxit, tol = tol)
 	}
 }
-	
+
 
 # After this stage, all canonical tensor weights 
 # are scaled to have unit norm or unit variance 
@@ -242,33 +242,6 @@ if (scale == "block" && search == "exhaustive") {
 			crossprod(score[,i,], score[,j,])
 		part[j, i, , ] <- t(part[i, j, , ])
 	}
-	# objective <- array(0, dim = rep(m, m))
-	# for (i in 1:m)
-	# for (j in 1:m)
-	# {
-		# if (i == j) { 
-			# # self-contribution c(i,i) sum_t <v_i, x_it >^2
-			# perm <- 1:m
-			# perm[c(1,i)] <- c(i,1)
-			# objective <- aperm(objective, perm)
-			# dim(objective) <- c(m, m^(m-1))
-			# objective <- objective + diag(part[i,i,,])
-			# dim(objective) <- rep(m, m)
-			# objective <- aperm(objective, perm)
-		# } else { 
-			# # c(i,j) sum_t <v_i, x_it> <v_j, x_jt>  for i != j 
-			# perm <- 1:m
-			# perm[1:2] <- c(i,j)
-			# perm[-(1:2)] <- setdiff(1:m, c(i,j))
-			# objective <- aperm(objective, perm)
-			# dim(objective) <- c(m^2, m^(m-2))
-			# objective <- objective + as.vector(part[i,j,,])
-			# dim(objective) <- rep(m, m)
-			# iperm <- integer(m)
-			# iperm[perm] <- 1:m
-			# objective <- aperm(objective, iperm)
-		# }
-	# }
 	
 	objective <- array(0, dim = rep(m, m + 2))	
 	for (i in 1:m)
@@ -297,9 +270,6 @@ if (scale == "block" && search == "exhaustive") {
 			objective <- aperm(objective, iperm)
 		}
 	}
-
-	# test <- colSums(objective, dims = 2L)
-	# browser()
 	
 	flip <- lapply(0:floor(m/2), combn, x = m, simplify = FALSE)
 	flip <- unlist(flip, FALSE)
@@ -317,10 +287,6 @@ if (scale == "block" && search == "exhaustive") {
 	}
 	k <- which.max(objective.best)
 	assignment <- arrayInd(idx.best[k], rep(m,m))
-		
-		
-	# browser()
-	# assignment <- arrayInd(which.max(objective), rep(m,m))
 	dim(assignment) <- NULL
 	v <- v[cbind(1:m, assignment)]
 	for (i in flip[[k]]) 
@@ -335,7 +301,7 @@ if (scale == "block" && search == "exhaustive") {
 ####################################
 
 
-# >>> TO BE COMPLETED <<<
+# >>> TO BE COMPLETED (OR NOT) <<<
 
 
 
