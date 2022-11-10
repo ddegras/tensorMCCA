@@ -8,7 +8,7 @@
 
 tnsr.rk1 <- function(x, scale = FALSE, maxit = 100, tol = 1e-6)
 {
-# stopifnot(is.numeric(x))
+stopifnot(is.numeric(x))
 # stopifnot(maxit > 0 && tol >= 0)
 if (is.vector(x)) {
 	if (scale) {
@@ -64,9 +64,9 @@ v
 
 
 ##############################################
-# Function to approximate a tensor of general 
-# order and rank by a rank-1 tensor under 
-# variance constraints on scores
+# Function to approximate a general tensor  
+# by a rank-1 tensor under norm constraints 
+# on scores
 ##############################################
  
 
@@ -95,11 +95,9 @@ objfun <- function(a, v, grad, x, cnstr, returnv = FALSE) {
 	vnew <- vector("list", d)
 	for (k in 1:d) 
 		vnew[[k]] <- v[[k]] - a * grad[[k]]
-	vnew <- scale.v(list(vnew), "var", x = cnstr, 
-			check.args = FALSE)
-	vnew <- unlist(vnew, recursive = FALSE)
+	vnew <- scale.v(vnew, "var", x = cnstr,	check.args = FALSE)
 	kronv <- if (d == 1) { 
-		vnew 
+		vnew[[1]]
 	} else {
 		as.vector(Reduce(kronecker, rev(vnew))) 
 	}
@@ -134,7 +132,7 @@ for (it in 1:maxit) {
  	if (progress <= (tol * max(1, objective.old))) break
  }
 	
-list(v)
+v
 }
 
 
