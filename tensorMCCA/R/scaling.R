@@ -2,7 +2,7 @@
 
 
 #########################################
-# Function for scaling canonical vectors
+# Function for scaling canonical weights
 #########################################
 
 scale.v <- function(v, type = c("norm", "var"), 
@@ -11,10 +11,14 @@ scale.v <- function(v, type = c("norm", "var"),
 type <- match.arg(type) 
 scale <- match.arg(scale)
 stopifnot(type == "norm" || !is.null(x))
+stopifnot(is.list(v))
+islist.v1 <- is.list(v[[1]])
+if (!islist.v1) v <- list(v)
 m <- NROW(v)
 r <- NCOL(v)
 isvec.v <- is.null(dim(v))
 if (isvec.v) dim(v) <- c(m, r)
+if (!is.null(x) && !is.list(x)) x <- list(x) 
 if (check.args && !is.null(x)) test <- check.arguments(x, v)
 d <- sapply(v[, 1], length)
 eps <- 1e-15 # numerical tolerance for zero
@@ -77,6 +81,7 @@ if (type == "norm" && scale == "block") {
 }
 
 if (isvec.v) dim(v) <- NULL
+if (!islist.v1) v <- v[[1]]
 v
 }
 
