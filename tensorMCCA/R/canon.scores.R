@@ -1,7 +1,8 @@
 canon.scores <- function(x, v, check.args = TRUE)
 {
+if (!is.list(x)) x <- list(x)
+if (!is.list(v)) v <- list(v)
 if (check.args) {
-	stopifnot(is.list(x) && is.list(v))
 	stopifnot(is.vector(v) || is.matrix(v))
 	test1 <- (is.vector(v) && length(v) == length(x))
 	test2 <- (is.matrix(v) && nrow(v) == length(x))
