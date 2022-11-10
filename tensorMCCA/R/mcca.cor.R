@@ -5,9 +5,8 @@ mcca.cor <- function(x, r, w = 1, ortho = c("score", "weight"),
 {
 
 ## Check arguments
-test <- if (is.list(init)) {
-	check.arguments(x, init, w)
-} else check.arguments(x, NULL, w) 
+test <- check.arguments(x = x, w = w, 
+	v = if (is.list(init)) init else NULL)
 eps <- 1e-14
 r0 <- r 
 r <- as.integer(r)
@@ -31,9 +30,9 @@ ortho <- match.arg(ortho)
 sweep <- match.arg(sweep)
 optim <- match.arg(optim)
 if (optim == "gradient.scale" && ortho == "score" && r > 1)
-	stop(paste("The gradient-based optimization method", 
-	"cannot handle orthogonality constraints on scores.",
-	"To use this method, set 'ortho' to 'weight' or 'r' to 1."))
+	stop("The gradient-based methods do not support orthogonality ",
+	"constraints on canonical scores. If 'optim' is set to 'grad.scale', ",
+	"'ortho' must be set to 'weight' or 'r' to 1.")
 if (is.character(init)) init <- match.arg(init)
 
 ## Set initialization method
@@ -62,13 +61,14 @@ if (r > 1) {
 			cnstr = control$ortho$cnstr, 
 			method = control$ortho$method)
 	} else {
-		ortho.cnstr <- vector("list", m * r)
-		dim(ortho.cnstr) <- c(m, r)
+		ortho.cnstr <- vector("list", m * (r-1))
+		dim(ortho.cnstr) <- c(m, r-1)
 	}
 }
 
 ## Set up initialization parameters
 test <- (is.list(control) && !is.null(control$init))
+init.args <- NULL
 if (identical(init, "cca")) {
 	init.args <- list(k = NULL, w = w, 
 		objective = "cor", scale = "block", center = FALSE, 
@@ -95,7 +95,7 @@ call.args <- list(objective.type = "cor", r = NULL, w = w,
 	optim = optim, init.method = NULL, init.args = init.args, 
 	init.val = NULL, maxit = maxit, tol = tol, sweep = sweep, 
 	control = control) 
-if (ortho == "weight" && scale == "block")
+if (ortho == "weight")
 	call.args$ortho.cnstr <- ortho.mode
 if (is.character(init)) { 
 	call.args$init.method <- init
@@ -191,12 +191,21 @@ if (!identical(o, 1:r)) {
 	iters <- iters[o]
 }
 
+r <- length(o)
+call.args$r <- r
+if (ortho == "score" && r > 1) 
+	call.args$ortho.cnstr <- ortho.cnstr
+if (r == 1) {
+	dim(block.score) <- c(n, m)
+	dim(global.score) <- NULL
+} 
+
 ## Clean up scores
 block.score[abs(block.score) < eps] <- 0
 global.score[abs(global.score) < eps] <- 0
 
 list(v = v, block.score = block.score, global.score = global.score,
-	objective = objective, iters = iters, input = input)
+	objective = objective, iters = iters, call.args = call.args)
 }
 
 
