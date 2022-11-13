@@ -44,7 +44,8 @@ v
 
 
 
-simulate.factor.model <- function(dimx, r, sigma2, xi, ortho = FALSE)
+simulate.factor.model <- function(dimx, r, sigma2, xi, 
+	scale = c("block", "global"), ortho = FALSE)
 {
 ## Data dimensions
 d <- sapply(dimx, length) - 1L
@@ -61,10 +62,18 @@ r0 <- r <- as.integer(r)
 sigma2 <- rep_len(sigma2, r)
 stopifnot(length(xi) == 1 || length(xi) == length(dimx))
 nxi <- length(xi)
+scale <- match(scale)
 
 ## Outputs
 x <- vector("list", m)
-v <- simulate.v(p, r, ortho)
+v <- if (scale == "block") {
+	simulate.v(p, r, ortho)
+} else if (ortho == FALSE) {
+	scale.v(simulate.v(p, r, FALSE), "norm", "global", 
+		check.args = FALSE)
+} else {
+	orthogonalize.global(simulate.v(p, r, FALSE))
+}
 score <- if (r == 0) {
 	numeric(n)
 } else {
@@ -118,59 +127,89 @@ list(x = x, v = v, score = score)
 
 
 
-simulate.x2 <- function(dimx, r, sigma)
-{
-## Data dimensions
-m <- length(dimx)
-n <- sapply(dimx, tail, 1)
-if (any(n != n[1])) 
-	stop(paste("Last values in each component of list",
-	"'dimx' must all be equal (number of replications)."))
-n <- n[1]
-p <- sapply(dimx, function(idx) idx[-length(idx)])
-d <- sapply(dimx, length) - 1
+# simulate.x2 <- function(dimx, r, sigma)
+# {
+# ## Data dimensions
+# m <- length(dimx)
+# n <- sapply(dimx, tail, 1)
+# if (any(n != n[1])) 
+	# stop(paste("Last values in each component of list",
+	# "'dimx' must all be equal (number of replications)."))
+# n <- n[1]
+# p <- sapply(dimx, function(idx) idx[-length(idx)])
+# d <- sapply(dimx, length) - 1
 
-## Check dimensions of sigma and replicate if needed
-test <- is.matrix(sigma) && dim(sigma) == c(m,m)
-stopifnot(test || all(dim(sigma) == c(m,m,r)))
-if (test) sigma <- replicate(r, sigma)
+# ## Check dimensions of sigma and replicate if needed
+# test <- is.matrix(sigma) && dim(sigma) == c(m,m)
+# stopifnot(test || all(dim(sigma) == c(m,m,r)))
+# if (test) sigma <- replicate(r, sigma)
 
-## Outputs
-v <- vector("list", m * r)
-dim(v) <- c(m, r)
-x <- lapply(dimx, function(dims) array(0, dims))
-block.scores <- array(dim = c(n,m,r))
+# ## Outputs
+# v <- vector("list", m * r)
+# dim(v) <- c(m, r)
+# x <- lapply(dimx, function(dims) array(0, dims))
+# block.scores <- array(dim = c(n,m,r))
 
-## Generate canonical vectors
-rand.vec <- function(pp) {
-	v <- runif(pp)
-	v / sqrt(sum(v^2))
-}
-for (i in 1:m)
-for (l in 1:r)
-v[[i,l]] <- lapply(p[[i]], rand.vec)
+# ## Generate canonical vectors
+# rand.vec <- function(pp) {
+	# v <- runif(pp)
+	# v / sqrt(sum(v^2))
+# }
+# for (i in 1:m)
+# for (l in 1:r)
+# v[[i,l]] <- lapply(p[[i]], rand.vec)
 
-## Generate data
-for (l in 1:r) {    
-	## Generate block scores
-	R <- chol(sigma[,,l])
-	tmp <- matrix(rnorm(m*n), m, n)
-	block.scores[,,l] <- crossprod(tmp, R)
+# ## Generate data
+# for (l in 1:r) {    
+	# ## Generate block scores
+	# R <- chol(sigma[,,l])
+	# tmp <- matrix(rnorm(m*n), m, n)
+	# block.scores[,,l] <- crossprod(tmp, R)
             	
-	## Simulate data 
-	for (i in 1:m) {
-		vil <- Reduce(kronecker, rev(v[[i,l]]))
-		vs <- tcrossprod(vil, block.scores[,i,l])
-		x[[i]] <- x[[i]] + array(vs, dimx[[i]])
+	# ## Simulate data 
+	# for (i in 1:m) {
+		# vil <- Reduce(kronecker, rev(v[[i,l]]))
+		# vs <- tcrossprod(vil, block.scores[,i,l])
+		# x[[i]] <- x[[i]] + array(vs, dimx[[i]])
+	# }
+# }
+
+# list(x = x, v = v, block.scores = block.scores)
+# }
+
+
+#####################################
+# Function to globally orthogonalize 
+# sets of rank-1 tensors
+#####################################
+
+# Given rank-1 tensors v(i,l), i = 1, ..., m, and l = 1, ..., r,
+# such that for each i, v(i,1), ..., v(i,r) have same dimensions,
+# find scaling factors a(i,l) such that the tensors u(i,l) = a(i,l) v(i,l)
+# satisfy (1/m) sum(i=1:m) < u(i,k), u(i,l) > = 0 if k != l, = 1 if k = l.   
+
+
+orthogonalize.global <- function(v)
+{
+m <- NROW(v)
+r <- NCOL(v)
+if (r > 1) {
+	cp <- aperm(tnsr.rk1.cp(v), c(3, 1, 2))
+	a <- matrix(, m, r)
+	for (l in 1:r) {
+		if (l == 1) {
+			a[,1] <- 1 / sqrt(mean(cp[,1,1]))
+		} else {
+			b <- cp[,1:(l-1),l] * a[,1:(l-1)]
+			a[,l] <- qr.Q(qr(b), complete = TRUE)[,l]
+			a[,l] <- 1 / sqrt(mean((a[,l] * cp[,l,l])^2))
+		}
+		for (i in 1:m) 
+			v[[i,l]][[1]] <- a[i,l] * v[[i,l]][[1]]
 	}
 }
-
-list(x = x, v = v, block.scores = block.scores)
+return(scale.v(v, "norm", "global", check.args = FALSE))
 }
-
-
-
-
 
 
 
