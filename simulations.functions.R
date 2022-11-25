@@ -62,7 +62,7 @@ r0 <- r <- as.integer(r)
 sigma2 <- rep_len(sigma2, r)
 stopifnot(length(xi) == 1 || length(xi) == length(dimx))
 nxi <- length(xi)
-scale <- match(scale)
+scale <- match.arg(scale)
 
 ## Outputs
 x <- vector("list", m)
@@ -208,7 +208,7 @@ if (r > 1) {
 			v[[i,l]][[1]] <- a[i,l] * v[[i,l]][[1]]
 	}
 }
-return(scale.v(v, "norm", "global", check.args = FALSE))
+scale.v(v, "norm", "global", check.args = FALSE)
 }
 
 
