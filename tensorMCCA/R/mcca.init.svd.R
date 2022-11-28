@@ -15,7 +15,7 @@ n <- tail(dimx[[1]], 1)
 
 objective <- match.arg(objective) # norm or variance constraints
 
-## Initialize canonical vectors 
+## Initialize canonical weights 
 v <- vector("list", m)
 
 ## Unfold data along last mode (individuals/objects) and concatenate
@@ -45,17 +45,17 @@ dim(xmat) <- NULL
 
 ## Iteratively unfold singular vectors and recalculate SVD
 lenx <- sapply(p, prod)
-start <- c(0, cumsum(lenx[-m])) + 1
 end <- cumsum(lenx)
+start <- c(0, end[-m]) + 1
 for (i in 1:m) {
 	xi <- xmat[start[i]:end[i]]
-	if (d[i] > 1) dim(xi) <- p[[i]]
+	dim(xi) <- if (d[i] == 1) NULL else p[[i]]
 	v[[i]] <- if (all(xi == 0)) {
 		lapply(p[[i]], function(len) rep(1/sqrt(len), len))
-	} else { hosvd(xi, 1)$vectors }
+	} else { lapply(hosvd(xi, 1)$factors, as.vector) }
 }
 
-## Scale initial canonical vectors as needed	
+## Scale initial canonical weights as needed	
 if (objective == "cor") {
 	y <- canon.scores(x, v)
 	nrm <- sqrt(colMeans(y^2))
