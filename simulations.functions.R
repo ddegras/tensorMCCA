@@ -238,3 +238,111 @@ dim(out) <- dim(v1)
 out
 }
 
+
+
+###########################
+# Cosine distance function 
+# between rank-1 tensors 
+# taking sign into account
+###########################
+
+cosine.dist.mod <- function(v1, v2)
+{
+distance <- cosine.dist(v1, v2)
+idx <- which(colMeans(distance) > 1)
+if (length(idx) > 0) 
+	distance[,idx] <- 2 - distance[,idx]
+distance
+}
+
+
+################################################
+# Distance between (projectors associated with)
+# spaces spanned by two sets of rank-1 tensors
+################################################
+
+space.dist <- function(v1, v2)
+{
+if (!is.matrix(v1)) dim(v1) <- c(length(v1), 1)
+if (!is.matrix(v2)) dim(v2) <- c(length(v2), 1)
+v1 <- scale.v(v1, check.args = FALSE)
+v2 <- scale.v(v2, check.args = FALSE)
+m <- nrow(v1)
+r <- ncol(v1)
+distance <- numeric(m)
+for (i in 1:m) {
+	pi <- sapply(v1[[i]], length)
+	di <- length(pi)
+	v1i <- v2i <- matrix(0, prod(pi), r)
+	for (l in 1:r) {
+		v1i[,l] <- if (di == 1L) {
+			v1[[i,l]][[1]] } else Reduce(kronecker, rev(v1[[i,l]]))
+		v2i[,l] <- if (di == 1L) {
+			v2[[i,l]][[1]] } else Reduce(kronecker, rev(v2[[i,l]]))
+	}
+	qr1i <- qr(v1i)
+	qr2i <- qr(v2i)
+	rk1i <- qr1i$rank
+	rk2i <- qr2i$rank
+	cp <- crossprod(qr.Q(qr1i), qr.Q(qr2i))
+	distance[i] <- sqrt(rk1i + rk2i - 2 * sum(cp^2))
+}
+distance
+}	
+
+
+
+#################################
+# Function to reshape output of 
+# 'mgcca_array' of package RGCCA 	
+#################################
+
+reshape.mgcca <- function(v)
+{
+m <- length(v$a)
+r <- ncol(v$a[[1]])
+vout <- vector("list", m * r)
+dim(vout) <- c(m, r)
+for (i in 1:m) {
+	is.null.b <- is.null(v$b[[i]])
+	is.null.c <- is.null(v$c[[i]])
+	for (l in 1:r) {
+		vout[[i,l]] <- if (is.null.b) {
+			list(v$a[[i]][,l])	
+		} else if (is.null(c)) {
+			list(v$b[[i]][,l])
+		} else {
+			list(v$b[[i]][,l], v$c[[i]][,l])
+		}	
+	}
+}
+vout	
+}
+
+
+
+######################################
+# Function to reshape output of 'ctd'  	
+#####################################
+
+reshape.ctd <- function(v)
+{
+m <- length(v)
+r <- ncol(v[[1]][[1]])
+vout <- vector("list", m * r)
+dim(vout) <- c(m, r)
+for (i in 1:m) {
+	di <- length(v[[i]]) - 1L
+	for (l in 1:r) {
+		vout[[i,l]] <- if (r == 1L) {
+			lapply(v[[i]][1:d[i]], as.vector)
+		} else {
+			lapply(v[[i]][1:d[i]], function(x) x[,l])
+		}
+	}
+}
+vout		
+}
+
+
+
