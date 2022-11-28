@@ -29,7 +29,7 @@ d <- length(dim(x))
 if (d == 3L) { return(tnsr3d.rk1(x, scale, maxit, tol)) }
 svdx <- hosvd(x, 1) 
 nrmv <- if (scale) 1 else as.numeric(svdx$core)
-v <- svdx$vectors
+v <- svdx$factors
 if (d == 2L || maxit == 0) {
 	if (scale) {
 		return(v)
