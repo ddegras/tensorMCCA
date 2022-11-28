@@ -21,10 +21,10 @@ if (is.null(r)) {
 if (d == 1L) {
 	nrm <- sqrt(sum(x^2))
 	if (nrm == 0) {
-		return(list(vectors = list(rep.int(1/sqrt(p), p)), 
+		return(list(factors = list(rep.int(1/sqrt(p), p)), 
 			core = 0))
 	} else {
-		return(list(vectors = list(x/nrm), core = nrm))
+		return(list(factors = list(x/nrm), core = nrm))
 	}
 }
 if (d == 2L) {
@@ -32,7 +32,7 @@ if (d == 2L) {
 	svdx <- if (RSpectra.flag) {
 		svds(x, max(r), r[1], r[2])	
 	} else svd(x, r[1], r[2])
-	return(list(vectors = list(svdx$u, svdx$v), 
+	return(list(factors = list(svdx$u, svdx$v), 
 		core = diag(svdx$d, r[1], r[2])))
 }
 
@@ -51,7 +51,7 @@ for (k in 1:d) {
 	dim(core) <- c(p[k], prod(dimc[-1]))
 	
 	## SVD
-	RSpectra.flag <- (min(dim(core)) > max(2, r[k]))
+	RSpectra.flag <- all(dim(core) > max(2, r[k]))
 	svdk <- if (RSpectra.flag) {
 		svds(core, r[k])
 	} else { svd(core, nu = r[k], nv = r[k]) }
@@ -63,7 +63,7 @@ for (k in 1:d) {
 	if (k > 1) core <- aperm(core, perm)	
 }	
 
-list(vectors = u, core = core)
+list(factors = u, core = core)
 	
 }
 
