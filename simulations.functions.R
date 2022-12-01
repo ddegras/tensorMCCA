@@ -74,10 +74,12 @@ v <- if (scale == "block") {
 } else {
 	orthogonalize.global(simulate.v(p, r, FALSE))
 }
-score <- if (r == 0) {
-	numeric(n)
+if (r == 0) {
+	score <- numeric(n)
 } else {
-	sapply(sqrt(sigma2), function(sig) rnorm(n, 0, sig))
+	score <- sapply(sqrt(sigma2), function(sig) rnorm(n, 0, sig))
+	score <- sweep(score, 2, colMeans(score))
+	score[is.nan(score)] <- 0 
 }
 
 for (i in 1:m) {	
@@ -100,11 +102,13 @@ for (i in 1:m) {
 		noise <- crossprod(R, matrix(rnorm(pp[i] * n), pp[i], n))
 	}
 	dim(noise) <- c(p[[i]], n)		
+	noise <- noise - as.vector(rowMeans(noise, dims = d[i]))
 	x[[i]] <- signal + noise
 }
 
 list(x = x, v = v, score = score)
 }
+
 
 ########################################
 # Simulate model (2) with block scores
@@ -112,7 +116,7 @@ list(x = x, v = v, score = score)
 ########################################
 
 
-# X_it = sum_(l=1:r) v_i^l s_it^l        (2)
+# X_it = sum_(l=1:r) v_i^l s_it^l + e_it       (2)
 
 
 # ASSUMPTIONS ON THE SCORES
