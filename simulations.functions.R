@@ -343,7 +343,7 @@ for (i in 1:m) {
 	rk1i <- qr1i$rank
 	rk2i <- qr2i$rank
 	cp <- crossprod(qr.Q(qr1i), qr.Q(qr2i))
-	distance[i] <- sqrt(rk1i + rk2i - 2 * sum(cp^2))
+	distance[i] <- sqrt(max(rk1i + rk2i - 2 * sum(cp^2), 0))
 }
 distance
 }	
