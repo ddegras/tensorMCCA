@@ -46,8 +46,8 @@ it will be replicated to form a matrix with \eqn{m} columns,
 where \eqn{m} is the number of data arrays.)
 
 
-\bf{Only one of the arguments \code{v} and \code{score} must be specified. 
-The other one should be left to its default value \code{NULL}.}
+NOTE: Only one of the arguments \code{v} and \code{score} must be specified. 
+The other one should be left to its default value \code{NULL}.
  
 If \code{v} is specified, this list must have the same length as \code{x}. 
 Each sublist \code{v[[i]]} must have its length equal to the order 
