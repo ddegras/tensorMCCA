@@ -13,6 +13,7 @@ export(
 "objective.gradient",
 "permutation.test",
 "scale.v",
+"simulate.factor.model",
 "tnsr.mat.prod",
 "tnsr.vec.prod",
 "tnsr3d.rk1",
