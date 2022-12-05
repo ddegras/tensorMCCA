@@ -65,6 +65,7 @@ if (type == "norm" && scale == "block") {
 	}
 } else {
 	score <- canon.scores(x, v)
+	n <- dim(score)[1]
 	dim(score) <- c(n, m, r)
 	sd.score <- colMeans(score^2) - colMeans(score)^2
 	sd.score <- sqrt(pmax(sd.score, 0))
