@@ -60,7 +60,7 @@ r0 <- r <- as.integer(r)
 
 ## Preprocess score covariance
 SIGMA <- score.cov
-if (is.vector(SIGMA)) {
+if (is.vector(SIGMA) && is.numeric(SIGMA)) {
 	SIGMA <- rep_len(SIGMA, r)
 	stopifnot(all(SIGMA >= 0))
 } else if (is.list(SIGMA)) {
@@ -116,7 +116,7 @@ for (i in 1:m) {
 	if (r > 0) {
 		for (l in 1:r) {
 			vil <- Reduce(kronecker, rev(v[[i,l]]))
-		signal <- signal + tcrossprod(vil, score[,i,l])
+			signal <- signal + tcrossprod(vil, score[,i,l])
 		}
 		dim(signal) <- c(p[[i]], n)
 	}	
