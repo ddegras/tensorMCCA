@@ -64,8 +64,10 @@ for (it in 1:maxit) {
 		
 		## Set up quadratic program 
 		a <- if (wiizero[i]) 0 else x[[i]] # quadratic component
-		b <- tnsr.vec.prod(x[[i]], score[, -i] %*% (w[-i, i] / s[i]), 
-			d[i]+1L) # linear component
+		b <- tnsr.vec.prod(x[[i]], 
+			if (m == 2) { score[, -i] * (w[-i, i] / s[i])
+			} else score[, -i] %*% (w[-i, i] / s[i]), 
+			d[i] + 1L) # linear component
 		
 		## Update canonical vectors
 		v[[i]] <- optim.block.cov(v[[i]], a, b, ortho[i,], maxit, tol) 	
