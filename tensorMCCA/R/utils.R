@@ -57,6 +57,6 @@ for (i in seq_along(v)) {
 		unlist(v[[i]]) } else {
 		array(Reduce(kronecker, rev(v[[i]])), dims)	}
 }
-if (single) v <- v[[1]]
+if (single) v <- unlist(v, FALSE)
 v	
 }
