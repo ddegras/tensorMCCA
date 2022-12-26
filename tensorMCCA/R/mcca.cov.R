@@ -137,7 +137,7 @@ for (l in 1:r) {
 				# check.args = FALSE)	
 		} 
 	}
-
+	
 	## Initialize canonical weights
 	if (is.character(init)) {
 		init.args$x <- if (ortho == "score" && l > 1) {
@@ -159,6 +159,23 @@ for (l in 1:r) {
 		v0 <- scale.v(v0, type = "norm", scale = scale, 
 			check.args = FALSE)
 	}	
+
+	## Drop singleton dimensions
+	dimxx <- lapply(x, dim)
+	singleton <- lapply(dimxx, "==", "1")
+	any.singleton <- sapply(singleton, any)
+	all.singleton <- sapply(singleton, all)
+	if (any(any.singleton)) {
+		for (i in which(any.singleton)) {
+			if (all.singleton[i]) {
+				dim(x[[i]]) <- NULL
+				v0[[i]] <- list(unlist(v0[[i]]))
+			} else {
+				dim(x[[i]]) <- dim(x[[i]])[!singleton[[i]]]
+				v0[[i]] <- v0[[i]][!head(singleton[[i]], d[i])]
+			}
+		}		
+	}
 	
 	## Run MCCA and store results
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
@@ -182,11 +199,23 @@ for (l in 1:r) {
 		mcca.gradient.rotate(x = x, v = v0, w = w, 
 			maxit = maxit, tol = tol, verbose = verbose)
 	}	
-	v[,l] <- out$v 
 	objective[l] <- out$objective
 	block.score[,,l] <- out$score
 	global.score[,l] <- rowMeans(block.score[,,l]) 
 	iters[l] <- out$iters
+	## Reinsert singleton dimensions in canonical weights if needed
+	if (any(any.singleton)) {
+		for (i in which(any.singleton)) {
+			vil <- replicate(1, d[i], FALSE)
+			if (all.singleton[i]) {
+					vil[[1]] <- out$v[[i]]
+			} else {
+				vil[!head(singleton[[i]], d[i])] <- out$v[[i]]
+			}
+			out$v[[i]] <- vil
+		}
+	}
+	v[,l] <- out$v 
 
 	## Transform back canonical weights to original search space 
 	## if needed
@@ -195,7 +224,7 @@ for (l in 1:r) {
 			mat = ortho.cnstr$mat, modes = ortho.cnstr$modes, 
 			transpose.mat = TRUE)
 	}
-
+	
 	## Monitor objective value
 	if (objective[l] <= eps) break 
 		
