@@ -133,7 +133,7 @@ for (it in 1:maxit) {
 			h[[i]][[k]] <- if (hikzero) vik else (hik / nrmhik)
 		}
 	}
-		
+	
 	## Grid search
 	vals <- sapply(theta.grid, objective.fn, v = v, h = h, 
 		x = x, w = w)
