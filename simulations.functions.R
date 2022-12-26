@@ -410,3 +410,41 @@ vout
 
 
 
+############################################
+# Function to calculate the signal-to-noise 
+# ratio in the factor model
+############################################
+
+SNR.fun <- function(v, score.cov, noise.cov)
+{
+if (!is.matrix(v)) 
+	dim(v) <- c(length(v), 1L)
+r <- ncol(v)
+m <- nrow(v)
+lenv <- sapply(v[,1], function(ll) prod(sapply(ll, length)))
+signal.var <- matrix(0, m, r)
+noise.var <- numeric(m)
+for (l in 1:r) {
+	vl <- tnsr.rk1.expand(v[,l])
+	score.var <- if (is.list(score.cov)) {
+		diag(score.cov[[l]])
+	} else if (is.matrix(score.cov)) {
+		diag(score.cov)
+	} else if (is.array(score.cov)) {
+		diag(score.cov[,,l])
+	} else {
+		score.cov[min(l, length(score.cov))]
+	}
+	score.var <- rep_len(score.var, m)
+	signal.var[,l] <- mapply(function(x,y) sum(x^2) * y, 
+		x = vl, y = score.var)
+}
+for (i in 1:m) {
+	noise.var[i] <- if (is.list(noise.cov)) {
+		sum(diag(noise.cov[[i]]))
+	} else {
+		noise.cov[min(i, length(noise.cov))] * lenv[i]
+	}
+}	
+sum(signal.var) / sum(noise.var)
+}
