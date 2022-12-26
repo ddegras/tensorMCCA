@@ -307,9 +307,15 @@ out
 cosine.dist.mod <- function(v1, v2)
 {
 distance <- cosine.dist(v1, v2)
-idx <- which(colMeans(distance) > 1)
-if (length(idx) > 0) 
-	distance[,idx] <- 2 - distance[,idx]
+if (is.matrix(distance)) {
+	idx <- which(colMeans(distance) > 1)
+	if (length(idx) > 0) 
+		distance[,idx] <- 2 - distance[,idx]
+} else {
+	idx <- which(distance > 1)
+	if (length(idx) > 0) 
+		distance[idx] <- 2 - distance[idx]
+}
 distance
 }
 
