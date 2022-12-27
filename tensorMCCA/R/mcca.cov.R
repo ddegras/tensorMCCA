@@ -206,7 +206,7 @@ for (l in 1:r) {
 	## Reinsert singleton dimensions in canonical weights if needed
 	if (any(any.singleton)) {
 		for (i in which(any.singleton)) {
-			vil <- replicate(1, d[i], FALSE)
+			vil <- replicate(d[i], 1, FALSE)
 			if (all.singleton[i]) {
 					vil[[1]] <- out$v[[i]]
 			} else {
