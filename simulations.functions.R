@@ -448,3 +448,25 @@ for (i in 1:m) {
 }	
 sum(signal.var) / sum(noise.var)
 }
+
+
+#####################################
+# Function to best match estimated 
+# canonical weights to true weights
+#####################################
+
+
+best.assign <- function(vhat, v)
+{
+stopifnot(identical(dim(vhat), dim(v)))
+m <- nrow(v)
+r <- ncol(v)
+if (r == 1) return(1)
+cp <- matrix(0, r, r)
+for (k in 1:r) {
+	for (l in 1:r) {
+		cp[k,l] <- abs(sum(tnsr.rk1.cp(v[,k], vhat[,l])))
+	}
+}
+as.integer(clue::solve_LSAP(cp, TRUE))
+}
