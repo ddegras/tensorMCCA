@@ -1,4 +1,4 @@
-mcca.cov <- function(x, r = 1, w = 1, scale = c("block", "global"), 
+mcca.cov <- function(x, r = 1L, w = 1, scale = c("block", "global"), 
 	ortho = c("score", "weight"), optim = c("bca", "grad.scale", 
 	"grad.rotate"), init = c("cca", "svd", "random"), maxit = 1000, 
 	tol = 1e-6, sweep = c("cyclical", "random"), control = list(), 
@@ -235,9 +235,9 @@ o <- order(objective, decreasing = TRUE)
 o <- o[objective[o] > eps]
 if (length(o) == 0) o <- 1
 if (!identical(o, 1:r)) {
-	v <- v[,o]
-	block.score <- block.score[,,o]
-	global.score <- global.score[,o]
+	v <- v[,o, drop = FALSE]
+	block.score <- block.score[,,o, drop = FALSE]
+	global.score <- global.score[,o, drop = FALSE]
 	objective <- objective[o]
 	iters <- iters[o]
 }
@@ -246,10 +246,10 @@ r <- length(o)
 call.args$r <- r
 if (ortho == "score" && r > 1) 
 	call.args$ortho.cnstr <- ortho.cnstr
-if (r == 1) {
-	dim(block.score) <- c(n, m)
-	dim(global.score) <- NULL
-} 
+# if (r == 1) {
+	# dim(block.score) <- c(n, m)
+	# dim(global.score) <- NULL
+# } 
 
 ## Clean up scores
 block.score[abs(block.score) < eps] <- 0
