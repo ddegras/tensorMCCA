@@ -44,6 +44,15 @@ n <- NCOL(a)
 p <- length(b)
 dim(b) <- NULL
 
+## Trivial case: v scalar
+if (p == 1L) {
+	test <- (is.null(cc) || all(abs(cc) <= eps))
+	v <- if (test && b >= 0) { 1
+	} else if (test && b < 0) { -1
+	} else { 0 }
+	return(list(v))
+}
+
 ## Handle orthogonality constraints by changing variables
 if (!is.null(cc)) {
 	if (is.list(cc)) 
@@ -53,15 +62,6 @@ if (!is.null(cc)) {
 	qq <- qr.Q(qrc, complete = TRUE)[, -(1:qrc$rank), drop = FALSE]
 	a <- crossprod(qq, a)
 	b <- as.vector(crossprod(qq, b))
-}
-
-## Trivial case: b scalar
-if (length(b) == 1L) {
-	v <- if (is.null(cc) && b >= 0) { 1
-	} else if (is.null(cc) && b < 0) { -1
-	} else if (b >= 0) { qq[,1] 
-	} else { -qq[,1] }
-	return(list(v))
 }
 
 ## Trivial case: A = 0
@@ -193,9 +193,9 @@ z <- sweep(z, 2, nrmz, "/")
 objective <- colSums(delta * z^2) + 2 * colSums(b * z)
 idx <- which.max(objective)
 if (objective[idx] > objective.best) { v <- P %*% z[,idx] }
-dim(v) <- NULL
 v <- v / sqrt(sum(v^2))
 if (!is.null(cc)) v <- qq %*% v
+dim(v) <- NULL
 list(v)
 }
 
