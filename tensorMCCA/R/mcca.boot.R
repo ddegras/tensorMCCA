@@ -67,6 +67,7 @@ if (parallel.flag) {
 
 ## Estimate inference targets from original data
 mcca.out <- list()
+if ("v" %in% target) mcca.out$v <- object$v
 score.target <- NULL
 if ("score.cov" %in% target) score.target <- "cov"
 if ("score.cor" %in% target) score.target <- c(score.target, "cor")
@@ -82,7 +83,6 @@ if (!is.null(noise.target))
 
 ## Realign the bootstrap estimates with original estimates
 if ("v" %in% target) {
-	mcca.out$v <- object$v
 	for (b in 1:length(boot.out)) {
 		idx <- which(colMeans(cosine.dist(boot.out[[b]]$v, mcca.out$v)) > 1)
 		for (l in idx) { 
