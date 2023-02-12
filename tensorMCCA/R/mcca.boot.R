@@ -42,17 +42,24 @@ if (method == "residual") {
 ## Perform bootstrap in parallel or sequentially 
 if (parallel.flag) {
 	boot.out <- if (method == "raw") {
-		foreach(b = 1:nboot) %dopar% mcca.boot.single(x, method, target, call.args)
-	} else foreach(b = 1:nboot) %dopar% mcca.boot.single(list(fitted, resid), method, 
-		target, call.args)
+		foreach(b = 1:nboot, .errorhandling = "remove") %dopar% {
+			mcca.boot.single(x, method, target, call.args) 
+		}
+	} else foreach(b = 1:nboot, .errorhandling = "remove") %dopar% {
+		mcca.boot.single(list(fitted, resid), method, target, call.args)
+		}
 } else {
 	boot.out <- vector("list", nboot)
 	if (method == "raw") {
-		for (b in 1:nboot) boot.out[[b]] <- mcca.boot.single(x, method, target, call.args)
+		for (b in 1:nboot) boot.out[[b]] <- tryCatch(
+			mcca.boot.single(x, method, target, call.args), error = function(e) e)
 	} else {
-		for (b in 1:nboot) boot.out[[b]] <- mcca.boot.single(list(fitted, resid), method, 
-			target, call.args)
+		for (b in 1:nboot) boot.out[[b]] <- tryCatch(
+			mcca.boot.single(list(fitted, resid), method, target, call.args), 
+			error = function(e) e)
 	}
+	error.flag <- sapply(boot.out, inherits, what = "error")
+	if (any(error.flag)) boot.out <- boot.out[!error.flag]
 }
 
 ## Estimate inference targets from original data
@@ -73,7 +80,7 @@ if (!is.null(noise.target))
 ## Realign the bootstrap estimates with original estimates
 if ("v" %in% target) {
 	mcca.out$v <- object$v
-	for (b in 1:nboot) {
+	for (b in 1:length(boot.out)) {
 		idx <- which(colMeans(cosine.dist(boot.out[[b]]$v, mcca.out$v)) > 1)
 		for (l in idx) { 
 			for (i in 1:m) {
