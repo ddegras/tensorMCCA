@@ -11,7 +11,9 @@ and covariance/correlation matrices of the noise.
 }
 
 \usage{
-mcca.boot(x, object, method = c("raw", "residual"), nboot = 100, parallel = TRUE, target = c("v", "score.cov", "noise.cov", "score.cor", "noise.cor"))
+mcca.boot(x, object, method = c("raw", "residual"), nboot = 100, parallel = TRUE, 
+	target = c("v", "score.cov", "noise.cov", "score.cor", "noise.cor"),
+	.errorhandling = c("stop", "remove", "pass"))
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -19,10 +21,10 @@ mcca.boot(x, object, method = c("raw", "residual"), nboot = 100, parallel = TRUE
 List of data arrays. All arrays must have the same size in their last dimension (= common instances, cases, or subjects).
 }
   \item{object}{
-List created by calling \code{\link{mcca.cor}} or \code{\link{mcca.cov}} on \code{x}.
+The result of a call to \code{\link{mcca.cor}} or \code{\link{mcca.cov}} on \code{x}.
 }
   \item{method}{
-Type of boostrap: based on \code{raw} data or based on \code{residual}.
+Type of boostrap: based on raw data or on residuals.
 }
   \item{nboot}{
 Number of bootstrap replications. Default = 100.}
@@ -31,12 +33,19 @@ Number of bootstrap replications. Default = 100.}
 Logical value specifying whether calculations should be run in parallel (\code{TRUE}, default) or not. A back-end for parallel computations must be registered before calling this function. 
 }
   \item{target}{
-
+  	Targets for bootstrap inference. Any subset of "v", "score.cov", "noise.cov", "score.cor", and "noise.cor". Partial matching is enabled. 
+}
+\item{.errorhandling}{
+	Error handling in the bootstrap loop.
 }
 }
 \details{
 The result of a call to \code{mcca.boot} is not meant to be looked at directly. 
 Rather, it served as a intermediate step before calling the function \code{\link{mcca.boot.ci}}. 
+
+If \code{method} = \code{raw}, the entire data are resampled (with replacement). If \code{method} = \code{residual}, all fitted values are retained while the residuals are resampled (with replacement) and added to the fitted values. 
+
+If \code{parallel} = \code{TRUE} and execution in parallel is possible, the argument \code{.errorhandling} is passed as-is to the function \code{foreach} from package \code{foreach}. Otherwise the same functionalities (stop on errors, pass errors and keep error messages, or remove results containing errors) are implemented in the serial loop. 
 
 
 }
@@ -46,7 +55,7 @@ A LIST with components
 \item{bootstrap}{list of length \code{nboot} containing the required bootstrap estimates}
 \item{original}{corresponding list of estimates based on the original data}
 }
-The sublist \code{origin} and each field of the sublist \code{bootstrap} contain the same field names which may be: \code{v}, \code{score.cov.block}, \code{score.cov.global}, \code{score.cor.block}, \code{score.cor.global}, \code{noise.cov}, and \code{noise.cor}.
+The sublist \code{original} and each field of the sublist \code{bootstrap} contain the same field names which may be: \code{v}, \code{score.cov.block}, \code{score.cov.global}, \code{score.cor.block}, \code{score.cor.global}, \code{noise.cov}, and \code{noise.cor}.
 }
 
 
