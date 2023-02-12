@@ -1,5 +1,6 @@
 mcca.boot <- function(x, object, method = c("raw", "residual"), nboot = 100, parallel = TRUE, 
-	target = c("v", "score.cov", "noise.cov", "score.cor", "noise.cor"))
+	target = c("v", "score.cov", "noise.cov", "score.cor", "noise.cor"),
+	.errorhandling = c("stop", "remove", "pass"))
 {
 ## Determine bootstrap targets
 lookup <- c("v", "score.cov", "noise.cov", "score.cor", "noise.cor")
@@ -8,6 +9,7 @@ stopifnot(length(target) > 0)
 
 ## Match other arguments
 method <- match.arg(method)
+.errorhandling <- match.arg(.errorhandling)
 
 ## Determine if bootstrap should be computed in parallel 
 parallel.flag <- FALSE
@@ -34,32 +36,33 @@ call.args <- object$call.args
 objective.type <- call.args$objective.type
 
 ## Prepare resampling in case of residual-based bootstrap
-if (method == "residual") {
+if (method == "raw") {
+	xx <- x
+} else { # method == "residual"
 	resid <- calculate.residuals(x, object, matrix.out = TRUE)
 	fitted <- lapply(1:m, function(i) as.numeric(x[[i]]) - resid[[i]])
+	xx <- list(fitted = fitted, resid = resid, dimx = dimx)
 }
 
 ## Perform bootstrap in parallel or sequentially 
 if (parallel.flag) {
-	boot.out <- if (method == "raw") {
-		foreach(b = 1:nboot, .errorhandling = "remove") %dopar% {
-			mcca.boot.single(x, method, target, call.args) 
-		}
-	} else foreach(b = 1:nboot, .errorhandling = "remove") %dopar% {
-		mcca.boot.single(list(fitted, resid), method, target, call.args)
-		}
+	boot.out <- foreach(b = 1:nboot, .errorhandling = .errorhandling) %dopar% {
+			mcca.boot.single(xx, method, target, call.args) 
+	}
 } else {
 	boot.out <- vector("list", nboot)
-	if (method == "raw") {
-		for (b in 1:nboot) boot.out[[b]] <- tryCatch(
-			mcca.boot.single(x, method, target, call.args), error = function(e) e)
+	if (.errorhandling == "stop") {
+		for (b in 1:nboot) 
+			boot.out[[b]] <- mcca.boot.single(xx, method, target, call.args)
 	} else {
-		for (b in 1:nboot) boot.out[[b]] <- tryCatch(
-			mcca.boot.single(list(fitted, resid), method, target, call.args), 
-			error = function(e) e)
+		for (b in 1:nboot) 
+			boot.out[[b]] <- tryCatch(
+			mcca.boot.single(xx, method, target, call.args), error = function(e) e)
 	}
-	error.flag <- sapply(boot.out, inherits, what = "error")
-	if (any(error.flag)) boot.out <- boot.out[!error.flag]
+	if (.errorhandling == "remove") {
+		error.flag <- sapply(boot.out, inherits, what = "error")
+		if (any(error.flag)) boot.out <- boot.out[!error.flag]
+	}
 }
 
 ## Estimate inference targets from original data
@@ -206,28 +209,26 @@ if (method == "raw") {
 	m <- length(x)
 	dimx <- lapply(x, dim)
 } else { # method == "residual"
-	m <- length(x[[1]]) 
-	dimx <- lapply(x[[1]], dim)	
+	dimx <- x$dimx
+	m <- length(dimx) 
 }
-n <- dimx[[1]][length(dimx[[1]])] 
-p <- lapply(dimx, function(dims) dims[-length(dims)])
-d <- sapply(p, length)
-r <- call.args$r
+n <- tail(dimx[[1]], 1) 
 out <- list()
 
 ## Resample data
 idx <- sample(n, n, replace = TRUE)
 if (method == "raw") {
 	xstar <- x
+	p <- lapply(dimx, function(dims) dims[-length(dims)])
 	for (i in 1:m) {
 		dim(xstar[[i]]) <- c(prod(p[[i]]), n)
 		xstar[[i]] <- xstar[[i]][,idx]
 		dim(xstar[[i]]) <- dimx[[i]]
 	}
 } else { # method == "residual"
-	xstar <- x$fitted
+	xstar <- vector("list", m)
 	for (i in 1:m) {
-		xstar[[i]] <- xstar[[i]] + x$resid[[i]][,idx]
+		xstar[[i]] <- x$fitted[[i]] + x$resid[[i]][,idx]
 		dim(xstar[[i]]) <- dimx[[i]]
 	}
 }
@@ -262,7 +263,7 @@ noise.target <- NULL
 if ("noise.cov" %in% target) noise.target <- "cov"
 if ("noise.cov" %in% target) noise.target <- c(noise.target, "cor")
 if (!is.null(noise.target)) 
-	out <- c(out, calculate.noise.cov(x, result, type = score.target, 
+	out <- c(out, calculate.noise.cov(xstar, result, type = score.target, 
 		matrix.out = FALSE))
 
 out
