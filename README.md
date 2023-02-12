@@ -11,6 +11,7 @@ install_github("https://github.com/ddegras/tensorMCCA", subdir = "tensorMCCA")
 
 **Main functions:**
 
--  `mcca.cov`, `mcca.cor`
--  `mcca.init.cca`, `mcca.init.svd`, `mcca.init.random` 
--  `permutation.test`
+-  MCCA optimization: `mcca.cov`, `mcca.cor`
+-  Initialization: `mcca.init.cca`, `mcca.init.svd`, `mcca.init.random` 
+-  Permutation tests: `permutation.test`
+-  Bootstrap confidence intervals: `mcca.boot`, `mcca.boot.ci`
