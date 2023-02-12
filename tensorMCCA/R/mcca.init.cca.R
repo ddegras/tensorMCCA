@@ -100,8 +100,8 @@ for (i in 1:m) {
 		} else { matrix(x[[i]], pp[i], n) } 
 	test <- (max(3, 2 * k[i]) <= min(pp[i], n))
 	if (test) 
-		svdx <- tryCatch(svds(xmat, k[i]), error = function(e) list())
-	if (!test || length(svdx$d) < k[i])
+		svdx <- tryCatch(svds(xmat, k[i]), error = function(e) NULL)
+	if (!test || is.null(svdx))
 		svdx <- svd(xmat, nu = k[i], nv = k[i])
 	if (objective.type == "cov") {
 		u[[i]] <- svdx$u
@@ -134,8 +134,8 @@ for (i in 1:m) {
 		test <- all(k[c(i,j)] > 2)
 		if (test) 
 			svdij <- tryCatch(svds(crossprod(v[[i]], v[[j]]), k = 1), 
-				error = function(e) list())
-		if (!test || length(svdij$d) == 0)
+				error = function(e) NULL)
+		if (!test || is.null(svdij))
 			svdij <- svd(crossprod(v[[i]], v[[j]]), nu = 1, nv = 1)		
 		a[[i]][,j] <- u[[i]] %*% svdij$u
 		a[[j]][,i] <- u[[j]] %*% svdij$v
