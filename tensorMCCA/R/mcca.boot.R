@@ -234,14 +234,12 @@ if (method == "raw") {
 }
 
 # Run mCCA on bootstrapped data
-objective.type <- call.args$objective.type
-init.args <- call.args$init.args
-result <- if (objective.type == "cor") {
-	mcca.cor(xstar, r = call.args$r, w = init.args$w, ortho = call.args$ortho.type,
+result <- if (call.args$objective.type == "cor") {
+	mcca.cor(xstar, r = call.args$r, w = call.args$w, ortho = call.args$ortho.type,
 		optim = call.args$optim, init = call.args$init.method, sweep = call.args$sweep,
 		maxit = call.args$maxit, tol = call.args$tol, control = call.args$control)
 } else {
-	mcca.cov(xstar, r = call.args$r, w = init.args$w, scale = init.args$scale, 
+	mcca.cov(xstar, r = call.args$r, w = call.args$w, scale = call.args$scale, 
 		ortho = call.args$ortho.type, optim = call.args$optim, init = call.args$init.method, 
 		sweep = call.args$sweep, maxit = call.args$maxit, tol = call.args$tol, 
 		control = call.args$control)
