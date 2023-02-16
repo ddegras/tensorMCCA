@@ -74,11 +74,11 @@ stopifnot(is.numeric(SIGMA) || identical(dim(SIGMA), c(m,m,r)))
 ## Preprocess noise covariance
 PSI <- noise.cov
 if (is.numeric(PSI)) {
-	PSI <- rep_len(PSI, r)
+	PSI <- rep_len(PSI, m)
 } else if (is.list(PSI)) {
-	stopifnot(length(PSI) == r)
-	for (l in 1:r) 
-		stopifnot(identical(dim(PSI[[l]]), c(pp[l],pp[l])))
+	stopifnot(length(PSI) == m)
+	for (i in 1:m) 
+		stopifnot(identical(dim(PSI[[i]]), c(pp[i],pp[i])))
 }
 
 scale <- match.arg(scale)
