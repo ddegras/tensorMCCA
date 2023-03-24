@@ -11,6 +11,7 @@ test <- check.arguments(x, object$v, object$call.args$w)
 v <- object$v[,1]
 score <- object$block.score[,,1]
 w <- object$call.args$w
+objective <- object$objective[1]
 
 ## Calculate data dimensions
 m <- length(x)
