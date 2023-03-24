@@ -6,7 +6,7 @@
 \description{Perform multiple CCA by maximizing sum of covariances between canonical scores.}
 
 \usage{
-mcca.cov(x, r = 1, w = 1, scale = c("block", "global"), 
+mcca.cov(x, r = 1, w = NULL, scale = c("block", "global"), 
 	ortho = c("score", "weight"), optim = c("bca", "grad.scale", 
 	"grad.rotate"), init = c("cca", "svd", "random"), maxit = 1000, 
 	tol = 1e-6, sweep = c("cyclical", "random"), control = list(), 
@@ -29,9 +29,9 @@ mcca.cov(x, r = 1, w = 1, scale = c("block", "global"),
 
 
 \details{
-The objective weights \code{w} can be specified as a single positive number (to be recycled) or as an \eqn{m}-by-\eqn{m} matrix, where \eqn{m} is the length of \code{x} (number of datasets). These weights must be nonnegative and have a positive sum. Within the function \code{mcca.cov}, \code{w} is made symmetric and scaled so its elements add up to 1.
+The objective weights \code{w} can be specified as a single positive number (to be recycled) or as an \eqn{m}-by-\eqn{m} matrix, where \eqn{m} is the length of \code{x} (number of datasets). These weights must be nonnegative and have a positive sum. By default (\code{w=NULL}), \code{w} is set to a mmatrix with diagonal coefficients zero and off-diagonal coefficients equal to a positive number. Within the function \code{mcca.cov}, \code{w} is made symmetric and scaled so its elements add up to 1.
 
-For each dataset, the number \code{r} of canonical components cannot exceed the number of cases, say \eqn{n}, or the number of elements in each image (the dataset containing \eqn{n} images). If needed, \code{r} will be reduced to meet these limits. 
+For each data array, the number \code{r} of canonical components cannot exceed the number of cases, say \eqn{n}, or the number of elements in each image (the dataset containing \eqn{n} images). If needed, \code{r} will be reduced to meet these limits. 
 
 The scaling constraint \code{scale} can take the value \code{block} (each canonical tensor must have norm equal to 1) or \code{global} (on average across datasets, the canonical tensors have squared norm equal to 1). (at each stage \eqn{1,...,r} of the MCCA). 
 

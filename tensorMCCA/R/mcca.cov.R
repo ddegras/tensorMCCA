@@ -1,4 +1,4 @@
-mcca.cov <- function(x, r = 1L, w = 1, scale = c("block", "global"), 
+mcca.cov <- function(x, r = 1L, w = NULL, scale = c("block", "global"), 
 	ortho = c("score", "weight"), optim = c("bca", "grad.scale", 
 	"grad.rotate"), init = c("cca", "svd", "random"), maxit = 1000, 
 	tol = 1e-6, sweep = c("cyclical", "random"), control = list(), 
@@ -19,7 +19,9 @@ p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 n <- tail(dimx[[1]], 1) 
 
 ## Objective weights
-w <- if (length(w) == 1) {
+w <- if (is.null(w)) {
+	(1 - diag(m)) / m / (m-1)
+} else if (length(w) == 1) {
 	matrix(1 / (m^2), m, m)
 } else {
 	(w + t(w)) / (2 * sum(w)) 
