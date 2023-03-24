@@ -5,6 +5,7 @@ p <- dim(x)
 d <- length(p)
 if (!is.list(v)) v <- list(v)
 if (is.null(modes) && length(v) == d) modes <- 1:d
+stopifnot(length(v) == length(modes))
 modes <- as.integer(modes)
 nmodes <- length(modes)
 if (nmodes > 1 && any(diff(modes) < 0)) {
