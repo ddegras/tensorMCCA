@@ -3,6 +3,7 @@ export(
 "check.arguments",
 "deflate.x",
 "hosvd",
+"kkt",
 "mcca.boot",
 "mcca.boot.ci",
 "mcca.cor",
