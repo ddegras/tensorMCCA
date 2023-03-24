@@ -2,14 +2,16 @@
 \alias{simulate.factor.model}
 
 \title{
-Simulate Factor Model for Multiple Tensor Datasets
+Simulate Factor Model for Multiple Tensor Data
 }
 
 \description{
 %%  ~~ A concise (1-5 lines) description of what the function does. ~~
 }
+
 \usage{
-simulate.factor.model(dimx, r, score.cov, noise.cov, scale = c("block", "global"), ortho = FALSE)
+simulate.factor.model(dimx, r, score.cov, noise.cov, 
+	scale = c("block", "global"), ortho = FALSE)
 }
 
 \arguments{
