@@ -55,7 +55,12 @@ for (it in 1:maxit) {
 		
 		## Set up linear program
 		a <- tnsr.vec.prod(x = x[[i]], modes = d[i] + 1L,
-			v = list(score[, -i] %*% (w[-i, i] / n)))
+			v = if (m == 2) {
+				list(score[, -i] * (w[-i, i] / n))
+			} else {
+				list(score[, -i] %*% (w[-i, i] / n))
+			}
+		)
 		
 		## Update canonical vectors
 		v[[i]] <- optim.block.cor(v = v[[i]], obj = a, 
