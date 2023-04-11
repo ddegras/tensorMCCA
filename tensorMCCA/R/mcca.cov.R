@@ -94,7 +94,8 @@ if (identical(init, "cca")) {
 }
 
 ## Create output objects 
-v <- vector("list", m * r) # canonical vectors
+feasible <- logical(r)
+v <- vector("list", m * r) # canonical weights
 dim(v) <- c(m, r)
 block.score <- array(0, c(n, m, r)) # canonical scores
 global.score <- matrix(0, n, r) 
@@ -177,10 +178,16 @@ for (l in 1:r) {
 				v0[[i]] <- v0[[i]][!head(singleton[[i]], d[i])]
 			}
 		}		
-	}
+	}	
 	
-	## Run MCCA and store results
+	## Run MCCA
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
+	## Check if there are feasible solutions
+	infeasible <- all(unlist(v0) == 0)
+	feasible[l] <- !infeasible
+	if (infeasible) {
+		if (is.list(init)) next else break
+	} 
 	out <- if (optim == "bca" && scale == "block") {
 		mcca.cov.bca.block(x = x, v = v0, w = w, 
 			ortho = if (ortho == "score" && l > 1) {
@@ -205,6 +212,7 @@ for (l in 1:r) {
 	block.score[,,l] <- out$score
 	global.score[,l] <- rowMeans(block.score[,,l]) 
 	iters[l] <- out$iters
+	
 	## Reinsert singleton dimensions in canonical weights if needed
 	if (any(any.singleton)) {
 		for (i in which(any.singleton)) {
@@ -220,22 +228,26 @@ for (l in 1:r) {
 	v[,l] <- out$v 
 
 	## Transform back canonical weights to original search space 
-	## if needed
 	if (l > 1 && ortho == "weight" && scale == "block") {
 		v[,l] <- tnsr.rk1.mat.prod(v = v[,l], 
 			mat = ortho.cnstr$mat, modes = ortho.cnstr$modes, 
 			transpose.mat = TRUE)
 	}
-	
-	## Monitor objective value
-	if (objective[l] <= eps) break 
 		
 } 
 
+## Retain feasible solutions
+if (any(!feasible)) {
+	objective <- objective[feasible]
+	v <- v[, feasible, drop = FALSE]
+	block.score <- block.score[,, feasible, drop = FALSE]
+	global.score <- global.score[, feasible, drop = FALSE]
+	iters <- iters[feasible]
+	r <- sum(feasible)
+}
+
 ## Re-order results according to objective values
 o <- order(objective, decreasing = TRUE)
-o <- o[objective[o] > eps]
-if (length(o) == 0) o <- 1
 if (!identical(o, 1:r)) {
 	v <- v[,o, drop = FALSE]
 	block.score <- block.score[,,o, drop = FALSE]
@@ -244,18 +256,13 @@ if (!identical(o, 1:r)) {
 	iters <- iters[o]
 }
 
-r <- length(o)
 call.args$r <- r
 if (ortho == "score" && r > 1) 
 	call.args$ortho.cnstr <- ortho.cnstr
-# if (r == 1) {
-	# dim(block.score) <- c(n, m)
-	# dim(global.score) <- NULL
-# } 
 
 ## Clean up scores
-block.score[abs(block.score) < eps] <- 0
-global.score[abs(global.score) < eps] <- 0
+# block.score[abs(block.score) < eps] <- 0
+# global.score[abs(global.score) < eps] <- 0
 
 list(v = v, block.score = block.score, global.score = global.score,
 	objective = objective, iters = iters, call.args = call.args)
