@@ -139,7 +139,7 @@ v
 
 ##############################################
 # Function to approximate a general 3D tensor 
-# by a rank-1 3D tensor
+# by a rank-1 tensor
 ##############################################
 
 tnsr3d.rk1 <- function(x, scale = FALSE, maxit = 100, tol = 1e-6)
@@ -235,6 +235,7 @@ tnsr.rk1.ortho <- function(v0, ortho, maxit, tol)
 {
 m <- length(v0)
 d <- sapply(v0, length)
+if (is.null(ortho)) return(v0)
 v <- v0
 cpfun <- function(x, y) sum(x * y) 
 
