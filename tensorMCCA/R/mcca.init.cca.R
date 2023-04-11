@@ -16,11 +16,12 @@ eps <- 1e-14
 m <- length(x) 
 dimx <- lapply(x, dim) 
 p <- lapply(dimx, function(idx) idx[-length(idx)]) 
+pp <- sapply(p, prod)
 n <- tail(dimx[[1]], 1)
 
 ## Check for constant datasets
 cnst.set <- sapply(x, function(xx) all(abs(xx - xx[1]) < eps))
-if (all(cnst.set)) {
+if (sum(cnst.set | pp == 1) >= (m-1)) {
 	v <- vector("list", m)
 	for (i in 1:m) 
 		v[[i]] <- lapply(p[[i]], function(len) rep(1/sqrt(len), len))
