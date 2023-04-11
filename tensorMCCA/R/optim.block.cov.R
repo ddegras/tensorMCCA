@@ -60,7 +60,7 @@ if (!is.null(cc)) {
 	qrc <- qr(cc)
 	if (qrc$rank == p) return(list(numeric(p)))
 	qq <- qr.Q(qrc, complete = TRUE)[, -(1:qrc$rank), drop = FALSE]
-	a <- crossprod(qq, a)
+	if (is.matrix(a)) a <- crossprod(qq, a)
 	b <- as.vector(crossprod(qq, b))
 }
 
@@ -313,14 +313,17 @@ return(v)
 optim3D.cov <- function(v, a, b, cc, maxit = 1000, tol = 1e-6)
 {
 	
-## Data dimensions
-dima <- dim(a)
-p <- dima[1:3]
-n <- dima[4]
-
 ## Trivial case
-if (all(a == 0) && is.null(cc)) {
+if (all(a == 0) && is.null(cc)) 
 	return(tnsr3d.rk1(b, scale = TRUE, maxit, tol))
+
+## Data dimensions
+p <- dim(b)
+anzero <- !all(a == 0)
+if (!anzero) {	
+	a <- 0
+} else {
+	n <- dim(a)[4]
 }
 
 ## Reshape orthogonality constraints
@@ -339,40 +342,47 @@ for (it in 1:maxit) {
 	## Update canonical vector in dimension k = 1,2,3
 	for (k in 1:3) {
 		i1 <- if (k == 1L) 2L else 1L
-		i2 <- if (k == 3L) 2L else 3L
-		aa <- aperm(a, c(i1, k, 4, i2))
+		i2 <- if (k == 3L) 2L else 3L		 
+		aa <- if (anzero) aperm(a, c(i1, k, 4, i2)) else 0
 		bb <- aperm(b, c(i1, k, i2))
 		
 		if (p[i1] == 1 && p[i2] == 1) {
-			aa <- (v[[i1]] * v[[i2]]) * drop(aa)
-			bb <- (v[[i1]] * v[[i2]]) * drop(b)
+			if (anzero) 
+				aa <- (v[[i1]] * v[[i2]]) * drop(aa)
+			bb <- (v[[i1]] * v[[i2]]) * drop(bb)
 		} else if (p[i1] == 1) {
-			dim(aa) <- c(p[k] * n, p[i2])
-			aa <- aa %*% (v[[i1]] * v[[i2]])
+			if (anzero) {
+				dim(aa) <- c(p[k] * n, p[i2])
+				aa <- aa %*% (v[[i1]] * v[[i2]])
+			}
 			bb <- if (p[k] == 1) {
 				v[[i1]] * sum(bb * v[[i2]])
 			} else {
 				drop(bb) %*% (v[[i1]] * v[[i2]])
 			}
 		} else if (p[i2] == 1) {
-			dim(aa) <- c(p[i1], p[k] * n)
-			aa <- crossprod(v[[i1]] * v[[i2]], aa)
+			if (anzero) {
+				dim(aa) <- c(p[i1], p[k] * n)
+				aa <- crossprod(v[[i1]] * v[[i2]], aa)
+			}
 			bb <- if (p[k] == 1) {
 				v[[i2]] * sum(bb * v[[i1]])
 			} else {
 				crossprod(v[[i1]] * v[[i2]], drop(bb)) 
 			}
-		} else {		
-			dim(aa) <- c(p[i1], p[k] * n * p[i2])
-			aa <- crossprod(v[[i1]], aa)
-			dim(aa) <- c(p[k] * n, p[i2])
-			aa <- aa %*% v[[i2]]
+		} else {
+			if (anzero) {	
+				dim(aa) <- c(p[i1], p[k] * n * p[i2])
+				aa <- crossprod(v[[i1]], aa)
+				dim(aa) <- c(p[k] * n, p[i2])
+				aa <- aa %*% v[[i2]]
+			}
 			dim(bb) <- c(p[i1], p[k] * p[i2])
 			bb <- crossprod(v[[i1]], bb) 
 			dim(bb) <- c(p[k], p[i2])
 			bb <- bb %*% v[[i2]]
 		}
-		dim(aa) <- c(p[k], n)	
+		if (anzero) dim(aa) <- c(p[k], n)	
 		if (!is.null(cc)) {
 			ccmat <- aperm(cc, c(i1, k, 4, i2))
 			dim(ccmat) <- c(p[i1], p[k] * northo * p[i2])
@@ -387,8 +397,11 @@ for (it in 1:maxit) {
 	## Calculate objective
 	objective[it] <- if (p[[3]] == 1) {
 		v[[3]]^2 * mean(aa^2) + 2  * v[[3]] * bb
-	} else { mean(crossprod(v[[3]], aa)^2) + 
-		2 * sum(bb * v[[3]]) }
+	} else if (anzero) { 
+		mean(crossprod(v[[3]], aa)^2) + 2 * sum(bb * v[[3]]) 
+	} else { 
+		2 * sum(bb * v[[3]]) 
+	}
 	
 	## Check convergence 
 	if (it > 1 && abs(objective[it] - objective[it-1]) <= 
