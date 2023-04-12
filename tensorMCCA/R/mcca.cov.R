@@ -115,7 +115,9 @@ if (is.character(init)) {
 ## MAIN LOOP
 for (l in 1:r) {	
 	
-	## Deflate data as required
+	if (verbose) cat("\n\nMCCA: Component", l, "\n")
+
+	## Reduce data by orthogonal projections if required
 	if (l > 1) { 	
 		if (ortho == "score" && scale == "block") { 
 			score <- block.score[,, 1:(l-1), drop = FALSE]
@@ -140,37 +142,58 @@ for (l in 1:r) {
 		} 
 	}
 	
-	## Further process data
+	## More data preprocessing
 	if ((ortho == "weight" && scale == "block") || l == 1) {
 		## Remove datasets that are empty or constant
+		## (datasets become empty when there are too many 
+		## orthogonality constraints)
 		empty.set <- (sapply(x, length) == 0)
 		const.set <- sapply(x, 
 			function(a) length(a) > 0 && all(a == a[1]))
 		keep <- !(empty.set | const.set)
 		if (any(!keep)) x <- x[keep]
-		## Drop singleton dimensions		
-		dimxx <- lapply(x, 
-			function(xx) if (is.array(xx)) dim(xx) else c(1,n))
-		dimv <- lapply(dimxx, function(x) x[-length(x)])
-		for (i in 1:length(x)) {
-			if (all(dimv[[i]] > 1)) next
-			x[[i]] <- drop(x[[i]])
-			if (!is.array(x[[i]]))
-				dim(x[[i]]) <- c(1, length(x[[i]]))
+		## Drop singleton dimensions
+		if (any(keep)) {	
+			dimxx <- lapply(x, 
+				function(xx) if (is.array(xx)) dim(xx) else c(1,n))
+			dimv <- lapply(dimxx, function(x) x[-length(x)])
+			for (i in 1:length(x)) {
+				if (all(dimv[[i]] > 1)) next
+				x[[i]] <- drop(x[[i]])
+				if (!is.array(x[[i]]))
+					dim(x[[i]]) <- c(1, n)
+			}
 		}
 	}
-	
+
 	## Specify canonical weights for empty or constant datasets
 	for (i in which(empty.set)) 
 		v[[i,l]] <- lapply(p[[i]], numeric)
 	for (i in which(const.set)) {
-		v[[i,l]] <- lapply(p[[i]], function(len) rep(1, len))	
+		v[[i,l]] <- if (scale == "block") {
+			lapply(p[[i]], function(len) rep(1, len))	
+		} else lapply(p[[i]], numeric)
 		#@@@@ can be set to zeros if scale = global ? @@@
 	} 
 
-	## Check for early termination 
+	## Trivial case: all datasets are empty or constant
 	if (all(empty.set)) next
 	if (all(!keep)) {objective[l] <- 0; next}
+
+	## Trivial case: all but one datasets are empty or constant
+	if (sum(keep) == 1) {
+		i <- which(keep)
+		v[[i,l]] <- tnsr.rk1.wrapper(x, dimx[[i]])	
+		if (l > 1 && ortho == "weight" && scale == "block") {
+		v[[i,l]] <- tnsr.rk1.mat.prod(v = v[[i,l]], 
+			mat = ortho.cnstr$mat[[i]], modes = ortho.cnstr$modes[[i]], 
+			transpose.mat = TRUE)
+		}
+		block.score[,,l] <- canon.scores(x0, v[,l], FALSE)
+		global.score[,l] <- rowMeans(block.score[,,l])
+		objective[l] <- sum(crossprod(block.score[,,l]) * w) / n
+		next	
+	}
 
 	## Initialize canonical weights
 	if (is.character(init)) {
@@ -198,7 +221,6 @@ for (l in 1:r) {
 	}	
 	
 	## Run MCCA
-	if (verbose) cat("\n\nMCCA: Component", l, "\n")
 	## Check if initial solution is admissible (i.e., satisfies norm constraints)
 	nrmv0 <- tnsr.rk1.nrm(v0, scale)
 	test <- (abs(nrmv0) <= eps)
