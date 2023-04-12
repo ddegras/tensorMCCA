@@ -105,3 +105,49 @@ out
 # distance
 # }
 
+## Internal function to calculate best rank-1 approximation to tensor 
+## and optionally apply tensor-matrix products to back-transform solution
+# Inputs
+# x: reduced tensor (possibly projected in lower-dimensional space 
+#    to handle orthogonality constraints, singleton dimensions dropped
+# dimx0: original dimensions of x
+# 
+tnsr.rk1.wrapper <- function(x, dimx0 = NULL)
+{
+## Data dimensions
+dimredx <- dim(x)
+if (is.null(dimredx)) { 
+	n <- length(x)
+	dimredx <- c(1, n)
+	d <- 1
+} else {
+	d <- length(dimredx)
+	n <- dimredx[d]
+} 
+if (is.null(dimx0)) dimx0 <- dimredx
+
+## Calculate best approximation (canonical weights)
+if (d == 1) {
+	v <- list(1)
+} else if (d == 2) {
+	svdx <- tryCatch(svds(x, 1, 1, 0), error = function(e) NULL)
+	if (is.null(svdx)) svdx <- svd(x, 1, 0)
+	v <- list(svdx$u)
+} else if (d == 3) {
+	v <- tnsr3d.rk1(x)[1:2]
+} else {
+	v <- tnsr.rk1(x)[1:(d-1)]
+}
+
+## Reshape tensor as needed
+dimv <- dimx0[-length(dimx0)]
+if (any(dimv == 1))	{
+	vtmp <- replicate(length(dimv) - 1, 1, FALSE)
+	vtmp[dimv > 1] <- v			
+	v <- vtmp
+}
+
+v	
+}
+
+
