@@ -177,7 +177,7 @@ for (l in 1:r) {
 	} 
 
 	## Trivial case: all datasets are empty or constant
-	if (all(empty.set)) next
+	if (any(empty.set)) next
 	if (all(!keep)) {objective[l] <- 0; next}
 
 	## Trivial case: all but one datasets are empty or constant
