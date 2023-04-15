@@ -124,8 +124,9 @@ n <- dimx[[1]][ndimx[1]] # number of individuals/objects
 ## Set up objective values
 objective <- numeric(maxit+1)
 objective[1] <- objective.internal(x, v, w)
-if (verbose) 
+if (verbose && is.null(ortho)) 
 	cat("\nIteration", 0, "Objective", objective[1])
+# Starting value typically not feasible so don't show its objective value
 
 ## Catch trivial case
 if (all(unlist(x) == 0)) {
