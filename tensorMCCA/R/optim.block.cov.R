@@ -67,14 +67,15 @@ if (!is.null(cc)) {
 ## Trivial case: A = 0
 if (all(abs(a) <= eps)) {
 	nrm <- sqrt(sum(b^2))
-	if (nrm > eps) {
-		v <- if (is.null(cc)) {
-			b / nrm } else {
-			as.vector(qq %*% b) / nrm }
-		return(list(v))
+	v <- if (nrm > eps && is.null(cc)) { 
+		b / nrm 
+	} else if (nrm > eps && (!is.null(cc))) {
+		as.vector(qq %*% b) / nrm	
+	} else if (nrm <= eps && is.null(cc)) {
+		rep(1/sqrt(p), p)
+	} else if (nrm <= eps && (!is.null(cc))) {
+		qq[,1]
 	}
-	v <- if (is.null(cc)) {
-		rep(1/sqrt(p), p) } else { qq[,1] }
 	return(list(v))
 }
 
@@ -226,8 +227,15 @@ if (length(dim(a)) == 3L) {
 }
 
 ## Trivial case
-if (all(a == 0)) {
-	svdb <- if (min(p) > 2) svds(b, 1) else svd(b, 1, 1)
+azero <- all(a == 0) 
+if (azero && is.null(cc)) {
+	if (all(b == 0)) 
+		return(list(rep(1/sqrt(p[1], p[1]), rep(1/sqrt(p[2], p[2])))))
+	svdb <- NULL
+	if (min(p) > 2) 
+		svdb <- tryCatch(svds(b, 1), error = function(e) NULL) 
+	if (is.null(svdb) || any(is.nan(c(svdb$u, svdb$v))))
+		svdb <- svd(b, 1, 1)
 	return(list(as.numeric(svdb$u), as.numeric(svdb$v)))
 } 
 
@@ -240,6 +248,7 @@ ccmat <- NULL
 
 ## MAIN LOOP
 objective <- numeric(maxit)
+aa <- 0
 for (it in 1:maxit) {
 
 	## Update canonical vector in dimension 1 
@@ -247,10 +256,11 @@ for (it in 1:maxit) {
 		aa <- matrix(a * v[[2]], p[1], n)
 		bb <- as.vector(b * v[[2]])
 	} else {
-		dim(a) <- c(p[1] * n, p[2])
-		aa <- a %*% v[[2]]
-		dim(aa) <- c(p[1], n)
-		dim(a) <- dima
+		if (!azero) {
+			dim(a) <- c(p[1] * n, p[2])
+			aa <- a %*% v[[2]]
+			dim(aa) <- c(p[1], n)
+			dim(a) <- dima }
 		bb <- b %*% v[[2]]
 	}
 	if (!is.null(cc)) {
@@ -265,11 +275,12 @@ for (it in 1:maxit) {
 		aa <- matrix(a * v[[1]], p[2], n)
 		bb <- as.vector(b) * v[[1]]
 	} else {
-		dim(a) <- c(p[1], n * p[2])
-		aa <- crossprod(v[[1]], a)
-		dim(aa) <- c(n, p[2])
-		aa <- t(aa)
-		dim(a) <- dima
+		if (!azero) {
+			dim(a) <- c(p[1], n * p[2])
+			aa <- crossprod(v[[1]], a)
+			dim(aa) <- c(n, p[2])
+			aa <- t(aa)
+			dim(a) <- dima }
 		bb <- crossprod(b, v[[1]])
 	}
 	if (!is.null(cc)) {
@@ -283,6 +294,8 @@ for (it in 1:maxit) {
 	## Calculate objective
 	objective[it] <- if (p[2] == 1) {
 		v[[2]]^2 * mean(aa^2) + 2 * v[[2]] * bb
+	} else if (azero) {
+		2 * sum(bb * v[[2]])
 	} else { mean(crossprod(v[[2]], aa)^2) + 
 		2 * sum(bb * v[[2]]) }
 	
