@@ -41,12 +41,14 @@ for (i in 1:m) {
 if (type == "norm" && scale == "block") {
 	## rescale each canonical vector by its norm
 	zero <- (nrmt < eps)
+	scalefun <- function(x,y) as.numeric(x) / y
 	for (i in 1:m) {
 		for (l in 1:r) {
 			v[[i,l]] <- if (zero[i,l]) { 
 				lapply(p[[i]], numeric) 
-			} else { mapply("/", v[[i,l]], nrmv[[i,l]], 
-				SIMPLIFY = FALSE) }
+			} else { 
+				mapply(scalefun, v[[i,l]], nrmv[[i,l]], SIMPLIFY = FALSE) 
+			}
 		}
 	}
 } else if (type == "norm" && scale == "global") {
@@ -54,29 +56,33 @@ if (type == "norm" && scale == "block") {
 	## in a way that its canonical vectors are balanced 
 	sl <- sqrt(colMeans(nrmt^2)) # grand scaling factor
 	zero <- (nrmt < eps)
+	scalefun <- function(x,y) as.numeric(x) * y
 	for (i in 1:m) {
 		for (l in 1:r) {
 			if (zero[i,l]) { 
 				v[[i,l]] <- lapply(p[[i]], numeric) 			
 			} else { 
 				sil <- (nrmt[i,l] / sl[l])^(1/d[i]) / nrmv[[i,l]]
-				v[[i,l]] <- mapply("*", v[[i,l]], sil, SIMPLIFY = FALSE) }
+				v[[i,l]] <- mapply(scalefun, v[[i,l]], sil, SIMPLIFY = FALSE) 
+			}
 		}
 	}
-} else {
+} else { # type == "var"
 	score <- canon.scores(x, v)
 	n <- dim(score)[1]
 	dim(score) <- c(n, m, r)
 	sd.score <- colMeans(score^2) - colMeans(score)^2
 	sd.score <- sqrt(pmax(sd.score, 0))
 	zero <- (nrmt < eps | sd.score < eps)
+	scalefun <- function(x,y) as.numeric(x) * y
 	for (i in 1:m) {
 		for (l in 1:r) {
-			sil <- (nrmt[i,l] / sd.score[i,l])^(1/d[i]) / nrmv[[i,l]]
-			v[[i,l]] <- if (zero[i,l]) { 
-				lapply(p[[i]], numeric) 
+			if (zero[i,l]) { 
+				v[[i,l]] <- lapply(p[[i]], numeric) 
 			} else { 
-				mapply("*", v[[i,l]], sil, SIMPLIFY = FALSE) }
+				sil <- (nrmt[i,l] / sd.score[i,l])^(1/d[i]) / nrmv[[i,l]]
+				v[[i,l]] <- mapply(scalefun, v[[i,l]], sil, SIMPLIFY = FALSE) 
+			}
 		}
 	}	
 }
