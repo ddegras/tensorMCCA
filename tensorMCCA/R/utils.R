@@ -1,5 +1,9 @@
 
-## Function to calculate norms of rank-1 tensors
+################################################
+# Function to calculate norms of rank-1 tensors
+################################################
+
+
 tnsr.rk1.nrm <- function(v, norm = c("block", "global"))
 {
 stopifnot(is.list(v))
@@ -17,8 +21,12 @@ sqrt(rowMeans(out))
 }
 
 
+#######################################
+# Function to calculate cross-products 
+# between rank-1 tensors
+#######################################
 
-## Function to calculate cross-products between rank-1 tensors
+
 tnsr.rk1.cp <- function(v, v2 = NULL)
 {
 stopifnot(is.list(v) && (is.null(v2) || is.list(v2)))
@@ -48,7 +56,12 @@ out
 }
 
 
-## Function to expand rank-1 tensors from lists of vectors to arrays
+####################################
+# Function to expand rank-1 tensors 
+# from lists of vectors to arrays
+####################################
+
+
 tnsr.rk1.expand <- function(v)
 {
 stopifnot(is.list(v))
@@ -65,8 +78,12 @@ v
 }
 
 
+########################################
+# Function to calculate cosine distance 
+# between rank-1 tensors
+########################################
 
-## Function to calculate cosine distance between rank-1 tensors
+
 cosine.dist <- function(v1, v2)
 {
 stopifnot(is.list(v1) && is.list(v2))
@@ -87,9 +104,12 @@ out
 }
 
 
+###################################################
+# Function to calculate cosine distance 
+# between rank-1 tensors taking sign into account
+###################################################
 
-## Function to calculate cosine distance between rank-1 tensors
-## taking sign into account
+
 # cosine.dist.mod <- function(v1, v2)
 # {
 # distance <- cosine.dist(v1, v2)
@@ -105,42 +125,47 @@ out
 # distance
 # }
 
-## Internal function to calculate best rank-1 approximation to tensor 
-## and optionally apply tensor-matrix products to back-transform solution
+
+#####################################
+# Wrapper function to calculate best 
+# rank-1 approximation to tensor 
+#####################################
+
+
 # Inputs
-# x: reduced tensor (possibly projected in lower-dimensional space 
+# redx: reduced tensor (possibly projected in lower-dimensional space 
 #    to handle orthogonality constraints, singleton dimensions dropped
-# dimx0: original dimensions of x
+# dimx: original dimensions of x
 # 
-tnsr.rk1.wrapper <- function(x, dimx0 = NULL)
+tnsr.rk1.wrapper <- function(redx, dimx = NULL)
 {
 ## Data dimensions
-dimredx <- dim(x)
+dimredx <- dim(redx)
 if (is.null(dimredx)) { 
-	n <- length(x)
+	n <- length(redx)
 	dimredx <- c(1, n)
 	d <- 1
 } else {
 	d <- length(dimredx)
 	n <- dimredx[d]
 } 
-if (is.null(dimx0)) dimx0 <- dimredx
+if (is.null(dimx)) dimx <- dimredx
 
 ## Calculate best approximation (canonical weights)
 if (d == 1) {
 	v <- list(1)
 } else if (d == 2) {
-	svdx <- tryCatch(svds(x, 1, 1, 0), error = function(e) NULL)
-	if (is.null(svdx)) svdx <- svd(x, 1, 0)
+	svdx <- tryCatch(svds(redx, 1, 1, 0), error = function(e) NULL)
+	if (is.null(svdx)) svdx <- svd(redx, 1, 0)
 	v <- list(svdx$u)
 } else if (d == 3) {
-	v <- tnsr3d.rk1(x)[1:2]
+	v <- tnsr3d.rk1(redx)[1:2]
 } else {
-	v <- tnsr.rk1(x)[1:(d-1)]
+	v <- tnsr.rk1(redx)[1:(d-1)]
 }
 
 ## Reshape tensor as needed
-dimv <- dimx0[-length(dimx0)]
+dimv <- dimx[-length(dimx)]
 if (any(dimv == 1))	{
 	vtmp <- replicate(length(dimv) - 1, 1, FALSE)
 	vtmp[dimv > 1] <- v			
@@ -150,4 +175,32 @@ if (any(dimv == 1))	{
 v	
 }
 
+
+#########################################
+# Function to reorient canonical weights 
+# so as to maximize objective function
+#########################################
+
+reorient <- function(score, w)
+{
+m <- NROW(w)
+flip <- logical(m)
+if (m == 1) 
+	return(list(flip = flip, objective = sum(w * score^2)))
+x <- crossprod(score) * w
+if (all(x >= 0)) 
+	return(list(flip = flip, objective = sum(x)))
+halfm <- floor(m/2)
+best.sum <- 0
+for (k in 1:halfm) {
+	set <- combn(m, k)
+	val <- apply(set, 2, function(idx) sum(x[idx,-idx]))
+	idx <- which.min(val)
+	if (val[idx] < best.sum) {
+		best.sum <- val[idx]
+		flip <- is.element(1:m, set[,idx])
+	}
+}
+list(flip = flip, objective = sum(x) - 4 * best.sum)
+}
 
