@@ -219,7 +219,7 @@ list(v)
 optim2D.cov <- function(v, a, b, cc, maxit = 1000, tol = 1e-6)
 {
 ## Data dimensions
-p <- c(length(v[[1]]), length(v[[2]]))
+p <- sapply(v, length)
 if (length(dim(a)) == 3L) {
 	a <- aperm(a, c(1, 3, 2))
 	dima <- dim(a)
@@ -230,7 +230,7 @@ if (length(dim(a)) == 3L) {
 azero <- all(a == 0) 
 if (azero && is.null(cc)) {
 	if (all(b == 0)) 
-		return(list(rep(1/sqrt(p[1], p[1]), rep(1/sqrt(p[2], p[2])))))
+		return(lapply(p, function(len) rep(1/sqrt(len), len)))
 	svdb <- NULL
 	if (min(p) > 2) 
 		svdb <- tryCatch(svds(b, 1), error = function(e) NULL) 
@@ -253,7 +253,7 @@ for (it in 1:maxit) {
 
 	## Update canonical vector in dimension 1 
 	if (p[2] == 1L) {
-		aa <- matrix(a * v[[2]], p[1], n)
+		if (!azero) aa <- matrix(a * v[[2]], p[1], n)
 		bb <- as.vector(b * v[[2]])
 	} else {
 		if (!azero) {
@@ -272,7 +272,7 @@ for (it in 1:maxit) {
 		
 	## Update canonical vector in dimension 2
 	if (p[1] == 1L) {
-		aa <- matrix(a * v[[1]], p[2], n)
+		if (!azero) aa <- matrix(a * v[[1]], p[2], n)
 		bb <- as.vector(b) * v[[1]]
 	} else {
 		if (!azero) {
