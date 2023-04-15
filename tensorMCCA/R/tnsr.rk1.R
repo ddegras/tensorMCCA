@@ -243,7 +243,9 @@ for (i in 1:m) {
 objective <- Inf
 cp.v0v <- mapply(cpfun, v0[[i]], v[[i]])
 cp.vv <- mapply(cpfun, v[[i]], v[[i]])
-
+pi <- sapply(v0[[i]], length)
+vzero <- all(unlist(v) == 0)
+if (vzero) next
 	for (it in 1:maxit) {
 		objective.old <- objective
 		## Block coordinate descent
@@ -257,15 +259,23 @@ cp.vv <- mapply(cpfun, v[[i]], v[[i]])
 			## Apply orthogonal constraints to target vector
 			qrM <- qr(Mik)
 			rkM <- qrM$rank
-			Qik <- qr.Q(qrM)[,1:rkM]
-			projv0ik <- if (rkM > 0) {
-				v0[[i]][[k]] - Qik %*% crossprod(Qik, v0[[i]][[k]])
-			} else { v0[[i]][[k]] }
+			if (rkM == pi[k]) {
+				v[[i]] <- lapply(pi, numeric)
+				vzero <- TRUE
+				break
+			} else if (rkM == 0) {
+				projv0ik <- v0[[i]][[k]]
+			} else {
+				Qik <- qr.Q(qrM)[,1:rkM]
+				projv0ik <- v0[[i]][[k]] - 
+					Qik %*% crossprod(Qik, v0[[i]][[k]])
+			} 
 			## Update v(i,k) and cross-products
 			v[[i]][[k]] <- prod(cp.v0v[-k]) / prod(cp.vv[-k]) * projv0ik
 			cp.v0v[k] <- cpfun(v0[[i]][[k]], v[[i]][[k]])
 			cp.vv[k] <- sum(v[[i]][[k]]^2)
-		}	
+		}
+		if (vzero) break	
 		objective <- sum((unlist(v0[[i]]) - unlist(v[[i]]))^2)
 		delta <- abs(objective - objective.old)
 		if (it > 1 && delta <= tol * max(1, objective.old) ) break
@@ -273,6 +283,86 @@ cp.vv <- mapply(cpfun, v[[i]], v[[i]])
 }
 v
 }
+
+
+
+
+
+# tnsr.rk1.ortho.global <- function(v0, ortho, maxit, tol)
+# {
+# if (is.null(ortho)) 
+	# return(scale.v(v0, type = "norm", scale = "global", check.args = FALSE))
+# m <- length(v0)
+# d <- sapply(v0, length)
+# maxd <- max(d)
+# p <- relist(lapply(unlist(v0, FALSE), length), v0)
+# pp <- sapply(p, prod)
+# if (!is.matrix(ortho)) dim(ortho) <- c(length(ortho), 1)
+# northo <- ncol(ortho)
+# ortho.arr <- tnsr.rk1.expand(ortho)
+# v0.arr <- tnsr.rk1.expand(v0)
+
+# v <- scale.v(v0, check.args = FALSE)
+
+
+# bdiagfun <- function(x) {
+# if (is.matrix(x)) return(x)
+# m <- length(x)
+# if (m == 1) return(x[[1]])
+# nr <- sapply(x, nrow)
+# nc <- sapply(x, ncol)
+# endr <- cumsum(nr)
+# startr <- c(1, endr[-m] + 1)
+# endc <- cumsum(nc)
+# startc <- c(1, endc[-m] + 1)
+# out <- matrix(0, sum(nr), sum(nc))
+# for (i in 1:m) 
+	# out[startr[i]:endr[i], startc[i]:endc[i]] <- x[[i]]
+# out
+# }
+
+
+# for (it in 1:maxit) {
+		
+# for (k in 1:maxd) {
+	
+	
+	# nrmv <- tnsr.rk1.nrm(v, "block") 
+		
+	
+	# for (i in 1:m) {
+# objective <- Inf
+# cp.v0v <- mapply(cpfun, v0[[i]], v[[i]])
+# cp.vv <- mapply(cpfun, v[[i]], v[[i]])
+
+
+		# objective.old <- objective
+		# ## Block coordinate descent
+
+					# ## Calculate matrix of orthogonal constraints for v(i,k)
+			# Mik <- if (d[i] == 1) {
+				# matrix(unlist(ortho[i,]), ncol = ncol(ortho))
+			# } else { sapply(ortho[i,], tnsr.vec.prod, 
+				# v = v[[i]][-k], modes = (1:d[i])[-k]) }
+			# ## Apply orthogonal constraints to target vector
+			# qrM <- qr(Mik)
+			# rkM <- qrM$rank
+			# Qik <- qr.Q(qrM)[,1:rkM]
+			# projv0ik <- if (rkM > 0) {
+				# v0[[i]][[k]] - Qik %*% crossprod(Qik, v0[[i]][[k]])
+			# } else { v0[[i]][[k]] }
+			# ## Update v(i,k) and cross-products
+			# v[[i]][[k]] <- prod(cp.v0v[-k]) / prod(cp.vv[-k]) * projv0ik
+			# cp.v0v[k] <- cpfun(v0[[i]][[k]], v[[i]][[k]])
+			# cp.vv[k] <- sum(v[[i]][[k]]^2)
+		# }	
+		# objective <- sum((unlist(v0[[i]]) - unlist(v[[i]]))^2)
+		# delta <- abs(objective - objective.old)
+		# if (it > 1 && delta <= tol * max(1, objective.old) ) break
+	# }	
+# }
+# v
+# }
 
 
 
