@@ -5,7 +5,7 @@
 ###########################################
 
 
-deflate.x <- function(x, v = NULL, score = NULL, # ortho.mode = NULL, 
+deflate.x <- function(x, v = NULL, score = NULL, 
 	scope = c("block", "global"), check.args = TRUE)
 {
 scope <- match.arg(scope)
@@ -21,26 +21,7 @@ if (check.args) {
 	if (is.null(v)  == is.null(score)) 
 		stop(paste("Please specify exactly one of the arguments",
 		"'v' and 'score' and leave the other set to NULL."))
-	# if (!is.null(v)) {		
-		# if (is.null(ortho.mode))
-			# stop("If 'v' is specified, then so must 'ortho.mode'.")
-		# r <- NCOL(v)
-		# ortho.mode <- drop(ortho.mode)
-		# if (!((r == 1L && length(ortho.mode) == m) || 
-			# (r > 1L) && identical(dim(ortho.mode), c(m, r))))
-			# stop(paste("'ortho.mode' must be a matrix of lists",
-			# "with dimensions matching those of 'v'"))
-		# for (i in 1:m) {
-			# modes <- unlist(
-				# if (r == 1L) { ortho.mode[[i]] 
-				# } else ortho.mode[i,])
-			# if (!all(modes %in% (1:d[i])))
-				# stop(paste("Values in 'ortho.mode[[i]]' or",
-				# "'ortho.mode[i,]' not compatible with the",
-				# "dimensions of 'x'."))
-		# }	
-	# }
-	if (!is.null(score)) {
+		if (!is.null(score)) {
 		stopifnot(is.vector(score) || is.matrix(score))
 		test1 <- (is.vector(score) && length(score) == m)
 		test2 <- (is.matrix(score) && all(dim(score) == c(n, m)))
