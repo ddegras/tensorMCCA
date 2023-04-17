@@ -28,8 +28,8 @@ vbest <- v
 objective.best <- objective[1]
 
 score <- matrix(0, n, m) # canonical scores <X_it, v_i>
-wiizero <- (diag(w) == 0)
-s <- ifelse(wiizero, rep(1,m), diag(w)) # scaling term 
+s <- diag(w) # scaling term 
+s[s == 0] <- 1
 if (sweep == "cyclical") idxi <- 1:m
 if (!is.null(ortho) && !is.matrix(ortho)) 
 	dim(ortho) <- c(m, 1)
@@ -63,14 +63,14 @@ for (it in 1:maxit) {
 		lastidx <- idxi[m]
 		
 		## Set up quadratic program 
-		a <- if (wiizero[i]) 0 else x[[i]] # quadratic component
+		a <- if (w[i,i] == 0) 0 else x[[i]] # quadratic component
 		b <- tnsr.vec.prod(x[[i]], 
 			if (m == 2) { score[, -i] * (w[-i, i] / s[i])
 			} else score[, -i] %*% (w[-i, i] / s[i]), 
 			d[i] + 1L) # linear component
 		
 		## Update canonical vectors
-		v[[i]] <- optim.block.cov(v[[i]], a, b, ortho[i,], maxit, tol) 	
+		v[[i]] <- optim.block.cov(v[[i]], a, b, ortho[i,], maxit, tol)
 	}								
 	
 	## Calculate objective value 
