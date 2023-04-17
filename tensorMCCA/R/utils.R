@@ -17,7 +17,7 @@ for (i in 1:lenv)
 dim(out) <- dim(v)
 if (norm == "block") return(sqrt(out))
 if (is.vector(out)) return(sqrt(mean(out))) 
-sqrt(rowMeans(out))
+sqrt(colMeans(out))
 }
 
 
