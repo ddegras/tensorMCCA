@@ -65,9 +65,9 @@ for (it in 1:maxit) {
 		## Update canonical vectors
 		v[[i]] <- optim.block.cor(v = v[[i]], obj = a, 
 			scale = x[[i]], maxit = maxit, tol = tol,
-			ortho = if (is.null(ortho)) NULL else ortho[i,])		
+			ortho = ortho[i,])		
 	}	
-	
+
 	## Calculate objective value
 	objective[it + 1L] <- objective.internal(x, v, w)	
 	if (objective[it + 1L] > objective.best) {
