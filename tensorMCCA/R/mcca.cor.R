@@ -88,9 +88,10 @@ if (identical(init, "cca")) {
 feasible <- logical(r)
 v <- vector("list", m * r) # canonical weights
 dim(v) <- c(m, r)
-block.score <- array(dim = c(n, m, r)) 
-global.score <- matrix(nrow = n, ncol = r) 
-objective <- iters <- rep(NA, r)
+block.score <- array(0, c(n, m, r)) 
+global.score <- matrix(0, n, r) 
+objective <- rep(NA, r)
+iters <- numeric(r)
 call.args <- list(objective.type = "cor", r = NULL, w = w, 
 	scale = "block", ortho.type = ortho, ortho.cnstr = NULL, 
 	optim = optim, init.method = NULL, init.args = init.args, 
@@ -104,7 +105,7 @@ if (is.character(init)) {
 	call.args$init.val <- as.matrix(init)
 }
 
-ones <- function(n) rep(1/sqrt(n), n) 
+ones <- function(len) rep(1/sqrt(len), len) 
 
 ## MAIN LOOP
 
@@ -128,7 +129,7 @@ for (l in 1:r) {
 				# x <- deflate.x(x = x0, v = v[,1:(l-1)],  
 				# ortho.mode = ortho.mode[,1:(l-1),l], 
 				# check.args = FALSE)
-		} else { # ortho == "score"
+		} else if (ortho == "score") {
 			## Calculate orthogonality constraints explicitly	
 			for (i in 1:m)
 				ortho.cnstr[[i,l-1]] <- tnsr.vec.prod(x[[i]], 
@@ -159,10 +160,8 @@ for (l in 1:r) {
 	## Trivial case: all or all but one datasets equal to zero
 	if (sum(xzero) >= (m-1)) {
 		v[,l] <- relist(lapply(unlist(p), numeric), p)
-		objective[l] <- 0
-		block.score[,,l] <- 0
-		global.score[,l] <- 0
-		if (ortho == "weight") next else break
+		if (l == 1) objective[1] <- 0
+		if (l > 1 && ortho == "weight") next else break
 	}
 	
 	## Specify canonical weights for datasets equal to zero
@@ -190,6 +189,10 @@ for (l in 1:r) {
 			maxit = 100L, tol = 1e-6)
 		v0 <- scale.v(v0, type = "var", x = x, check.args = FALSE)
 	}
+	if (all(unlist(v0) == 0)) {
+		v[,l] <- relist(lapply(unlist(p), numeric), p)
+		next
+	}
 	
 	## Run MCCA
 	out <- if (optim == "bca") {
@@ -203,8 +206,8 @@ for (l in 1:r) {
 			tol = tol, verbose = verbose)
 	}
 	objective[l] <- out$objective
-	block.score[,,l] <- out$score
-	global.score[,l] <- rowMeans(block.score[,,l])	
+	block.score[,xnzero,l] <- out$score
+	global.score[,l] <- rowMeans(block.score[,xnzero,l])	
 	iters[l] <- out$iters	
 	
 	## Reinsert singleton dimensions in canonical weights if needed
@@ -233,7 +236,8 @@ for (l in 1:r) {
 	test <- reorient(out$score, w[xnzero,xnzero])
 	if (any(test$flip)) {
 		objective[l] <- test$objective
-		for (i in which(test$flip)) {
+		idx <- which(xnzero)[test$flip]
+		for (i in idx) {
 			v[[i,l]][[1]] <- (-v[[i,l]][[1]])
 			block.score[,i,l] <- -block.score[,i,l]
 		}
