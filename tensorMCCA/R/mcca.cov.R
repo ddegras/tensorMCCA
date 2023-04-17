@@ -96,9 +96,10 @@ if (identical(init, "cca")) {
 ## Create output objects 
 v <- vector("list", m * r) # canonical weights
 dim(v) <- c(m, r)
-block.score <- array(NA, c(n, m, r)) # canonical scores
-global.score <- matrix(NA, n, r) 
-objective <- iters <- rep(NA, r)
+block.score <- array(0, c(n, m, r)) # canonical scores
+global.score <- matrix(0, n, r) 
+objective <- rep(NA, r)
+iters <- numeric(r)
 call.args <- list(objective.type = "cov", r = NULL, w = w, 
 	scale = scale, ortho.type = ortho, ortho.cnstr = NULL, 
 	optim = optim, init.method = NULL, init.args = init.args, 
@@ -112,7 +113,7 @@ if (is.character(init)) {
 	call.args$init.val <- as.matrix(init)
 }
 
-ones <- function(n) rep(1/sqrt(n), n) 
+ones <- function(len) rep(1/sqrt(len), len) 
 
 ## MAIN LOOP
 for (l in 1:r) {	
@@ -174,7 +175,8 @@ for (l in 1:r) {
 		objective[l] <- 0
 		block.score[,,l] <- 0
 		global.score[,l] <- 0
-		if (ortho == "weight" && scale == "block") next else break
+		if (l > 1 && ortho == "weight" && scale == "block") 
+			next else break
 	}
 	
 	## Specify canonical weights for datasets equal to zero
@@ -230,8 +232,6 @@ for (l in 1:r) {
 		v0 <- scale.v(v0, check.args = FALSE)
 	}	
 	if (all(unlist(v0) == 0)) {
-		block.score[,,l] <- 0
-		global.score[,l] <- 0
 		v[,l] <- relist(lapply(unlist(p), numeric), p)
 		next
 	}
