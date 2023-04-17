@@ -226,7 +226,13 @@ if (length(dim(a)) == 3L) {
 	n <- dima[2]
 }
 
-## Trivial case
+## Reshape orthogonality constraints if any
+if (!is.null(cc)) {
+	northo <- length(cc)
+	cc <- array(unlist(cc), c(p, northo))
+}
+
+## Trivial case: A(t) = 0 for all t and C(l) = 0 for all l
 azero <- all(a == 0) 
 if (azero && is.null(cc)) {
 	if (all(b == 0)) 
@@ -237,18 +243,27 @@ if (azero && is.null(cc)) {
 	if (is.null(svdb) || any(is.nan(c(svdb$u, svdb$v))))
 		svdb <- svd(b, 1, 1)
 	return(list(as.numeric(svdb$u), as.numeric(svdb$v)))
-} 
-
-## Reshape orthogonality constraints if any
-if (!is.null(cc)) {
-	northo <- length(cc)
-	cc <- array(unlist(cc), c(p, northo))
 }
-ccmat <- NULL
+
+## Trivial case: A(t) = 0 for all t and B = 0
+if (azero && !is.null(cc) && all(b == 0) && northo < max(p)) {
+	if (northo < p[1]) {
+		qrc <- qr(cc[,1,])
+		return(list(qr.Q(qrc, complete = TRUE)[, qrc$rank + 1],
+			rep(c(1,0), c(1,p[2]-1))))
+	} else {
+		qrc <- qr(cc[1,,])
+		return(list(rep(c(1,0), c(1,p[1]-1),
+			qr.Q(qrc, complete = TRUE)[, qrc$rank + 1])))
+	}
+}
 
 ## MAIN LOOP
 objective <- numeric(maxit)
 aa <- 0
+cc <- aperm(cc, c(1,3,2)) # new dims p1 x northo x p2
+ccmat <- NULL
+
 for (it in 1:maxit) {
 
 	## Update canonical vector in dimension 1 
@@ -280,7 +295,8 @@ for (it in 1:maxit) {
 			aa <- crossprod(v[[1]], a)
 			dim(aa) <- c(n, p[2])
 			aa <- t(aa)
-			dim(a) <- dima }
+			dim(a) <- dima 
+		}
 		bb <- crossprod(b, v[[1]])
 	}
 	if (!is.null(cc)) {
