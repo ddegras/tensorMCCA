@@ -48,9 +48,11 @@ if (!is.null(cc)) {
 		cc <- matrix(unlist(cc), p, length(cc))
 	qrc <- qr(cc)
 	if (qrc$rank == p) return(list(numeric(p)))
-	Q <- qr.Q(qrc, complete = TRUE)[, -(1:qrc$rank), drop = FALSE]
-	a <- crossprod(Q, a)
-	b <- crossprod(Q, b)
+	if (qrc$rank > 0) {
+		Q <- qr.Q(qrc, complete = TRUE)[, -(1:qrc$rank), drop = FALSE]
+		a <- crossprod(Q, a)
+		b <- crossprod(Q, b)
+	} else cc <- NULL
 }
 if (length(a) == 1) {
 	v <- as.numeric(sign(a)) / sqrt(mean(b^2))
