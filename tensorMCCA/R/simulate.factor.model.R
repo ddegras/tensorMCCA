@@ -3,16 +3,13 @@
 #########################################
 
 simulate.v <- function(p, r, ortho = TRUE) {
-if (any(unlist(p) < 1)) 
-	stop("The values in 'dims' must be positive integers.")
+stopifnot(all(unlist(p) >= 1))
 stopifnot(r >= 0)
 if (!is.list(p)) p <- list(p)
 p <- lapply(p, as.integer)
 r <- as.integer(r)
+stopifnot(!ortho || r >= min(unlist(p)))
 if (r == 1) ortho <- FALSE
-if (ortho && any(unlist(p) < r))
-	warning("The generated canonical weight tensors",
-		" are not orthogonal to each other in all modes.")
 d <- sapply(p, length)
 m <- length(p)
 v <- vector("list", m * max(1, r))
@@ -31,7 +28,7 @@ for (i in 1:m) {
 		}
 		nik <- ncol(vik)
 		for (l in 1:r) 
-			v[[i,l]][[k]] <- vik[, min(l, nik)]
+			v[[i,l]][[k]] <- vik[, max(l %% nik, 1)]
 	}
 }
 v
@@ -42,8 +39,7 @@ v
 # Function to simulate all data 
 ################################
 
-simulate.factor.model <- function(dimx, r, score.cov, noise.cov, 
-	scale = c("block", "global"), ortho = FALSE)
+simulate.factor.model <- function(dimx, r, score.cov, noise.cov, ortho = FALSE)
 {
 ## Data dimensions
 d <- sapply(dimx, length) - 1L
@@ -81,18 +77,9 @@ if (is.numeric(PSI)) {
 		stopifnot(identical(dim(PSI[[i]]), c(pp[i],pp[i])))
 }
 
-scale <- match.arg(scale)
-
 ## Outputs
 x <- vector("list", m)
-v <- if (scale == "block") {
-	simulate.v(p, r, ortho)
-} else if (ortho == FALSE) {
-	scale.v(simulate.v(p, r, FALSE), "norm", "global", 
-		check.args = FALSE)
-} else {
-	orthogonalize.global(simulate.v(p, r, FALSE))
-}
+v <- simulate.v(p, r, ortho)
 if (r == 0) {
 	score <- NULL
 } else if (is.vector(SIGMA)) {
