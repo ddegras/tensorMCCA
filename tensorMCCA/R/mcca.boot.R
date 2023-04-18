@@ -76,9 +76,9 @@ if (!is.null(score.target))
 		matrix.out = FALSE))
 noise.target <- NULL
 if ("noise.cov" %in% target) noise.target <- "cov"
-if ("noise.cov" %in% target) noise.target <- c(noise.target, "cor")
+if ("noise.cor" %in% target) noise.target <- c(noise.target, "cor")
 if (!is.null(noise.target)) 
-	mcca.out <- c(mcca.out, calculate.noise.cov(x, object, type = score.target, 
+	mcca.out <- c(mcca.out, calculate.noise.cov(x, object, type = noise.target, 
 		matrix.out = FALSE))
 
 ## Realign the bootstrap estimates with original estimates
@@ -180,6 +180,7 @@ if (!matrix.out) {
 	pp <- sapply(dimx, function(dims) prod(dims[-length(dims)]))
 }
 resid <- calculate.residuals(x, object, matrix.out = TRUE)
+resid <- sapply(resid, t)
 if ("cov" %in% type) {
 	out$noise.cov <- lapply(resid, cov)	
 	if (!matrix.out) {
