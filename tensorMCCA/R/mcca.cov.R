@@ -105,7 +105,7 @@ call.args <- list(objective.type = "cov", r = NULL, w = w,
 	optim = optim, init.method = NULL, init.args = init.args, 
 	init.val = NULL, maxit = maxit, tol = tol, sweep = sweep, 
 	control = control) 
-if (ortho == "weight" && scale == "block")
+if (ortho == "weight" && scale == "block" && r > 1)
 	call.args$ortho.cnstr <- ortho.mode
 if (is.character(init)) { 
 	call.args$init.method <- init
