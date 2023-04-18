@@ -13,6 +13,7 @@ target <- names(object$original)
 out <- list()
 nboot <- length(object$bootstrap)
 
+
 if ("v" %in% target) {
 	v <- object$original$v
 	m <- NROW(v)
@@ -48,33 +49,6 @@ if ("v" %in% target) {
 if ("score.cov.block" %in% target) {
 	r <- ncol(object$original$score.cov.block)
 	out$score.cov.block <- out$score.cov.global <- vector("list", r)
-	vec2cov <- function(vec) {
-		mat <- as.matrix(vec)
-		n <- ncol(mat)
-		stopifnot(n %in% c(1,2))
-		m <- as.integer((sqrt(8 * nrow(mat) + 1) - 1) / 2)
-		if (m == 1) {
-			out <- vec
-		} else {
-			idxlo <- which(lower.tri(matrix(0, m, m)))
-			idxrow <- rep(1:(m-1), (m-1):1)
-			idxcol <- rep(2:m, 1:(m-1)) 
-			idxup <- (idxcol - 1L) * m + idxrow
-			idxdiag <- cumsum(c(0L, m:2)) + 1L
-			idxdiag2 <- seq(0, by = m, len = m) + (1:m)
-			out <- matrix(0, m^2, n)
-			out[idxlo,] <- mat[-idxdiag,]
-			out[idxup,] <- out[idxlo,]
-			out[idxdiag2,] <-  mat[idxdiag,]
-		}
-		if (n == 1) {
-			dim(out) <- c(m, m)			
-		} else {
-			dim(out) <- c(m, m, n)	
-			dimnames(out) <- list(data1 = 1:m, data2 = 1:m, bound = c("lwr", "upr"))			
-		}
-		out
-	}
 	for (l in 1:r) {
 		bootmat <- sapply(object$bootstrap, function(obj) obj$score.cov.block[,l])
 		if(!is.matrix(bootmat)) 
@@ -84,7 +58,6 @@ if ("score.cov.block" %in% target) {
 		out$score.cov.block[[l]] <- lapply(ci, vec2cov)	 
 		names(out$score.cov.block[[l]]) <- names(ci)
 	}	
-
 	bootmat <- sapply(object$bootstrap, "[[", "score.cov.global")
 	stat <- object$original$score.cov.global
 	ci <- build.ci(bootmat, stat, level, type)
@@ -95,48 +68,54 @@ if ("score.cov.block" %in% target) {
 if ("score.cor.block" %in% target) {
 	r <- ncol(object$original$score.cor.block) 
 	out$score.cor.block <- out$score.cor.global <- vector("list", r)
-	vec2cor <- function(vec) {
-		mat <- as.matrix(vec)
-		n <- ncol(mat)
-		m <- as.integer((sqrt(8 * nrow(mat) + 1) + 1) / 2)
-		if (m == 1) {
-			out <- mat
-		} else {
-			idxlo <- which(lower.tri(matrix(0, m, m)))
-			idxrow <- rep(1:(m-1), (m-1):1)
-			idxcol <- rep(2:m, 1:(m-1)) 
-			idxup <- (idxcol - 1L) * m + idxrow
-			idxdiag <- seq(0, by = m, len = m) + (1:m)
-			out <- matrix(1, m^2, n)
-			out[idxlo,] <- mat
-			out[idxup,] <- mat
-			out[idxdiag,] <- 1
-		}
-		if (n == 1) {
-			dim(out) <- c(m, m)
-		} else {
-			dim(out) <- c(m, m, n)
-			dimnames(out) <- list(data1 = NULL, data2 = NULL, bound = c("lwr", "upr"))	
-		}
-		out
-	}
 	for (l in 1:r) {
-		bootmat <- sapply(object$bootstrap, function(obj) obj$score.cor.block[,l])
+		bootmat <- sapply(object$bootstrap, 
+			function(obj) obj$score.cor.block[,l])
 		stat <- object$original$score.cor.block[,l]
 		ci <- build.ci(bootmat, stat, level, type)	
 		out$score.cor.block[[l]] <- lapply(ci, vec2cor)
 		names(out$score.cor.block[[l]]) <- names(ci)
 	}	
-	if (r == 1) {
-		out$score.cor.global <- replicate(length(type), 
-			c(lwr = 1, upr = 1), FALSE)		
-		names(out$score.cor.global) <- type
-	} else {
+	if (r > 1) {
+		# out$score.cor.global <- replicate(length(type), 
+			# c(lwr = 1, upr = 1), FALSE)		
+		# names(out$score.cor.global) <- type
+	# } else {
 		bootmat <- sapply(object$bootstrap, "[[", "score.cor.global")
 		stat <- object$original$score.cor.global
 		ci <- build.ci(bootmat, stat, level, type)	
 		out$score.cor.global <- lapply(ci, vec2cor)
 	}
+}
+
+if ("noise.cov" %in% target) {
+	m <- length(object$original$noise.cov)
+	out$noise.cov <- vector("list", m)
+	for (i in 1:m) {
+		bootmat <- sapply(object$bootstrap, 
+			function(obj) obj$noise.cov[[i]])
+		if(!is.matrix(bootmat)) 
+			bootmat <- matrix(bootmat, ncol = nboot)
+		stat <- object$original$noise.cov[[i]]
+		ci <- build.ci(bootmat, stat, level, type)
+		out$noise.cov[[i]] <- lapply(ci, vec2cov)	 
+		names(out$noise.cov[[i]]) <- names(ci)
+	}	
+}
+
+if ("noise.cor" %in% target) {
+	m <- length(object$original$noise.cor)
+	out$noise.cor <- vector("list", m)
+	for (i in 1:m) {
+		bootmat <- sapply(object$bootstrap, 
+			function(obj) obj$noise.cor[[i]])
+		if(!is.matrix(bootmat)) 
+			bootmat <- matrix(bootmat, ncol = nboot)
+		stat <- object$original$noise.cor[[i]]
+		ci <- build.ci(bootmat, stat, level, type)
+		out$noise.cor[[i]] <- lapply(ci, vec2cor)	 
+		names(out$noise.cor[[i]]) <- names(ci)
+	}	
 }
 
 out
@@ -147,11 +126,9 @@ out
 
 
 ###################################	
-# Low-level function to build CIs 
+# Helper function to build CIs 
 # and calculate SEs
 ###################################	
-
-# Internal function 
 
 build.ci <- function(bootmat, stat, level, type)
 {
@@ -178,3 +155,76 @@ if 	("normal" %in% type) {
 out
 }
 
+
+##################################
+# Helper function to convert vector 
+# to covariance matrix
+##################################
+
+# Input: vectorized half-covariance matrix 
+# or matrix of vectorized half-covariance matrices
+# (one per column)
+
+vec2cov <- function(vec) {
+	mat <- as.matrix(vec)
+	n <- ncol(mat)
+	stopifnot(n %in% c(1,2))
+	m <- as.integer((sqrt(8 * nrow(mat) + 1) - 1) / 2)
+	if (m == 1) {
+		out <- vec
+	} else {
+		idxlo <- which(lower.tri(matrix(0, m, m)))
+		idxrow <- rep(1:(m-1), (m-1):1)
+		idxcol <- rep(2:m, 1:(m-1)) 
+		idxup <- (idxcol - 1L) * m + idxrow
+		idxdiag <- cumsum(c(0L, m:2)) + 1L
+		idxdiag2 <- seq(0, by = m, len = m) + (1:m)
+		out <- matrix(0, m^2, n)
+		out[idxlo,] <- mat[-idxdiag,]
+		out[idxup,] <- out[idxlo,]
+		out[idxdiag2,] <-  mat[idxdiag,]
+	}
+	if (n == 1) {
+		dim(out) <- c(m, m)			
+	} else {
+		dim(out) <- c(m, m, n)	
+		dimnames(out) <- list(data1 = 1:m, data2 = 1:m, bound = c("lwr", "upr"))			
+	}
+	out
+}
+
+
+####################################
+# Helper function to convert vector 
+# to correlation matrix
+####################################
+
+# Input: vectorized half-correlation matrix 
+# or matrix of vectorized half-correlation matrices
+# (one per column)
+
+vec2cor <- function(vec) {
+	mat <- as.matrix(vec)
+	n <- max(1, ncol(mat))
+	m <- as.integer((sqrt(8 * nrow(mat) + 1) + 1) / 2)
+	if (m == 1) {
+		out <- 1
+	} else {
+		idxlo <- which(lower.tri(matrix(0, m, m)))
+		idxrow <- rep(1:(m-1), (m-1):1)
+		idxcol <- rep(2:m, 1:(m-1)) 
+		idxup <- (idxcol - 1L) * m + idxrow
+		idxdiag <- seq(0, by = m, len = m) + (1:m)
+		out <- matrix(1, m^2, n)
+		out[idxlo,] <- mat
+		out[idxup,] <- mat
+		out[idxdiag,] <- 1
+	}
+	if (n == 1) {
+		dim(out) <- c(m, m)
+	} else {
+		dim(out) <- c(m, m, n)
+		dimnames(out) <- list(data1 = 1:m, data2 = 1:m, bound = c("lwr", "upr"))	
+	}
+	out
+}
