@@ -37,7 +37,7 @@ if ("v" %in% target) {
 				dim(ci[[name]]) <- c(pi, 2)
 				dimn <- vector("list", d[i] + 1L)
 				names(dimn) <- c(paste0("dim",1:d[i]), "bound")
-				dimn$bound <- c("lower", "upper")
+				dimn$bound <- c("lwr", "upr")
 				dimnames(ci[[name]]) <- dimn
 			}
 			out$v[[i,l]] <- ci
@@ -51,36 +51,45 @@ if ("score.cov.block" %in% target) {
 	vec2cov <- function(vec) {
 		mat <- as.matrix(vec)
 		n <- ncol(mat)
+		stopifnot(n %in% c(1,2))
 		m <- as.integer((sqrt(8 * nrow(mat) + 1) - 1) / 2)
-		idxlo <- which(lower.tri(matrix(0, m, m)))
-		idxrow <- rep(1:(m-1), (m-1):1)
-		idxcol <- rep(2:m, 1:(m-1)) 
-		idxup <- (idxcol - 1L) * m + idxrow
-		idxdiag <- cumsum(c(0L, m:2)) + 1L
-		idxdiag2 <- seq(0, by = m, len = m) + (1:m)
-		out <- matrix(0, m^2, n)
-		out[idxlo,] <- mat[-idxdiag,]
-		out[idxup,] <- out[idxlo,]
-		out[idxdiag2,] <-  mat[idxdiag,]
+		if (m == 1) {
+			out <- vec
+		} else {
+			idxlo <- which(lower.tri(matrix(0, m, m)))
+			idxrow <- rep(1:(m-1), (m-1):1)
+			idxcol <- rep(2:m, 1:(m-1)) 
+			idxup <- (idxcol - 1L) * m + idxrow
+			idxdiag <- cumsum(c(0L, m:2)) + 1L
+			idxdiag2 <- seq(0, by = m, len = m) + (1:m)
+			out <- matrix(0, m^2, n)
+			out[idxlo,] <- mat[-idxdiag,]
+			out[idxup,] <- out[idxlo,]
+			out[idxdiag2,] <-  mat[idxdiag,]
+		}
 		if (n == 1) {
 			dim(out) <- c(m, m)			
 		} else {
 			dim(out) <- c(m, m, n)	
-			dimnames(out) <- list(data1 = 1:m, data2 = 1:m, bound = c("lower", "upper"))			
+			dimnames(out) <- list(data1 = 1:m, data2 = 1:m, bound = c("lwr", "upr"))			
 		}
 		out
 	}
 	for (l in 1:r) {
 		bootmat <- sapply(object$bootstrap, function(obj) obj$score.cov.block[,l])
+		if(!is.matrix(bootmat)) 
+			bootmat <- matrix(bootmat, ncol = nboot)
 		stat <- object$original$score.cov.block[,l]
-		ci <- build.ci(bootmat, stat, level, type)	
+		ci <- build.ci(bootmat, stat, level, type)
 		out$score.cov.block[[l]] <- lapply(ci, vec2cov)	 
+		names(out$score.cov.block[[l]]) <- names(ci)
 	}	
 
 	bootmat <- sapply(object$bootstrap, "[[", "score.cov.global")
 	stat <- object$original$score.cov.global
 	ci <- build.ci(bootmat, stat, level, type)
 	out$score.cov.global <- lapply(ci, vec2cov)
+	names(out$score.cov.global) <- names(ci)
 }
 
 if ("score.cor.block" %in% target) {
@@ -90,20 +99,24 @@ if ("score.cor.block" %in% target) {
 		mat <- as.matrix(vec)
 		n <- ncol(mat)
 		m <- as.integer((sqrt(8 * nrow(mat) + 1) + 1) / 2)
-		idxlo <- which(lower.tri(matrix(0, m, m)))
-		idxrow <- rep(1:(m-1), (m-1):1)
-		idxcol <- rep(2:m, 1:(m-1)) 
-		idxup <- (idxcol - 1L) * m + idxrow
-		idxdiag <- seq(0, by = m, len = m) + (1:m)
-		out <- matrix(1, m^2, n)
-		out[idxlo,] <- mat
-		out[idxup,] <- mat
-		out[idxdiag,] <- 1
+		if (m == 1) {
+			out <- mat
+		} else {
+			idxlo <- which(lower.tri(matrix(0, m, m)))
+			idxrow <- rep(1:(m-1), (m-1):1)
+			idxcol <- rep(2:m, 1:(m-1)) 
+			idxup <- (idxcol - 1L) * m + idxrow
+			idxdiag <- seq(0, by = m, len = m) + (1:m)
+			out <- matrix(1, m^2, n)
+			out[idxlo,] <- mat
+			out[idxup,] <- mat
+			out[idxdiag,] <- 1
+		}
 		if (n == 1) {
 			dim(out) <- c(m, m)
 		} else {
 			dim(out) <- c(m, m, n)
-			dimnames(out) <- list(data1 = NULL, data2 = NULL, bound = c("lower", "upper"))	
+			dimnames(out) <- list(data1 = NULL, data2 = NULL, bound = c("lwr", "upr"))	
 		}
 		out
 	}
@@ -112,11 +125,18 @@ if ("score.cor.block" %in% target) {
 		stat <- object$original$score.cor.block[,l]
 		ci <- build.ci(bootmat, stat, level, type)	
 		out$score.cor.block[[l]] <- lapply(ci, vec2cor)
+		names(out$score.cor.block[[l]]) <- names(ci)
 	}	
-	bootmat <- sapply(object$bootstrap, "[[", "score.cor.global")
-	stat <- object$original$score.cor.global
-	ci <- build.ci(bootmat, stat, level, type)	
-	out$score.cor.global <- lapply(ci, vec2cor)
+	if (r == 1) {
+		out$score.cor.global <- replicate(length(type), 
+			c(lwr = 1, upr = 1), FALSE)		
+		names(out$score.cor.global) <- type
+	} else {
+		bootmat <- sapply(object$bootstrap, "[[", "score.cor.global")
+		stat <- object$original$score.cor.global
+		ci <- build.ci(bootmat, stat, level, type)	
+		out$score.cor.global <- lapply(ci, vec2cor)
+	}
 }
 
 out
@@ -131,11 +151,13 @@ out
 # and calculate SEs
 ###################################	
 
-# This function is not meant to be called by the user
+# Internal function 
 
 build.ci <- function(bootmat, stat, level, type)
 {
 out <- list()
+if (!is.matrix(bootmat)) 
+	bootmat <- matrix(bootmat, nrow = length(stat))
 bootmean <- rowMeans(bootmat) 
 out$bias <- bootmean - stat
 out$se <- rowMeans(bootmat^2) - bootmean^2 # standard error
@@ -145,7 +167,7 @@ if (any(c("basic", "percentile") %in% type)) {
 	if ("percentile" %in% type) 
 		out$percentile <- percent.ci
 	if ("basic" %in% type) 
-		out$basic <- 2 * bootmean - percent.ci[,2:1]
+		out$basic <- matrix(2 * bootmean - percent.ci[,2:1], ncol = 2)
 }
 if 	("normal" %in% type) {
 	stat <- stat - out$bias 
