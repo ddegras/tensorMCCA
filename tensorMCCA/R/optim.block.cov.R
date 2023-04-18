@@ -261,7 +261,7 @@ if (azero && !is.null(cc) && all(b == 0) && northo < max(p)) {
 ## MAIN LOOP
 objective <- numeric(maxit)
 aa <- 0
-cc <- aperm(cc, c(1,3,2)) # new dims p1 x northo x p2
+if (!is.null(cc)) cc <- aperm(cc, c(1,3,2)) # new dims p1 x northo x p2
 ccmat <- NULL
 
 for (it in 1:maxit) {
