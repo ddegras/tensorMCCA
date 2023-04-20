@@ -2,14 +2,21 @@
 # Function to simulate canonical weights 
 #########################################
 
-simulate.v <- function(p, r, ortho = TRUE) {
+simulate.v <- function(p, r, ortho.mode = c("all", "single", "none")) 
+{
 stopifnot(all(unlist(p) >= 1))
 stopifnot(r >= 0)
 if (!is.list(p)) p <- list(p)
 p <- lapply(p, as.integer)
 r <- as.integer(r)
-stopifnot(!ortho || r >= min(unlist(p)))
-if (r == 1) ortho <- FALSE
+ortho.mode <- match.arg(ortho.mode)
+if (ortho.mode == "all" && r > min(unlist(p)))
+	stop("If 'ortho.mode' is set to 'all', ",
+		"'r' should be no larger than the smallest value in 'p'.")
+if (ortho.mode == "single" && r > min(sapply(p, prod))) 
+	stop("If 'ortho.mode' is set to 'single', ",
+		"'r' should be no larger than the smallest of the products",
+		"prod(p[[1]]), prod(p[[2]]), ...")
 d <- sapply(p, length)
 m <- length(p)
 v <- vector("list", m * max(1, r))
@@ -19,16 +26,20 @@ for (i in 1:m) {
 		v[[i]] <- lapply(p[[i]], numeric)
 		next
 	} 
+	if (ortho.mode == "single") {
+		modes <- mapply(seq, from = 1, to = p[[i]], SIMPLIFY = FALSE)
+		combs <- matrix(unlist(expand.grid(modes)), ncol = d[i])
+	}
 	for (k in 1:d[i]) {
 		vik <- matrix(runif(p[[i]][k] * r,-1, 1), p[[i]][k], r)
-		vik <- if (ortho) { 
-			svd(vik)$u
-		} else {
+		vik <- if (ortho.mode == "none") { 
 			sweep(vik, 2, sqrt(colSums(vik^2)), "/")
+		} else {
+			svd(vik)$u
 		}
-		nik <- ncol(vik)
+		idx <- if (ortho.mode == "single") combs[1:r, k] else 1:r
 		for (l in 1:r) 
-			v[[i,l]][[k]] <- vik[, max(l %% nik, 1)]
+			v[[i,l]][[k]] <- vik[, idx[l]]
 	}
 }
 v
