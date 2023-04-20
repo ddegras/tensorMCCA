@@ -50,7 +50,8 @@ v
 # Function to simulate all data 
 ################################
 
-simulate.factor.model <- function(dimx, r, score.cov, noise.cov, ortho = FALSE)
+simulate.factor.model <- function(dimx, r, score.cov, noise.cov, 
+	ortho.mode = c("all", "single", "none"))
 {
 ## Data dimensions
 d <- sapply(dimx, length) - 1L
@@ -64,6 +65,7 @@ p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 pp <- sapply(p, prod)
 stopifnot(r >= 0)
 r0 <- r <- as.integer(r)
+ortho.mode <- match.arg(ortho.mode)
 
 ## Preprocess score covariance
 SIGMA <- score.cov
@@ -90,7 +92,7 @@ if (is.numeric(PSI)) {
 
 ## Outputs
 x <- vector("list", m)
-v <- simulate.v(p, r, ortho)
+v <- simulate.v(p, r, ortho.mode)
 if (r == 0) {
 	score <- NULL
 } else if (is.vector(SIGMA)) {
