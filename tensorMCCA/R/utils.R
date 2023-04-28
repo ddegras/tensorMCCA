@@ -181,6 +181,7 @@ v
 # so as to maximize objective function
 #########################################
 
+
 reorient <- function(score, w)
 {
 m <- NROW(w)
@@ -190,17 +191,17 @@ if (m == 1)
 x <- crossprod(score) * w
 if (all(x >= 0)) 
 	return(list(flip = flip, objective = sum(x)))
-halfm <- floor(m/2)
-best.sum <- 0
-for (k in 1:halfm) {
-	set <- combn(m, k)
-	val <- apply(set, 2, function(idx) sum(x[idx,-idx]))
-	idx <- which.min(val)
-	if (val[idx] < best.sum) {
-		best.sum <- val[idx]
-		flip <- is.element(1:m, set[,idx])
-	}
-}
-list(flip = flip, objective = sum(x) - 4 * best.sum)
+d <- diag(x)
+csum <- colSums(x) - d
+while(any(csum < 0))
+{
+	i <- which.min(csum)
+	x[,i] <- -x[,i] 
+	x[i,] <- x[,i]
+	x[i,i] <- -x[i,i] 
+	flip[i] <- !(flip[i])
+	csum <- colSums(x) - d
+}	
+list(flip = flip, score = sum(x))
 }
 
