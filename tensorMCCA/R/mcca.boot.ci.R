@@ -137,10 +137,13 @@ if (!is.matrix(bootmat))
 	bootmat <- matrix(bootmat, nrow = length(stat))
 bootmean <- rowMeans(bootmat) 
 out$bias <- bootmean - stat
-out$se <- rowMeans(bootmat^2) - bootmean^2 # standard error
+out$se <- sqrt(rowMeans(bootmat^2) - bootmean^2) # standard error
+test <- is.nan(out$se)
+if (any(test)) out$se[test] <- 0
 alpha <- min(level, 1 - level) / 2
 if (any(c("basic", "percentile") %in% type)) {
-	percent.ci <- t(apply(bootmat, 1, quantile, probs = c(alpha, 1 - alpha)))
+	percent.ci <- t(apply(bootmat, 1, quantile, 
+		probs = c(alpha, 1 - alpha), names = FALSE))
 	if ("percentile" %in% type) 
 		out$percentile <- percent.ci
 	if ("basic" %in% type) 
@@ -148,7 +151,7 @@ if (any(c("basic", "percentile") %in% type)) {
 }
 if 	("normal" %in% type) {
 	stat <- stat - out$bias 
-	z <- qnorm(1 - alpha/2)
+	z <- qnorm(1 - alpha)
 	halfwidth <- z * out$se
 	out$normal <- cbind(stat - halfwidth, stat + halfwidth)  
 }
