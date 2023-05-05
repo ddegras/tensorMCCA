@@ -11,9 +11,10 @@ and covariance/correlation matrices of the noise.
 }
 
 \usage{
-mcca.boot(x, object, method = c("raw", "residual"), nboot = 100, parallel = TRUE, 
+mcca.boot(x, object, 
 	target = c("v", "score.cov", "noise.cov", "score.cor", "noise.cor"),
-	.errorhandling = c("stop", "remove", "pass"))
+	resample = c("data", "residuals"), nboot = 100, parallel = TRUE, 
+	control = list())
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -23,8 +24,8 @@ List of data arrays. All arrays must have the same size in their last dimension 
   \item{object}{
 The result of a call to \code{\link{mcca.cor}} or \code{\link{mcca.cov}} on \code{x}.
 }
-  \item{method}{
-Type of boostrap: based on raw data or on residuals.
+  \item{resample}{
+Type of boostrap: based on raw \code{data} or on \code{residuals}.
 }
   \item{nboot}{
 Number of bootstrap replications. Default = 100.}
