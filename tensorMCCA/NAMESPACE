@@ -17,6 +17,7 @@ export(
 "permutation.test",
 "scale.v",
 "simulate.factor.model",
+"simulate.v",
 "tnsr.mat.prod",
 "tnsr.vec.prod",
 "tnsr3d.rk1",
