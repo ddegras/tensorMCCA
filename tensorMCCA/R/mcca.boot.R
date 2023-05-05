@@ -1,6 +1,7 @@
-mcca.boot <- function(x, object, method = c("raw", "residual"), nboot = 100, parallel = TRUE, 
+mcca.boot <- function(x, object, 
 	target = c("v", "score.cov", "noise.cov", "score.cor", "noise.cor"),
-	.errorhandling = c("stop", "remove", "pass"))
+	resample = c("data", "residuals"), nboot = 100, parallel = TRUE, 
+	control = list())
 {
 ## Determine bootstrap targets
 lookup <- c("v", "score.cov", "noise.cov", "score.cor", "noise.cor")
@@ -8,8 +9,11 @@ target <- lookup[pmatch(target, lookup)]
 stopifnot(length(target) > 0)
 
 ## Match other arguments
-method <- match.arg(method)
-.errorhandling <- match.arg(.errorhandling)
+resample <- match.arg(resample)
+.errorhandling <- match.arg(control[[".errorhandling"]],  
+	c("stop", "remove", "pass"))
+unbiased.score.cov <- as.logical(control[["unbiased.score.cov"]])
+if (is.null(unbiased.score.cov)) unbiased.score.cov <- FALSE
 
 ## Determine if bootstrap should be computed in parallel 
 parallel.flag <- FALSE
@@ -36,9 +40,9 @@ call.args <- object$call.args
 objective.type <- call.args$objective.type
 
 ## Prepare resampling in case of residual-based bootstrap
-if (method == "raw") {
+if (resample == "data") {
 	xx <- x
-} else { # method == "residual"
+} else { # resample == "residuals"
 	resid <- calculate.residuals(x, object, matrix.out = TRUE)
 	fitted <- lapply(1:m, function(i) as.numeric(x[[i]]) - resid[[i]])
 	xx <- list(fitted = fitted, resid = resid, dimx = dimx)
@@ -47,17 +51,17 @@ if (method == "raw") {
 ## Perform bootstrap in parallel or sequentially 
 if (parallel.flag) {
 	boot.out <- foreach(b = 1:nboot, .errorhandling = .errorhandling) %dopar% {
-			mcca.boot.single(xx, method, target, call.args) 
+			mcca.boot.single(xx, resample, target, call.args) 
 	}
 } else {
 	boot.out <- vector("list", nboot)
 	if (.errorhandling == "stop") {
 		for (b in 1:nboot) 
-			boot.out[[b]] <- mcca.boot.single(xx, method, target, call.args)
+			boot.out[[b]] <- mcca.boot.single(xx, resample, target, call.args)
 	} else {
 		for (b in 1:nboot) 
 			boot.out[[b]] <- tryCatch(
-			mcca.boot.single(xx, method, target, call.args), error = function(e) e)
+			mcca.boot.single(xx, resample, target, call.args), error = function(e) e)
 	}
 	if (.errorhandling == "remove") {
 		error.flag <- sapply(boot.out, inherits, what = "error")
@@ -73,7 +77,7 @@ if ("score.cov" %in% target) score.target <- "cov"
 if ("score.cor" %in% target) score.target <- c(score.target, "cor")
 if (!is.null(score.target)) 
 	mcca.out <- c(mcca.out, calculate.score.cov(object, score.target, 
-		matrix.out = FALSE))
+		unbiased.score.cov, matrix.out = FALSE))
 noise.target <- NULL
 if ("noise.cov" %in% target) noise.target <- "cov"
 if ("noise.cor" %in% target) noise.target <- c(noise.target, "cor")
@@ -102,7 +106,8 @@ list(bootstrap = boot.out, original = mcca.out)
 ###################
 
 
-calculate.score.cov <- function(object, type = c("cov", "cor"), matrix.out = TRUE)
+calculate.score.cov <- function(object, type = c("cov", "cor"), 
+	unbiased = FALSE, matrix.out = TRUE)
 {
 type <- intersect(type, c("cov", "cor")) 
 if (length(type) == 0) 
@@ -116,7 +121,9 @@ r <- dims[3]
 global.score <- object$global.score
 if ("cov" %in% type) {	
 	out$score.cov.block <- array(apply(block.score, 3, cov), dim = c(m, m, r))
-	out$score.cov.global <- cov(global.score)
+	out$score.cov.global <- if (unbiased) {
+		calculate.score.cov.no.bias(global.score) 
+	} else cov(global.score)
 	if (!matrix.out) {
 		idx <- which(lower.tri(matrix(0, m, m), TRUE))
 		dim(out$score.cov.block) <- c(m^2, r)
@@ -127,7 +134,13 @@ if ("cov" %in% type) {
 }
 if ("cor" %in% type) {
 	 out$score.cor.block <- array(apply(block.score, 3, cor), dim = c(m, m, r))
-	out$score.cor.global <- cor(global.score)
+	out$score.cor.global <- if (!unbiased) {
+		cor(global.score)
+	} else if ("cov" %in% type) {
+		cov2cor(out$score.cov.global)
+	} else {
+		cov2cor(calculate.score.cov.no.bias(global.score))
+	}
 	if (!matrix.out) {
 		idx <- which(lower.tri(matrix(0, m, m)))
 		dim(out$score.cor.block) <- c(m^2, r)
@@ -138,6 +151,29 @@ if ("cor" %in% type) {
 }
 out
 }
+
+
+
+calculate.score.cov.no.bias <- function(score)
+{
+stopifnot(length(dim(score)) == 3)
+n <- dim(score)[1]
+m <- dim(score)[2]
+r <- dim(score)[3]
+
+global.score.cov <- matrix(0, r, r)
+mask <- lower.tri(matrix(0, m, m))
+for (l1 in 1:r) {
+	for (l2 in 1:l1) {
+		cov12 <- crossprod(score[,,l1], score[,,l2]) / n
+		global.score.cov[l1,l2] <- mean(cov12[mask]) 
+		global.score.cov[l2,l1] <- global.score.cov[l1,l2]
+	}
+}
+global.score.cov
+}
+
+
 
 
 calculate.residuals <- function(x, object, matrix.out = FALSE)
@@ -166,6 +202,9 @@ for (i in 1:m) {
 }
 resid	
 }
+
+
+
 
 
 calculate.noise.cov <- function(x, object, type = c("cov", "cor"), matrix.out = TRUE)
@@ -203,13 +242,13 @@ out
 }
 
 
-mcca.boot.single <- function(x, method, target, call.args) {
+mcca.boot.single <- function(x, resample, target, call.args) {
 	
 ## Data dimensions
-if (method == "raw") {
+if (resample == "data") {
 	m <- length(x)
 	dimx <- lapply(x, dim)
-} else { # method == "residual"
+} else { # resample == "residuals"
 	dimx <- x$dimx
 	m <- length(dimx) 
 }
@@ -218,7 +257,7 @@ out <- list()
 
 ## Resample data
 idx <- sample(n, n, replace = TRUE)
-if (method == "raw") {
+if (resample == "data") {
 	xstar <- x
 	p <- lapply(dimx, function(dims) dims[-length(dims)])
 	for (i in 1:m) {
@@ -226,7 +265,7 @@ if (method == "raw") {
 		xstar[[i]] <- xstar[[i]][,idx]
 		dim(xstar[[i]]) <- dimx[[i]]
 	}
-} else { # method == "residual"
+} else { # resample == "residuals"
 	xstar <- vector("list", m)
 	for (i in 1:m) {
 		xstar[[i]] <- x$fitted[[i]] + x$resid[[i]][,idx]
