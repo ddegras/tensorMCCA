@@ -2,44 +2,104 @@
 # Function to simulate canonical weights 
 #########################################
 
-simulate.v <- function(p, r, ortho.mode = c("all", "single", "none")) 
+simulate.v <- function(p, r, scale = 1,  
+	ortho = c("cyclical", "random", "alldim", "maxdim", "none")) 
 {
+## Check input arguments
 stopifnot(all(unlist(p) >= 1))
-stopifnot(r >= 0)
+stopifnot(length(r) == 1 && r >= 0)
+stopifnot(length(scale) %in% c(1, length(p)))
+stopifnot(all(scale >= 0))
+
+## Preprocess input arguments
 if (!is.list(p)) p <- list(p)
 p <- lapply(p, as.integer)
-r <- as.integer(r)
-ortho.mode <- match.arg(ortho.mode)
-if (ortho.mode == "all" && r > min(unlist(p)))
-	stop("If 'ortho.mode' is set to 'all', ",
-		"'r' should be no larger than the smallest value in 'p'.")
-if (ortho.mode == "single" && r > min(sapply(p, prod))) 
-	stop("If 'ortho.mode' is set to 'single', ",
-		"'r' should be no larger than the smallest of the products",
-		"prod(p[[1]]), prod(p[[2]]), ...")
 d <- sapply(p, length)
 m <- length(p)
-v <- vector("list", m * max(1, r))
-dim(v) <- c(m, max(1, r))
-for (i in 1:m) {
-	if (r == 0) {
-		v[[i]] <- lapply(p[[i]], numeric)
-		next
-	} 
-	if (ortho.mode == "single") {
-		modes <- mapply(seq, from = 1, to = p[[i]], SIMPLIFY = FALSE)
-		combs <- matrix(unlist(expand.grid(modes)), ncol = d[i])
+r <- as.integer(r)
+if (r == 0) {
+	r <- 1
+	scale <- numeric(m)
+}
+seq2r <- if (r > 1) 2:r else NULL
+if (r == 1) ortho == "none"
+if (length(scale) < m) scale <- rep(scale, m)
+ortho.mode <- NULL
+if (is.numeric(ortho)) {
+	ortho <- rep_len(as.integer(ortho), m)
+	stopifnot(all(ortho > 0))
+} else {
+	ortho <- match.arg(ortho)
+	if (ortho %in% c("cyclical", "random")) {
+		x <- lapply(p, function(dims) array(dim = c(dims, 1)))
+		ortho.mode <- set.ortho.mode(x, r, method = ortho)
 	}
-	for (k in 1:d[i]) {
-		vik <- matrix(runif(p[[i]][k] * r,-1, 1), p[[i]][k], r)
-		vik <- if (ortho.mode == "none") { 
-			sweep(vik, 2, sqrt(colSums(vik^2)), "/")
-		} else {
-			svd(vik)$u
+}
+
+## Error message
+err <- paste("Orthogonality constraints cannot be accommodated.",
+	"Consider using a different type of constraint in 'ortho'",
+	"or setting a smaller value for 'r'.")
+
+## Function to generate random vectors with unit norm 
+randvec <- function(p, r = 1) {
+	if (r == 1) {
+		x <- runif(p,-1, 1)
+		return(x / sqrt(sum(x^2)))
+	}
+	x <- matrix(runif(p * r,-1, 1), p, r)
+	sweep(x, 2, sqrt(colSums(x^2)), "/")
+}
+
+## Output 
+v <- vector("list", m * r)
+dim(v) <- c(m, r)
+
+## Main loop
+for (i in 1:m) {
+	if (scale[i] == 0) {
+		v[i,] <- replicate(r, lapply(p[[i]], numeric), FALSE)
+		next
+	}
+	if (!is.null(ortho.mode)) {
+		v[[i,1]] <- lapply(p[[i]], randvec)
+		for (l in seq2r) {
+			for (k in 1:d[i]) {
+				idx <- which(unlist(ortho.mode[i,1:(l-1),l]) == k)
+				if (length(idx) == 0) {
+					v[[i,l]][[k]] <- randvec(p[[i]][k])
+				} else {
+					vecs <- sapply(v[i,idx], "[[", k)
+					qrvecs <- qr(vecs)
+					if (qrvecs$rank == p[[i]][k]) stop(err)
+					v[[i,l]][[k]] <- qr.Q(qrvecs, TRUE)[,qrvecs$rank + 1]
+				}
+			}	
+		}		
+	} else {
+		kk <- if (is.numeric(ortho)) { 
+			ortho[i] 
+		} else if (ortho == "alldim") {
+			1:d[i]
+		} else if (ortho == "maxdim") {
+			which.max(p[[i]])
+		} else if (ortho == "none") {
+			NULL
 		}
-		idx <- if (ortho.mode == "single") combs[1:r, k] else 1:r
+		for (k in 1:d[i]) {
+			vik <- randvec(p[[i]][k], r)
+			if (k %in% kk) {
+				if (r > p[[i]][k]) stop(err)
+				vik <- qr.Q(qr(vik))
+			}
+			for (l in 1:r) v[[i,l]][[k]] <- vik[,l]			
+		}
+	} 
+	
+	## Rescale tensors if needed 
+	if (scale[i] != 1) {
 		for (l in 1:r) 
-			v[[i,l]][[k]] <- vik[, idx[l]]
+			v[[i,l]][[1]] <- v[[i,l]][[1]] * scale[i] 
 	}
 }
 v
@@ -50,8 +110,8 @@ v
 # Function to simulate all data 
 ################################
 
-simulate.factor.model <- function(dimx, r, score.cov, noise.cov, 
-	ortho.mode = c("all", "single", "none"))
+simulate.factor.model <- function(dimx, r, scale.v = 1, score.cov, noise.cov, 
+	ortho.v = c("cyclical", "random", "alldim", "maxdim", "none"))
 {
 ## Data dimensions
 d <- sapply(dimx, length) - 1L
@@ -65,7 +125,6 @@ p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 pp <- sapply(p, prod)
 stopifnot(r >= 0)
 r0 <- r <- as.integer(r)
-ortho.mode <- match.arg(ortho.mode)
 
 ## Preprocess score covariance
 SIGMA <- score.cov
@@ -74,11 +133,14 @@ if (is.vector(SIGMA) && is.numeric(SIGMA)) {
 	stopifnot(all(SIGMA >= 0))
 } else if (is.list(SIGMA)) {
 	SIGMA <- rep_len(SIGMA, r)
-	for (l in 1:r)
-		stopifnot(identical(dim(SIGMA[[l]]), c(m,m)))
+	for (l in 1:r) {
+		if (!is.matrix(SIGMA[[l]])) 
+			SIGMA[[l]] <- as.matrix(SIGMA[[l]])
+		stopifnot(all(dim(SIGMA[[l]]) == m))	
+	}	
 	SIGMA <- array(unlist(SIGMA), c(m, m, r))
 }
-stopifnot(is.numeric(SIGMA) || identical(dim(SIGMA), c(m,m,r)))
+# stopifnot(is.numeric(SIGMA) || identical(dim(SIGMA), c(m,m,r)))
 
 ## Preprocess noise covariance
 PSI <- noise.cov
@@ -86,13 +148,16 @@ if (is.numeric(PSI)) {
 	PSI <- rep_len(PSI, m)
 } else if (is.list(PSI)) {
 	stopifnot(length(PSI) == m)
-	for (i in 1:m) 
-		stopifnot(identical(dim(PSI[[i]]), c(pp[i],pp[i])))
+	for (i in 1:m) {
+		if (!is.matrix(PSI[[i]])) 
+			PSI[[i]] <- as.matrix(PSI[[i]])
+		stopifnot(all(dim(PSI[[i]]) == pp[i]))
+	}	
 }
 
 ## Outputs
 x <- vector("list", m)
-v <- simulate.v(p, r, ortho.mode)
+v <- simulate.v(p, r, scale.v, ortho.v)
 if (r == 0) {
 	score <- NULL
 } else if (is.vector(SIGMA)) {
