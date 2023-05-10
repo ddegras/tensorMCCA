@@ -51,17 +51,19 @@ if (resample == "data") {
 ## Perform bootstrap in parallel or sequentially 
 if (parallel.flag) {
 	boot.out <- foreach(b = 1:nboot, .errorhandling = .errorhandling) %dopar% {
-			mcca.boot.single(xx, resample, target, call.args) 
+			mcca.boot.single(xx, resample, target, call.args, unbiased.score.cov) 
 	}
 } else {
 	boot.out <- vector("list", nboot)
 	if (.errorhandling == "stop") {
 		for (b in 1:nboot) 
-			boot.out[[b]] <- mcca.boot.single(xx, resample, target, call.args)
+			boot.out[[b]] <- mcca.boot.single(xx, resample, target, call.args, 
+				unbiased.score.cov)
 	} else {
 		for (b in 1:nboot) 
 			boot.out[[b]] <- tryCatch(
-			mcca.boot.single(xx, resample, target, call.args), error = function(e) e)
+				mcca.boot.single(xx, resample, target, call.args, unbiased.score.cov), 
+				error = function(e) e)
 	}
 	if (.errorhandling == "remove") {
 		error.flag <- sapply(boot.out, inherits, what = "error")
@@ -122,7 +124,7 @@ global.score <- object$global.score
 if ("cov" %in% type) {	
 	out$score.cov.block <- array(apply(block.score, 3, cov), dim = c(m, m, r))
 	out$score.cov.global <- if (unbiased) {
-		calculate.score.cov.no.bias(global.score) 
+		calculate.score.cov.no.bias(block.score) 
 	} else cov(global.score)
 	if (!matrix.out) {
 		idx <- which(lower.tri(matrix(0, m, m), TRUE))
@@ -139,7 +141,7 @@ if ("cor" %in% type) {
 	} else if ("cov" %in% type) {
 		cov2cor(out$score.cov.global)
 	} else {
-		cov2cor(calculate.score.cov.no.bias(global.score))
+		cov2cor(calculate.score.cov.no.bias(block.score))
 	}
 	if (!matrix.out) {
 		idx <- which(lower.tri(matrix(0, m, m)))
@@ -242,7 +244,7 @@ out
 }
 
 
-mcca.boot.single <- function(x, resample, target, call.args) {
+mcca.boot.single <- function(x, resample, target, call.args, score.cov.unbiased) {
 	
 ## Data dimensions
 if (resample == "data") {
@@ -293,7 +295,7 @@ score.target <- NULL
 if ("score.cov" %in% target) score.target <- "cov"
 if ("score.cor" %in% target) score.target <- c(score.target, "cor")
 if (!is.null(score.target)) 
-	out <- c(out, calculate.score.cov(result, score.target, 
+	out <- c(out, calculate.score.cov(result, score.target, score.cov.unbiased,
 		matrix.out = FALSE))
 
 ## Calculate covariance and/or correlation of residuals
