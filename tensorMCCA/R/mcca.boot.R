@@ -13,7 +13,7 @@ resample <- match.arg(resample)
 .errorhandling <- match.arg(control[[".errorhandling"]],  
 	c("stop", "remove", "pass"))
 unbiased.score.cov <- as.logical(control[["unbiased.score.cov"]])
-if (is.null(unbiased.score.cov)) unbiased.score.cov <- FALSE
+if (length(unbiased.score.cov) == 0) unbiased.score.cov <- FALSE
 
 ## Determine if bootstrap should be computed in parallel 
 parallel.flag <- FALSE
@@ -244,7 +244,7 @@ out
 }
 
 
-mcca.boot.single <- function(x, resample, target, call.args, score.cov.unbiased) {
+mcca.boot.single <- function(x, resample, target, call.args, unbiased.score.cov) {
 	
 ## Data dimensions
 if (resample == "data") {
@@ -295,7 +295,7 @@ score.target <- NULL
 if ("score.cov" %in% target) score.target <- "cov"
 if ("score.cor" %in% target) score.target <- c(score.target, "cor")
 if (!is.null(score.target)) 
-	out <- c(out, calculate.score.cov(result, score.target, score.cov.unbiased,
+	out <- c(out, calculate.score.cov(result, score.target, unbiased.score.cov,
 		matrix.out = FALSE))
 
 ## Calculate covariance and/or correlation of residuals
