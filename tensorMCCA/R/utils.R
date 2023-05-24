@@ -202,6 +202,6 @@ while(any(csum < 0))
 	flip[i] <- !(flip[i])
 	csum <- colSums(x) - d
 }	
-list(flip = flip, score = sum(x))
+list(flip = flip, objective = sum(x))
 }
 
