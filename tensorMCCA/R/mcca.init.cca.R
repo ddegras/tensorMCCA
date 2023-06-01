@@ -136,7 +136,7 @@ for (i in 1:m) {
 		if (test) 
 			svdij <- tryCatch(svds(crossprod(v[[i]], v[[j]]), k = 1), 
 				error = function(e) NULL)
-		if (!test || is.null(svdij))
+		if (!test || is.null(svdij)|| is.null(svdij$u))
 			svdij <- svd(crossprod(v[[i]], v[[j]]), nu = 1, nv = 1)		
 		a[[i]][,j] <- u[[i]] %*% svdij$u
 		a[[j]][,i] <- u[[j]] %*% svdij$v
