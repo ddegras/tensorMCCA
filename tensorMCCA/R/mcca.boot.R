@@ -301,9 +301,9 @@ if (!is.null(score.target))
 ## Calculate covariance and/or correlation of residuals
 noise.target <- NULL
 if ("noise.cov" %in% target) noise.target <- "cov"
-if ("noise.cov" %in% target) noise.target <- c(noise.target, "cor")
+if ("noise.cor" %in% target) noise.target <- c(noise.target, "cor")
 if (!is.null(noise.target)) 
-	out <- c(out, calculate.noise.cov(xstar, result, type = score.target, 
+	out <- c(out, calculate.noise.cov(xstar, result, type = noise.target, 
 		matrix.out = FALSE))
 
 out
