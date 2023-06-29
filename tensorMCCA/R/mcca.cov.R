@@ -88,7 +88,8 @@ if (identical(init, "cca")) {
 		init.args[names.] <- control$init[names.]
 	}
 } else if (identical(init, "svd")) {
-	init.args <- list(objective = "cov", center = FALSE)
+	init.args <- list(objective = "cov", scale = scale, 
+		center = FALSE)
 } else if (identical(init, "random")) {
 	init.args <- list(objective = "cov")
 }
