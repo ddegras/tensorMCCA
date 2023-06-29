@@ -1,5 +1,5 @@
-mcca.init.svd <- function(x, objective = c("cov", "cor"), 
-	center = TRUE)
+mcca.init.svd <- function(x, w = NULL, objective = c("cov", "cor"), 
+	scale = c("block", "global"), center = TRUE)
 {
 ## Check argument x if required
 test <- check.arguments(x)
@@ -14,6 +14,7 @@ d <- sapply(p, length)
 n <- tail(dimx[[1]], 1)
 
 objective <- match.arg(objective) # norm or variance constraints
+if (is.null(w)) w <- matrix(1, m, m)
 
 ## Initialize canonical weights 
 v <- vector("list", m)
@@ -37,9 +38,16 @@ if (all(xmat == 0)) {
 }
 
 ## Initial SVD
-xmat <- if (all(dim(xmat) > 2)) {
-	svds(xmat, k = 1, nv = 0)$u 
-} else svd(xmat, nu = 1, nv = 0)$u
+dim.flag <- all(dim(xmat) > 2)
+error.flag <- FALSE
+if (dim.flag) {
+	svdx <- tryCatch(svds(xmat, k = 1, nv = 0)$u, 
+		error = function(e) NULL)
+	error.flag <- is.null(svdx)
+	if (!error.flag) xmat <- svdx 
+} 
+if ((!dim.flag) || error.flag)
+	xmat <- svd(xmat, nu = 1, nv = 0)$u
 dim(xmat) <- NULL
 
 
@@ -55,9 +63,19 @@ for (i in 1:m) {
 	} else { lapply(hosvd(xi, 1)$factors, as.vector) }
 }
 
+
 ## Scale initial canonical weights as needed	
-if (objective == "cor") {
+if (objective == "cov" && scale == "global") {
 	y <- canon.scores(x, v)
+	y <- scale(y, scale = FALSE)
+	M <- crossprod(y) * (w/n)
+	a <- eigen(M, TRUE)$vectors[,1] * sqrt(m) 
+	s <- a^(1/d) # scaling factors
+	for (i in 1:m)
+		v[[i]] <- lapply(v[[i]], "*", y = s[i])
+} else if (objective == "cor") {
+	y <- canon.scores(x, v)
+	y <- scale(y, scale = FALSE)
 	nrm <- sqrt(colMeans(y^2))
 	for (i in 1:m) {
 		v[[i]] <- if (nrm[i] > eps) {
