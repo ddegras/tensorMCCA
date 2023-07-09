@@ -14,6 +14,7 @@ d <- sapply(p, length)
 n <- tail(dimx[[1]], 1)
 
 objective <- match.arg(objective) # norm or variance constraints
+scale <- match.arg(scale)
 if (is.null(w)) w <- matrix(1, m, m)
 
 ## Initialize canonical weights 
