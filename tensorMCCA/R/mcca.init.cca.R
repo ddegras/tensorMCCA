@@ -40,10 +40,10 @@ k <- if (is.null(k)) pmin(pp, n) else rep_len(k, m)
 
 ## Scaling constraints
 objective.type <- match.arg(objective)   
+scale <- match.arg(scale) # block or global constraints
 if (objective.type == "cor" && scale == "global")
 	stop(paste("Argument values 'objective = cor'", 
 		"and 'scale = global' are incompatible."))
-scale <- match.arg(scale) # block or global constraints
 
 ## Search method in optimization
 search <- if (identical(search, 
@@ -80,22 +80,16 @@ if (center) {
 ## Find the ranks of unfolded datasets
 rankx <- integer(m)
 for (i in 1:m) {
-	transpose <- (pp[i] < n)
-	rankx[i] <- if (center && transpose) {
-		qr(sweep(matrix(x[[i]], n, pp[i], byrow = TRUE), 
-			MARGIN = 2, STATS = xbar[[i]]))$rank			
-	} else if (center && !transpose) {
-		qr(matrix(x[[i]], pp[i], n) - xbar[[i]])$rank	
-	} else if (transpose) {
-		qr(matrix(x[[i]], n, pp[i], byrow = TRUE))$rank
+	rankx[i] <- if (center) {
+		qr(matrix(x[[i]], pp[i], n) - xbar[[i]])$rank			
 	} else { qr(matrix(x[[i]], pp[i], n))$rank }
 }
 
 ## Effective rank of SVD 	
-k <- pmin(k, rankx, pp, n)
+k <- pmin(k, rankx)
 
 ## Calculate compact/truncated SVD of each unfolded dataset
-u <- v <- vector("list", m) 
+u <- v <- vector("list", m)
 for (i in 1:m) {
 	xmat <- if (center) { matrix(x[[i]] - xbar[[i]], pp[i], n)  
 		} else { matrix(x[[i]], pp[i], n) } 
@@ -106,9 +100,11 @@ for (i in 1:m) {
 		svdx <- svd(xmat, nu = k[i], nv = k[i])
 	if (objective.type == "cov") {
 		u[[i]] <- svdx$u
-		v[[i]] <- sweep(svdx$v, 2, svdx$d[1:rankx[i]], "/")
+		# v[[i]] <- sweep(svdx$v, 2, svdx$d[1:rankx[i]], "/")
+		v[[i]] <- sweep(svdx$v, 2, svdx$d[1:rankx[i]], "*")
 	} else if (objective.type == "cor") {
-		u[[i]] <- sweep(svdx$u, 2, svdx$d[1:rankx[i]], "*")
+		# u[[i]] <- sweep(svdx$u, 2, svdx$d[1:rankx[i]], "*")
+		u[[i]] <- sweep(svdx$u, 2, svdx$d[1:rankx[i]], "/")
 		v[[i]] <- svdx$v		
 	}
 }
@@ -155,13 +151,16 @@ for (i in 1:m) {
 v <- vector("list", m^2)
 dim(v) <- c(m, m)
 for (i in 1:m) {
-	dim(a[[i]]) <- c(p[[i]], m)
-	v[i,] <- if (objective.type == "cov") {
-		apply(a[[i]], d[i] + 1, tnsr.rk1, scale = TRUE, 
-			maxit = maxit, tol = tol)
-	} else {
-		apply(a[[i]], d[i] + 1, tnsr.rk1.score, cnstr = x[i], 
-			maxit = maxit, tol = tol)
+	if (objective.type == "cor")
+		xbar <- as.vector(rowMeans(x[[i]], dims = d[i]))
+	for (j in 1:m) {
+		aij <- array(a[[i]][,j], dim = p[[i]])
+		v[[i,j]] <- if (objective.type == "cov") {
+			tnsr.rk1(aij, scale = TRUE, 	maxit = maxit, tol = tol)
+		} else {
+			tnsr.rk1.score(aij, cnstr = x[[i]] - xbar, maxit = maxit, 
+				tol = tol)
+		}
 	}
 }
 
@@ -178,6 +177,8 @@ for (i in 1:m) {
 
 
 score <- canon.scores(x, v)
+score <- score - rep(colMeans(score), each = n)
+
 
 
 
