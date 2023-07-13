@@ -192,7 +192,7 @@ score <- score - rep(colMeans(score), each = n)
 # tensor one dataset at a time while keeping the 
 # other canonical tensors fixed
  
-if (scale == "block" && search == "approximate") {
+if (search == "approximate") {
 	## Initialization @@@@ does not do what it's supposed to do. FIX IT
 	objective <- 0
 	part <- matrix(0, m, m) # partial objective values
@@ -236,7 +236,7 @@ if (scale == "block" && search == "approximate") {
 ######################################
 
 
-if (scale == "block" && search == "exhaustive") {
+if (search == "exhaustive") {
 	part <- array(dim = rep(m, 4))
 	# Indices: 1 = dataset 1, 2 = dataset 2, 
 	# 3 = candidate for dataset 1, 4 = candidate for dataset 2
