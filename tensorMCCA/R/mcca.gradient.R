@@ -97,10 +97,17 @@ v <- scale.v(v = v, type = "norm", scale = "block",
 objective[1] <- objective.internal(x, v, w)
 if (verbose) 
 	cat("\nIteration", 0, "Objective", objective[1])
-objective.fn <- function(theta, v, h, x, w)
+objective.fn <- function(theta, v, h, x, w, fixed)
 {
 	vnew <- relist(cos(theta) * unlist(v) + 
 		sin(theta) * unlist(h), v)
+	if (length(fixed) > 0) {
+		for (idx in 1:nrow(fixed)) {
+			i <- fixed[idx,1]
+			k <- fixed[idx,2]
+			vnew[[i]][[k]] <- v[[i]][[k]]
+		}
+	}
 	objective.internal(x, vnew, w)
 }
 
@@ -111,6 +118,7 @@ theta.grid <- seq(-pi, pi, length.out = ntheta + 1L)[-1L]
 ## Initialize other quantities
 eps <- 1e-14 # numeric tolerance for zero
 h <- vector("list", m) # projected gradient
+hzero <- matrix(FALSE, m, max(d))
 
 
 for (it in 1:maxit) {
@@ -129,21 +137,26 @@ for (it in 1:maxit) {
 			hik <- if (vikzero) gik else {
 				gik - (sum(gik * vik) / nrmvik2) * vik }
 			nrmhik <- sqrt(sum(hik^2))
-			hikzero <- (nrmhik <= (p[[i]][[k]] * eps))
-			h[[i]][[k]] <- if (hikzero) vik else (hik / nrmhik)
+			hzero[i,k] <- (nrmhik <= (p[[i]][[k]] * eps))
+			h[[i]][[k]] <- if (hzero[i,k]) vik else (hik / nrmhik)
 		}
+	}
+	fixed <- NULL
+	if (any(hzero)) {
+		vold <- v
+		fixed <- which(hzero, TRUE)
 	}
 	
 	## Grid search
 	vals <- sapply(theta.grid, objective.fn, v = v, h = h, 
-		x = x, w = w)
+		x = x, w = w, fixed = fixed)
 	
 	## Line search 
 	idx <- which.max(vals)
 	lb <- theta.grid[max(1L, idx - 1L)]
 	ub <- theta.grid[min(ntheta, idx + 1L)]
 	optim.theta <- optimize(objective.fn, c(lb, ub), v = v, 
-		h = h, x = x, w = w, maximum = TRUE, tol = 1e-7)
+		h = h, x = x, w = w, fixed = fixed, maximum = TRUE, tol = 1e-7)
 
 	## Update solution and objective
 	if (optim.theta $objective > vals[idx]) {
@@ -153,7 +166,15 @@ for (it in 1:maxit) {
 		theta <- theta.grid[idx]
 		objective[it + 1L] <- vals[idx]
 	}
+
 	v <- relist(cos(theta) * unlist(v) + sin(theta) * unlist(h), v)
+	if (length(fixed) > 0) {
+		for (idx in 1:nrow(fixed)) {
+			i <- fixed[idx,1]
+			k <- fixed[idx,2]
+			v[[i]][[k]] <- vold[[i]][[k]]
+		}
+	}
 	if (verbose) 
 		cat("\nIteration", it, "Objective", objective[it + 1L])
 
