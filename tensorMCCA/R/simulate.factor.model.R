@@ -31,7 +31,7 @@ if (is.numeric(ortho)) {
 } else {
 	ortho <- match.arg(ortho)
 	if (ortho %in% c("cyclical", "random")) {
-		x <- lapply(p, function(dims) array(dim = c(dims, 1)))
+		x <- lapply(p, function(dims) array(0L, dim = c(dims, 1)))
 		ortho.mode <- set.ortho.mode(x, r, method = ortho)
 	}
 }
@@ -110,8 +110,8 @@ v
 # Function to simulate all data 
 ################################
 
-simulate.factor.model <- function(dimx, r, scale.v = 1, score.cov, noise.cov, 
-	ortho.v = c("cyclical", "random", "alldim", "maxdim", "none"))
+simulate.factor.model <- function(dimx, r, scale.v = 1, score.cov = NULL, 
+	noise.cov = NULL, ortho.v = c("cyclical", "random", "alldim", "maxdim", "none"))
 {
 ## Data dimensions
 d <- sapply(dimx, length) - 1L
@@ -124,9 +124,11 @@ n <- n[1]
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 pp <- sapply(p, prod)
 stopifnot(r >= 0)
-r0 <- r <- as.integer(r)
+r <- as.integer(r)
+if (is.character(ortho.v)) ortho.v <- match.arg(ortho.v)
 
 ## Preprocess score covariance
+if (is.null(score.cov)) score.cov <- 1
 SIGMA <- score.cov
 if (is.vector(SIGMA) && is.numeric(SIGMA)) {
 	SIGMA <- rep_len(SIGMA, r)
@@ -143,6 +145,7 @@ if (is.vector(SIGMA) && is.numeric(SIGMA)) {
 # stopifnot(is.numeric(SIGMA) || identical(dim(SIGMA), c(m,m,r)))
 
 ## Preprocess noise covariance
+if (is.null(noise.cov)) noise.cov <- 1
 PSI <- noise.cov
 if (is.numeric(PSI)) {
 	PSI <- rep_len(PSI, m)
@@ -157,9 +160,14 @@ if (is.numeric(PSI)) {
 
 ## Outputs
 x <- vector("list", m)
-v <- simulate.v(p, r, scale.v, ortho.v)
 if (r == 0) {
-	score <- NULL
+	v <- vector("list", m)
+	for (i in 1:m) v[[i]] <- lapply(p[[i]], numeric)
+} else {
+	v <- simulate.v(p, r, scale.v, ortho.v)
+}
+if (r == 0) {
+	score <- array(0, c(n, m, 1))
 } else if (is.vector(SIGMA)) {
 	score <- sapply(sqrt(SIGMA), function(sig) rep(rnorm(n, 0, sig), m))
 	dim(score) <- c(n, m, r)
