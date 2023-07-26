@@ -1,7 +1,7 @@
 set.ortho.mode <- function(x, r, cnstr = NULL,  
 	method = c("cyclical", "random", "alldim", "maxdim"))
 {
-test <- check.arguments(x)
+# test <- check.arguments(x)
 stopifnot(r >= 1)
 r <- as.integer(r)
 method <- match.arg(method)
