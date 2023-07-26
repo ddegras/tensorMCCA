@@ -15,12 +15,12 @@ m <- length(x)
 dimx <- lapply(x, dim)
 n <- tail(dimx[[1]], 1) 
 d <- sapply(dimx, length) - 1  
-if (is.vector(v)) {
+r <- NCOL(v)
+if (r == 1) {
 	score <- matrix(nrow = n, ncol = m)
 	for (i in 1:m) 
 		score[, i] <- tnsr.vec.prod(x[[i]], v[[i]], 1:d[i])
 } else {
-	r <- ncol(v)
 	score <- array(dim = c(n, m, r))
 	for (i in 1:m) {
 		for (l in 1:r) {
