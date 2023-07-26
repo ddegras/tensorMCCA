@@ -27,6 +27,5 @@ export(
 "tnsr.rk1.nrm"
 )
 importFrom("MASS", "ginv")
-importFrom("parallel", "mclapply")
+importFrom("foreach", "foreach")
 importFrom("RSpectra", "svds", "eigs_sym")
-importFrom("geigen", "geigen")
