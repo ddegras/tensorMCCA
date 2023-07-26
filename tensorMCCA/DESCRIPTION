@@ -2,9 +2,9 @@ Package: tensorMCCA
 Type: Package
 Title: Tensor-Based Multiple Canonical Correlation Analysis
 Version: 1.0
-Date: 2022-03-01
+Date: 2023-07-26
 Author: David Degras
 Maintainer: David Degras <david.degras@umb.edu>
 Description: A package for multiple canonical correlation analysis (MCCA) with data tensors measured on the same individuals/objects. The goal is to find canonical tensors that maximize sums of covariances or sums of correlations between pairs of datasets under orthogonality constraints. The functions in the package implement initialization algorithms (random, SVD), optimization algorithms (block coordinate ascent, gradient), as well as permutation tests to select the number of canonical components to retain. 
 License: GPL-3.0
-Imports: RSpectra, parallel, MASS, geigen
+Imports: RSpectra, foreach, MASS
