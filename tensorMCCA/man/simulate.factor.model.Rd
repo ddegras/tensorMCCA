@@ -10,7 +10,7 @@ This function generates tensor datasets from the block factor model or the globa
 }
 
 \usage{
-simulate.factor.model(dimx, r, scale.v = 1, score.cov, noise.cov, 
+simulate.factor.model(dimx, r, scale.v = 1, score.cov = NULL, noise.cov = NULL, 
 	ortho.v = c("cyclical", "random", "alldim", "maxdim", "none"))
 }
 
