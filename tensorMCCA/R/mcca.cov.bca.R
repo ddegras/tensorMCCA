@@ -50,28 +50,29 @@ if (all(xzero))
 ## Block coordinate ascent 
 for (it in 1:maxit) {
 	if (sweep == "random") idxi <- sample(m)
-	for (i in 1:m) { 		
+	for (ii in 1:m) { 	
+		i <- idxi[ii]	
 		if (xzero[i]) next
 		## Calculate the scores <X_jt, v_j> 
 		## After the first algorithm iteration (it = 1), in each 
 		## iteration of the i loop, only the inner products associated 
 		## with the previous value of i need being updated
-		idxj <- if (it == 1 && i == 1) { idxi[-1]  
-			} else if (i == 1) { lastidx } else idxi[i-1]
+		idxj <- if (it == 1 && ii == 1) { idxi[-1]  
+			} else if (ii == 1) { lastidx } else idxi[ii-1]
 		for (j in idxj) 
 			score[, j] <- tnsr.vec.prod(x[[j]], v[[j]], 1:d[j]) 
-		lastidx <- idxi[m]
 		
 		## Set up quadratic program 
 		a <- if (w[i,i] == 0) 0 else x[[i]] # quadratic component
 		b <- tnsr.vec.prod(x[[i]], 
-			if (m == 2) { score[, -i] * (w[-i, i] / s[i])
-			} else score[, -i] %*% (w[-i, i] / s[i]), 
+			if (m == 2) { list(score[, -i] * (w[-i, i] / s[i]))
+			} else list(score[, -i] %*% (w[-i, i] / s[i])), 
 			d[i] + 1L) # linear component
 		
 		## Update canonical vectors
 		v[[i]] <- optim.block.cov(v[[i]], a, b, ortho[i,], maxit, tol)
 	}								
+	lastidx <- idxi[m]
 	
 	## Calculate objective value 
 	objective[it + 1L] <- objective.internal(x, v, w)

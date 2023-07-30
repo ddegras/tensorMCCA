@@ -41,17 +41,17 @@ for (i in 1:m) {
 
 for (it in 1:maxit) {
 	if (sweep == "random") idxi <- sample(m)
-	for (i in 1:m) { 		
+	for (ii in 1:m) { 	
+		i <- idxi[ii]	
 		if (xzero[i]) next
 		## Calculate the inner products <X_jt, v_j> 
 		## After the first algorithm iteration (it = 1), in each 
 		## iteration of the i loop, only the inner products associated 
 		## with the previous value of i need being updated
-		idxj <- if (it == 1 && i == 1) { idxi[-1] 
-			} else if (i == 1) { lastidx } else idxi[i-1]
+		idxj <- if (it == 1 && ii == 1) { idxi[-1] 
+			} else if (ii == 1) { lastidx } else idxi[ii-1]
 		for (j in idxj) 
 			score[, j] <- tnsr.vec.prod(x[[j]], v[[j]], 1:d[j]) 
-		lastidx <- idxi[m]
 		
 		## Set up linear program
 		a <- tnsr.vec.prod(x = x[[i]], modes = d[i] + 1L,
@@ -67,6 +67,7 @@ for (it in 1:maxit) {
 			scale = x[[i]], maxit = maxit, tol = tol,
 			ortho = ortho[i,])		
 	}	
+	lastidx <- idxi[m]
 
 	## Calculate objective value
 	objective[it + 1L] <- objective.internal(x, v, w)	
