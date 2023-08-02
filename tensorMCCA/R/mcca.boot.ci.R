@@ -3,12 +3,14 @@
 # bootstrap confidence intervals
 #################################
 
-mcca.boot.ci <- function(object, level = 0.95, type = c("basic", "normal", "percentile"))
+mcca.boot.ci <- function(object, level = 0.95, 
+	type = c("basic", "normal", "normal_debiased", "percentile"))
 {
-lookup <- c("basic", "normal", "percentile")
+lookup <- c("basic", "normal", "normal_debiased", "percentile")
 type <- lookup[pmatch(type, lookup)]
 if (all(is.na(type))) stop("Please specify 'type' as 'basic', 'normal',", 
-	"'percentile', or any combination thereof (partial match allowed).")
+	"'normal_debiased', 'percentile', or any combination thereof",
+	"(partial match allowed).")
 target <- names(object$original)
 out <- list()
 nboot <- length(object$bootstrap)
@@ -76,7 +78,7 @@ if ("score.cor.block" %in% target) {
 		out$score.cor.block[[l]] <- lapply(ci, vec2cor)
 		names(out$score.cor.block[[l]]) <- names(ci)
 	}	
-	if (r > 1) {
+	# if (r > 1) {
 		# out$score.cor.global <- replicate(length(type), 
 			# c(lwr = 1, upr = 1), FALSE)		
 		# names(out$score.cor.global) <- type
@@ -85,7 +87,7 @@ if ("score.cor.block" %in% target) {
 		stat <- object$original$score.cor.global
 		ci <- build.ci(bootmat, stat, level, type)	
 		out$score.cor.global <- lapply(ci, vec2cor)
-	}
+	# }
 }
 
 if ("noise.cov" %in% target) {
@@ -150,11 +152,17 @@ if (any(c("basic", "percentile") %in% type)) {
 		out$basic <- matrix(2 * bootmean - percent.ci[,2:1], ncol = 2)
 }
 if 	("normal" %in% type) {
-	stat <- stat - out$bias 
 	z <- qnorm(1 - alpha)
 	halfwidth <- z * out$se
 	out$normal <- cbind(stat - halfwidth, stat + halfwidth)  
 }
+if 	("normal_debiased" %in% type) {
+	stat <- stat - out$bias 
+	z <- qnorm(1 - alpha)
+	halfwidth <- z * out$se
+	out$normal_debiased <- cbind(stat - halfwidth, stat + halfwidth)  
+}
+
 out
 }
 
