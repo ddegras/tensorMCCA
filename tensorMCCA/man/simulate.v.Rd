@@ -66,7 +66,22 @@ representing a rank-1 tensor.
 }
 
 \examples{
+p <- list(10, c(5,10), c(6,8,10)) # data dimensions
+r <- 4 # number of factors
 
+## Example 1: simulate rank-1 tensors with unit norm 
+## and orthogonal in all dimensions
+v <- simulate.v(p, r, ortho = "alldim")
+tnsr.rk1.nrm(v) # check norms
+tnsr.rk1.cp(v) # check inner products
+
+## Example 2: simulate rank-1 tensors with specified norms 
+## and orthogonal in the first dimension
+v <- simulate.v(p, r, scale = c(1, 1.25, 1.5), ortho = 1)
+tnsr.rk1.nrm(v) # check norms
+tnsr.rk1.cp(v) # check inner products (full tensor)
+v1 <- matrix(lapply(v, "[", 1), nrow(v), ncol(v)) # extract vectors from 1st dimension
+tnsr.rk1.cp(v1) # check that scalar products for these vectors are zero 
 }
 
 
