@@ -83,7 +83,7 @@ r <- 4 # number of factors
 
 ## Example 1: global factor model
 ## X(i,t) = s(t,1) v(i,1) + ... + s(t,r) v(i,r) + E(i,t) 
-score.cov <- seq(4, 1, len = r) # factor/score variances 
+score.cov <- r:1 # factor/score variances 
 noise.cov <- 0.5 
 # Each tensor E(i,t) is a white noise with variance 0.5 (recycled)
 scale.v <- 1 # set norm of each canonical weight tensor v(i,l) to 1 (default) 
