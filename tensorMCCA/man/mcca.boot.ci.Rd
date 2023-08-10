@@ -12,7 +12,8 @@ covariance/correlation structure of noise.
 }
 
 \usage{
-mcca.boot.ci(object, level = 0.95, type = c("basic", "normal", "percentile"))
+mcca.boot.ci <- function(object, level = 0.95, 
+	type = c("basic", "normal", "normal-debiased", "percentile"))
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -22,7 +23,7 @@ The result of a call to the function \code{\link{mcca.boot}}}.
 confidence level (default = 0.95)
 }
   \item{type}{
-type of CIs: any combination of the strings \code{basic}, \code{normal}, and \code{percentile}. 
+type of CIs: any combination of the strings \code{basic}, \code{normal}, \code{normal-debiased} and \code{percentile}. 
 Partial matching is enabled. 
 }
 }
@@ -33,7 +34,7 @@ For each of the inferential targets stored in \code{object}, the function calcul
 
 
 \value{
-A list whose possible fields \code{v}, \code{score.cov.block}, \code{score.cov.global}, code{score.cor.block}, \code{score.cor.global}, \code{noise.cov}, and \code{noise.cor}. Each of these fields represents a target for bootstrap inference and contains some or all of these subfields according to the contents of \code{object}: \code{bias}, \code{se}, \code{basic}, \code{percentile}, \code{normal}. 
+A list with possible fields \code{v}, \code{score.cov.block}, \code{score.cov.global}, code{score.cor.block}, \code{score.cor.global}, \code{noise.cov}, and \code{noise.cor}. Each of these fields represents a target for bootstrap inference and contains some or all of these subfields according to the contents of \code{object}: \code{bias}, \code{se}, \code{basic}, \code{percentile}, \code{normal}, and \code{normal-debiased}. 
 }
 
 \references{
@@ -52,9 +53,10 @@ p <- list(10, c(5,10), c(6,8,10)) # data dimensions
 d <- sapply(p, length) # tensor order
 dimx <- lapply(p, append, value = n) # full data dimensions
 r <- 4 # number of factors
-score.cov <- seq(4, 1, len = r) # score variance 
+score.cov <- r:1 # score variance 
 noise.cov <- 0.5 # noise variance (will be recycled)
-x <- simulate.factor.model(dimx, r, score.cov, noise.cov, ortho = TRUE)$x
+x <- simulate.factor.model(dimx, r = r, score.cov = score.cov, 
+	noise.cov = noise.cov)$x
 
 ## Run mCCA
 mcca.fit <- mcca.cor(x, r)
