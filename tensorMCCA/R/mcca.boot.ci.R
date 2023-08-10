@@ -4,12 +4,12 @@
 #################################
 
 mcca.boot.ci <- function(object, level = 0.95, 
-	type = c("basic", "normal", "normal_debiased", "percentile"))
+	type = c("basic", "normal", "normal-debiased", "percentile"))
 {
-lookup <- c("basic", "normal", "normal_debiased", "percentile")
+lookup <- c("basic", "normal", "normal-debiased", "percentile")
 type <- lookup[pmatch(type, lookup)]
 if (all(is.na(type))) stop("Please specify 'type' as 'basic', 'normal',", 
-	"'normal_debiased', 'percentile', or any combination thereof",
+	"'normal-debiased', 'percentile', or any combination thereof",
 	"(partial match allowed).")
 target <- names(object$original)
 out <- list()
@@ -156,11 +156,11 @@ if 	("normal" %in% type) {
 	halfwidth <- z * out$se
 	out$normal <- cbind(stat - halfwidth, stat + halfwidth)  
 }
-if 	("normal_debiased" %in% type) {
+if 	("normal-debiased" %in% type) {
 	stat <- stat - out$bias 
 	z <- qnorm(1 - alpha)
 	halfwidth <- z * out$se
-	out$normal_debiased <- cbind(stat - halfwidth, stat + halfwidth)  
+	out$normal-debiased <- cbind(stat - halfwidth, stat + halfwidth)  
 }
 
 out
