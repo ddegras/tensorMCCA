@@ -160,7 +160,7 @@ if 	("normal-debiased" %in% type) {
 	stat <- stat - out$bias 
 	z <- qnorm(1 - alpha)
 	halfwidth <- z * out$se
-	out$normal-debiased <- cbind(stat - halfwidth, stat + halfwidth)  
+	out[["normal-debiased"]] <- cbind(stat - halfwidth, stat + halfwidth)  
 }
 
 out
