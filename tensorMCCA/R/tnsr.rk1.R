@@ -38,7 +38,8 @@ if (d == 2L || maxit == 0) {
 	}
 }
 if (!scale) v[[d]] <- v[[d]] * nrmv
-kronv <- Reduce(kronecker, v)
+kronv <- outer.prod.nodim(v)
+# kronv <- Reduce(kronecker, v)
 for (it in 1:maxit) {
 	nrmv.old <- nrmv
 	kronv.old <- kronv
@@ -47,7 +48,8 @@ for (it in 1:maxit) {
 		nrmv <- sqrt(sum(v[[k]]^2))
 		if (k < d || scale) v[[k]] <- v[[k]] / nrmv
 	}
-	kronv <- Reduce(kronecker, v)
+	kronv <- outer.prod.nodim(v)
+	# kronv <- Reduce(kronecker, v)
 	e <- sqrt(sum((kronv - kronv.old)^2))
 	if (e <= tol * max(nrmv, nrmv.old, 1)) break
 }
@@ -96,11 +98,12 @@ objfun <- function(a, v, grad, x, cnstr, returnv = FALSE) {
 	for (k in 1:d) 
 		vnew[[k]] <- v[[k]] - a * grad[[k]]
 	vnew <- scale.v(vnew, "var", x = cnstr,	check.args = FALSE)
-	kronv <- if (d == 1) { 
-		vnew[[1]]
-	} else {
-		as.vector(Reduce(kronecker, rev(vnew))) 
-	}
+	kronv <- outer.prod.nodim(vnew)
+	# kronv <- if (d == 1) { 
+		# vnew[[1]]
+	# } else {
+		# as.vector(Reduce(kronecker, rev(vnew))) 
+	# }
 	out <- if (returnv) {
 		list(objective = sum((x - kronv)^2), v = vnew)
 	} else {
@@ -181,7 +184,8 @@ if (maxit == 0) {
 	return(lapply(v, "*", nrmv^(1/3)))
 }
 if (scale) v[[3]] <- v[[3]] * nrmv
-kronv <- Reduce(kronecker, v)
+kronv <- outer.prod.nodim(v)
+# kronv <- Reduce(kronecker, v)
 
 for (it in 1:maxit) {
 	kronv.old <- kronv
@@ -201,8 +205,9 @@ for (it in 1:maxit) {
 	if (scale) {
 		v[[3]] <- v[[3]] / nrmv	
 		nrmv <- 1
-	}		
-	kronv <- Reduce(kronecker, v)
+	}	
+	kronv <- outer.prod.nodim(v)	
+	# kronv <- Reduce(kronecker, v)
 	e <- sqrt(sum((kronv - kronv.old)^2)) 
 	if (e <= tol * max(nrmv, nrmv.old, 1)) break
 }
