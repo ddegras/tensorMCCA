@@ -31,8 +31,11 @@ if ("v" %in% target) {
 				stat <- v[[i,l]][[1]]
 			} else {
 				bootmat <- lapply(object$bootstrap, 
-					function(obj) Reduce(kronecker, rev(obj$v[[i,l]])))
-				stat <- Reduce(kronecker, rev(v[[i,l]])) 
+					function(obj) outer.prod.nodim(obj$v[[i,l]]))
+				stat <- outer.prod.nodim(v[[i,l]]) 
+				# bootmat <- lapply(object$bootstrap, 
+					# function(obj) Reduce(kronecker, rev(obj$v[[i,l]])))
+				# stat <- Reduce(kronecker, rev(v[[i,l]])) 
 			}
 			bootmat <- matrix(unlist(bootmat), ncol = nboot)
 			ci <- build.ci(bootmat, stat, level, type)
