@@ -58,7 +58,8 @@ end <- cumsum(lenx)
 start <- c(0, end[-m]) + 1
 for (i in 1:m) {
 	xi <- xmat[start[i]:end[i]]
-	dim(xi) <- if (d[i] == 1) NULL else p[[i]]
+	# dim(xi) <- if (d[i] == 1) NULL else p[[i]]
+	if (d[i] > 1) dim(xi) <- p[[i]]
 	v[[i]] <- if (all(xi == 0)) {
 		lapply(p[[i]], function(len) rep(1/sqrt(len), len))
 	} else { lapply(hosvd(xi, 1)$factors, as.vector) }
@@ -71,9 +72,10 @@ if (objective == "cov" && scale == "global") {
 	y <- scale(y, scale = FALSE)
 	M <- crossprod(y) * (w/n)
 	a <- eigen(M, TRUE)$vectors[,1] * sqrt(m) 
-	s <- a^(1/d) # scaling factors
-	for (i in 1:m)
-		v[[i]] <- lapply(v[[i]], "*", y = s[i])
+	s <- abs(a)^(1/d) # scaling factors
+	for (i in 1:m) {
+		if (a[i] < 0) v[[i]][[1]] <- -v[[i]][[1]]
+		v[[i]] <- lapply(v[[i]], "*", y = s[i]) }
 } else if (objective == "cor") {
 	y <- canon.scores(x, v)
 	y <- scale(y, scale = FALSE)
