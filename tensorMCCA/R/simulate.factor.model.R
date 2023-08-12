@@ -188,7 +188,8 @@ for (i in 1:m) {
 	signal <- 0 
 	if (r > 0) {
 		for (l in 1:r) {
-			vil <- Reduce(kronecker, rev(v[[i,l]]))
+			vil <- outer.prod.nodim(v[[i,l]])
+			# vil <- Reduce(kronecker, rev(v[[i,l]]))
 			signal <- signal + tcrossprod(vil, score[,i,l])
 		}
 		dim(signal) <- c(p[[i]], n)
