@@ -10,7 +10,8 @@ tnsr.rk1 <- function(x, scale = FALSE, maxit = 100, tol = 1e-6)
 {
 stopifnot(is.numeric(x))
 # stopifnot(maxit > 0 && tol >= 0)
-if (is.vector(x)) {
+d <- length(dim(x)) 
+if (d <= 1) {
 	if (scale) {
 		nrm <- sqrt(sum(x^2))
 		if (nrm > 0) {
@@ -25,7 +26,6 @@ if (is.vector(x)) {
 if (all(x == 0))
 	return(lapply(dim(x), numeric))
 
-d <- length(dim(x)) 
 if (d == 3L) { return(tnsr3d.rk1(x, scale, maxit, tol)) }
 svdx <- hosvd(x, 1) 
 nrmv <- if (scale) 1 else as.numeric(svdx$core)
