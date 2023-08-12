@@ -47,7 +47,8 @@ if (!is.null(v)) {
 	if (!is.matrix(v)) v <- as.matrix(v)
 	r <- ncol(v)
 	for (i in 1:m) {
-		vi <- sapply(v[i,], function(vi) Reduce(kronecker, rev(vi)))
+		vi <- sapply(v[i,], outer.prod.nodim)
+		# vi <- sapply(v[i,], function(vi) Reduce(kronecker, rev(vi)))
 		qrvi <- qr(vi)
 		if (qrvi$rank == 0) next
 		vi <- qr.Q(qrvi)[,1:qrvi$rank]
