@@ -56,6 +56,41 @@ out
 }
 
 
+
+################################
+# Basic functions to calculate 
+# outer products
+################################
+
+# faster than function(v) Reduce(kronecker, rev(v))
+
+## Outer product of vectors in list with vector(ized) output
+outer.prod.nodim <- function(v) {
+d <- length(v)
+if (d == 1) return(v[[1]])
+out <- v[[1]]
+for (k in 2:d) {
+	out <- tcrossprod(out, v[[k]])
+	dim(out) <- NULL
+}
+out
+}
+
+## Regular outer prodict of vectors
+outer.prod <- function(v) {
+stopifnot(is.list(v)) 
+d <- length(v)
+if (d == 1) return(v[[1]])
+out <- v[[1]]
+for (k in 2:d) {
+	out <- tcrossprod(out, v[[k]])
+	dim(out) <- NULL
+}
+dim(out) <- sapply(v, length)
+out
+}
+
+
 ####################################
 # Function to expand rank-1 tensors 
 # from lists of vectors to arrays
@@ -68,10 +103,11 @@ stopifnot(is.list(v))
 single <- is.numeric(v[[1]])
 if (single) v <- list(v)
 for (i in seq_along(v)) {
-	dims <- sapply(v[[i]], length)
-	v[[i]] <- if (length(dims) == 1) {
-		unlist(v[[i]]) } else {
-		array(Reduce(kronecker, rev(v[[i]])), dims)	}
+	# dims <- sapply(v[[i]], length)
+	v[[i]] <- outer.prod(v[[i]])
+	# v[[i]] <- if (length(dims) == 1) {
+		# unlist(v[[i]]) } else {
+		# array(Reduce(kronecker, rev(v[[i]])), dims)	}
 }
 if (single) v <- unlist(v, FALSE)
 v	
