@@ -58,7 +58,6 @@ end <- cumsum(lenx)
 start <- c(0, end[-m]) + 1
 for (i in 1:m) {
 	xi <- xmat[start[i]:end[i]]
-	# dim(xi) <- if (d[i] == 1) NULL else p[[i]]
 	if (d[i] > 1) dim(xi) <- p[[i]]
 	v[[i]] <- if (all(xi == 0)) {
 		lapply(p[[i]], function(len) rep(1/sqrt(len), len))
@@ -69,7 +68,6 @@ for (i in 1:m) {
 ## Scale initial canonical weights as needed	
 if (objective == "cov" && scale == "global") {
 	y <- canon.scores(x, v)
-	y <- scale(y, scale = FALSE)
 	M <- crossprod(y) * (w/n)
 	a <- eigen(M, TRUE)$vectors[,1] * sqrt(m) 
 	s <- abs(a)^(1/d) # scaling factors
