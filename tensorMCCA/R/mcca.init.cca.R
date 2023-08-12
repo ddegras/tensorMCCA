@@ -154,7 +154,8 @@ for (i in 1:m) {
 	if (objective.type == "cor")
 		xbar <- as.vector(rowMeans(x[[i]], dims = d[i]))
 	for (j in 1:m) {
-		aij <- array(a[[i]][,j], dim = p[[i]])
+		aij <- a[[i]][,j]
+		if (d[i] > 1) dim(aij) <- p[[i]]
 		v[[i,j]] <- if (objective.type == "cov") {
 			tnsr.rk1(aij, scale = TRUE, 	maxit = maxit, tol = tol)
 		} else {
