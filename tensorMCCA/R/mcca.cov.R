@@ -47,7 +47,8 @@ if (is.character(init))
 ## Center data
 for(i in 1:m) {
     xbar <- rowMeans(x[[i]], dims = d[i])
-    x[[i]] <- x[[i]] - as.vector(xbar)
+    if (!all(abs(xbar) < eps))
+	    x[[i]] <- x[[i]] - as.vector(xbar)
 }
 if (ortho == "weight") x0 <- x
 
