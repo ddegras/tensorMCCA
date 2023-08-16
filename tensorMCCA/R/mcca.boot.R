@@ -194,10 +194,11 @@ resid <- vector("list", m)
 for (i in 1:m) { 
 	resid[[i]] <- matrix(x[[i]], pp[i], n)
 	vi <- matrix(unlist(tnsr.rk1.expand(object$v[i,])), pp[i], r) 
-	score <- if (test) {
-		object$block.score[,i,] 
+	if (test) {
+		score <- object$block.score[,i,] 
 	} else {
-		crossprod(resid[[i]], qr.Q(qr(vi)))
+		vi <- qr.Q(qr(vi))
+		score <- crossprod(resid[[i]], vi)
 	}
 	resid[[i]] <- resid[[i]]  - tcrossprod(vi, score)
 	if (!matrix.out) dim(resid[[i]]) <- dimx[[i]]	
