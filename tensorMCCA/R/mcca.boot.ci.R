@@ -51,23 +51,23 @@ if ("v" %in% target) {
 	}
 }
 
-if ("score.cov.block" %in% target) {
-	r <- ncol(object$original$score.cov.block)
-	out$score.cov.block <- out$score.cov.global <- vector("list", r)
+if ("block.score.cov" %in% target) {
+	r <- ncol(object$original$block.score.cov)
+	out$block.score.cov <- out$global.score.cov <- vector("list", r)
 	for (l in 1:r) {
-		bootmat <- sapply(object$bootstrap, function(obj) obj$score.cov.block[,l])
+		bootmat <- sapply(object$bootstrap, function(obj) obj$block.score.cov[,l])
 		if(!is.matrix(bootmat)) 
 			bootmat <- matrix(bootmat, ncol = nboot)
-		stat <- object$original$score.cov.block[,l]
+		stat <- object$original$block.score.cov[,l]
 		ci <- build.ci(bootmat, stat, level, type)
-		out$score.cov.block[[l]] <- lapply(ci, vec2cov)	 
-		names(out$score.cov.block[[l]]) <- names(ci)
+		out$block.score.cov[[l]] <- lapply(ci, vec2cov)	 
+		names(out$block.score.cov[[l]]) <- names(ci)
 	}	
-	bootmat <- sapply(object$bootstrap, "[[", "score.cov.global")
-	stat <- object$original$score.cov.global
+	bootmat <- sapply(object$bootstrap, "[[", "global.score.cov")
+	stat <- object$original$global.score.cov
 	ci <- build.ci(bootmat, stat, level, type)
-	out$score.cov.global <- lapply(ci, vec2cov)
-	names(out$score.cov.global) <- names(ci)
+	out$global.score.cov <- lapply(ci, vec2cov)
+	names(out$global.score.cov) <- names(ci)
 }
 
 if ("score.cor.block" %in% target) {
