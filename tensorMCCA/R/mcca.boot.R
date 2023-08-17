@@ -53,18 +53,20 @@ if (resample == "data") {
 ## Perform bootstrap in parallel or sequentially 
 if (parallel.flag) {
 	boot.out <- foreach(b = 1:nboot, .errorhandling = .errorhandling) %dopar% {
-			mcca.boot.single(xx, resample, target, call.args, unbiased.score.cov) 
+			mcca.boot.single(xx, resample, target, call.args, 
+				unbiased.score.cov, unbiased.noise.cov) 
 	}
 } else {
 	boot.out <- vector("list", nboot)
 	if (.errorhandling == "stop") {
 		for (b in 1:nboot) 
 			boot.out[[b]] <- mcca.boot.single(xx, resample, target, call.args, 
-				unbiased.score.cov)
+				unbiased.score.cov, unbiased.noise.cov)
 	} else {
 		for (b in 1:nboot) 
 			boot.out[[b]] <- tryCatch(
-				mcca.boot.single(xx, resample, target, call.args, unbiased.score.cov), 
+				mcca.boot.single(xx, resample, target, call.args, 
+					unbiased.score.cov, unbiased.noise.cov), 
 				error = function(e) e)
 	}
 	if (.errorhandling == "remove") {
@@ -235,6 +237,7 @@ n <- tail(dim(x[[1]]), 1)
 r <- NCOL(object$v)
 if (unbiased) {
 	noise.cov <- vector("list", m)
+	global.score.var <- colSums(object$global.score^2) / (n-1)
 	for (i in 1:m) {
 		vi <- matrix(unlist(tnsr.rk1.expand(object$v[i,])), ncol = r)
 		vi <- sweep(vi, 2, sqrt(global.score.var), "*")
