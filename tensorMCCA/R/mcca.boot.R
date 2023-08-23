@@ -13,7 +13,9 @@ resample <- match.arg(resample)
 .errorhandling <- match.arg(control[[".errorhandling"]],  
 	c("stop", "remove", "pass"))
 unbiased.score.cov <- as.logical(control[["unbiased.score.cov"]])
-if (length(unbiased.score.cov) == 0) unbiased.score.cov <- FALSE
+if (length(unbiased.score.cov) == 0) unbiased.score.cov <- TRUE
+unbiased.noise.cov <- as.logical(control[["unbiased.noise.cov"]])
+if (length(unbiased.noise.cov) == 0) unbiased.noise.cov <- TRUE
 
 ## Determine if bootstrap should be computed in parallel 
 parallel.flag <- FALSE
@@ -51,18 +53,20 @@ if (resample == "data") {
 ## Perform bootstrap in parallel or sequentially 
 if (parallel.flag) {
 	boot.out <- foreach(b = 1:nboot, .errorhandling = .errorhandling) %dopar% {
-			mcca.boot.single(xx, resample, target, call.args, unbiased.score.cov) 
+			mcca.boot.single(xx, resample, target, call.args, 
+				unbiased.score.cov, unbiased.noise.cov) 
 	}
 } else {
 	boot.out <- vector("list", nboot)
 	if (.errorhandling == "stop") {
 		for (b in 1:nboot) 
 			boot.out[[b]] <- mcca.boot.single(xx, resample, target, call.args, 
-				unbiased.score.cov)
+				unbiased.score.cov, unbiased.noise.cov)
 	} else {
 		for (b in 1:nboot) 
 			boot.out[[b]] <- tryCatch(
-				mcca.boot.single(xx, resample, target, call.args, unbiased.score.cov), 
+				mcca.boot.single(xx, resample, target, call.args, 
+					unbiased.score.cov, unbiased.noise.cov), 
 				error = function(e) e)
 	}
 	if (.errorhandling == "remove") {
@@ -85,7 +89,7 @@ if ("noise.cov" %in% target) noise.target <- "cov"
 if ("noise.cor" %in% target) noise.target <- c(noise.target, "cor")
 if (!is.null(noise.target)) 
 	mcca.out <- c(mcca.out, calculate.noise.cov(x, object, type = noise.target, 
-		matrix.out = FALSE))
+		unbiased.noise.cov, matrix.out = FALSE))
 
 ## Realign the bootstrap estimates with original estimates
 if ("v" %in% target) {
@@ -109,7 +113,7 @@ list(bootstrap = boot.out, original = mcca.out)
 
 
 calculate.score.cov <- function(object, type = c("cov", "cor"), 
-	unbiased = FALSE, matrix.out = TRUE)
+	unbiased = TRUE, matrix.out = TRUE)
 {
 type <- intersect(type, c("cov", "cor")) 
 if (length(type) == 0) 
@@ -122,33 +126,45 @@ m <- dims[2]
 r <- dims[3]
 global.score <- object$global.score
 if ("cov" %in% type) {	
-	out$score.cov.block <- array(apply(block.score, 3, cov), dim = c(m, m, r))
-	out$score.cov.global <- if (unbiased) {
-		calculate.score.cov.no.bias(block.score) 
-	} else cov(global.score)
+	block.score.cov <- 
+		array(apply(block.score, 3, cov), dim = c(m, m, r))
+	out$block.score.cov <- block.score.cov
+	if (unbiased) {
+		adjust <- rowMeans(apply(block.score, 2, cov))
+		global.score.cov <- (m * cov(global.score) - adjust) / (m-1)
+	} else {
+		global.score.cov <- cov(global.score)
+	}
+	out$global.score.cov <- global.score.cov
 	if (!matrix.out) {
 		idx <- which(lower.tri(matrix(0, m, m), TRUE))
-		dim(out$score.cov.block) <- c(m^2, r)
-		out$score.cov.block <- out$score.cov.block[idx,,drop = FALSE]
+		dim(out$block.score.cov) <- c(m^2, r)
+		out$block.score.cov <- out$block.score.cov[idx,,drop = FALSE]
 		idx <- which(lower.tri(matrix(0, r, r), TRUE))
-		out$score.cov.global <- out$score.cov.global[idx]	
+		out$global.score.cov <- out$global.score.cov[idx]	
 	}
 }
 if ("cor" %in% type) {
-	 out$score.cor.block <- array(apply(block.score, 3, cor), dim = c(m, m, r))
-	out$score.cor.global <- if (!unbiased) {
-		cor(global.score)
-	} else if ("cov" %in% type) {
-		cov2cor(out$score.cov.global)
+	if ("cov" %in% type) {
+		out$block.score.cor <- 
+			array(apply(block.score.cov, 3, cov2cor), dim = c(m, m, r))
+		out$global.score.cor <- cov2cor(global.score.cov)
 	} else {
-		cov2cor(calculate.score.cov.no.bias(block.score))
+		out$block.score.cor <- 
+			array(apply(block.score, 3, cor), dim = c(m, m, r))
+		if (unbiased) {
+			adjust <- rowMeans(apply(block.score, 2, cov))
+			out$global.score.cor <- cov2cor(m * cov(global.score) - adjust)
+		} else {
+			out$global.score.cor <- cor(global.score)
+		} 
 	}
 	if (!matrix.out) {
 		idx <- which(lower.tri(matrix(0, m, m)))
-		dim(out$score.cor.block) <- c(m^2, r)
-		out$score.cor.block <- out$score.cor.block[idx,,drop = FALSE]
+		dim(out$block.score.cor) <- c(m^2, r)
+		out$block.score.cor <- out$block.score.cor[idx,,drop = FALSE]
 		idx <- which(lower.tri(matrix(0, r, r)))
-		out$score.cor.global <- out$score.cor.global[idx]	
+		out$global.score.cor <- out$global.score.cor[idx]	
 	}
 }
 out
@@ -156,24 +172,24 @@ out
 
 
 
-calculate.score.cov.no.bias <- function(score)
-{
-stopifnot(length(dim(score)) == 3)
-n <- dim(score)[1]
-m <- dim(score)[2]
-r <- dim(score)[3]
+# # calculate.score.cov.no.bias <- function(score)
+# {
+# stopifnot(length(dim(score)) == 3)
+# n <- dim(score)[1]
+# m <- dim(score)[2]
+# r <- dim(score)[3]
 
-global.score.cov <- matrix(0, r, r)
-mask <- lower.tri(matrix(0, m, m))
-for (l1 in 1:r) {
-	for (l2 in 1:l1) {
-		cov12 <- crossprod(score[,,l1], score[,,l2]) / n
-		global.score.cov[l1,l2] <- mean(cov12[mask]) 
-		global.score.cov[l2,l1] <- global.score.cov[l1,l2]
-	}
-}
-global.score.cov
-}
+# global.score.cov <- matrix(0, r, r)
+# mask <- lower.tri(matrix(0, m, m))
+# for (l1 in 1:r) {
+	# for (l2 in 1:l1) {
+		# cov12 <- cov(score[,,l1], score[,,l2])
+		# global.score.cov[l1,l2] <- mean(cov12[mask]) 
+		# global.score.cov[l2,l1] <- global.score.cov[l1,l2]
+	# }
+# }
+# global.score.cov
+# }
 
 
 
@@ -182,18 +198,17 @@ calculate.residuals <- function(x, object, matrix.out = FALSE)
 {
 m <- length(x)
 dimx <- lapply(x, dim)
-p <- lapply(dimx, function(dims) dims[-length(dims)])
-pp <- sapply(p, prod)
 n <- tail(dimx[[1]], 1)
 r <- object$call.args$r	
 objective.type <- object$call.args$objective.type
 scale.cnstr <- object$call.args$scale
 ortho.type <- object$call.args$ortho.type
-test <- (objective.type == "cov" && scale.cnstr == "block" && ortho.type == "weight") 
+test <- ((objective.type == "cov") && (scale.cnstr == "block") && 
+	(ortho.type == "weight"))
 resid <- vector("list", m)
 for (i in 1:m) { 
-	resid[[i]] <- matrix(x[[i]], pp[i], n)
-	vi <- matrix(unlist(tnsr.rk1.expand(object$v[i,])), pp[i], r) 
+	resid[[i]] <- matrix(x[[i]], ncol = n)
+	vi <- matrix(unlist(tnsr.rk1.expand(object$v[i,])), ncol = r) 
 	if (test) {
 		score <- object$block.score[,i,] 
 	} else {
@@ -210,42 +225,54 @@ resid
 
 
 
-calculate.noise.cov <- function(x, object, type = c("cov", "cor"), matrix.out = TRUE)
+calculate.noise.cov <- function(x, object, type = c("cov", "cor"), 
+	unbiased = TRUE, matrix.out = TRUE)
 {
 type <- intersect(type, c("cov", "cor")) 
 if (length(type) == 0) 
 	stop("Please specify 'type' as 'cov', 'cor', or both these values.")
 out <- list()
-if (!matrix.out) {
-	m <- length(x)
-	dimx <- lapply(x, dim)
-	pp <- sapply(dimx, function(dims) prod(dims[-length(dims)]))
+m <- length(x)
+n <- tail(dim(x[[1]]), 1)
+r <- NCOL(object$v)
+if (unbiased) {
+	noise.cov <- vector("list", m)
+	global.score.var <- colSums(object$global.score^2) / (n-1)
+	for (i in 1:m) {
+		vi <- matrix(unlist(tnsr.rk1.expand(object$v[i,])), ncol = r)
+		vi <- sweep(vi, 2, sqrt(global.score.var), "*")
+		noise.cov[[i]] <- cov(t(matrix(x[[i]], ncol = n))) - tcrossprod(vi)					}
+	if ("cov" %in% type) 
+		out$noise.cov <- noise.cov
+	if ("cor" %in% type) 
+		out$noise.cor <- lapply(noise.cov, cov2cor)
+	rm(vi, noise.cov)
+} else {
+	resid <- calculate.residuals(x, object, matrix.out = TRUE)
+	if ("cov" %in% type) 
+		out$noise.cov <- lapply(resid, function(x) cov(t(x)))
+	if ("cor" %in% type) 
+		out$noise.cor <- lapply(resid, function(x) cor(t(x)))
+	rm(resid)
 }
-resid <- calculate.residuals(x, object, matrix.out = TRUE)
-resid <- sapply(resid, t)
-if ("cov" %in% type) {
-	out$noise.cov <- lapply(resid, cov)	
-	if (!matrix.out) {
-		for (i in 1:m) {
+if (!matrix.out) {
+	for (i in 1:m) {
+		if ("cov" %in% type) {
 			idx <- which(lower.tri(matrix(0, pp[i], pp[i]), diag = TRUE))
 			out$noise.cov[[i]] <- out$noise.cov[[i]][idx]	
 		}
-	}		
-}
-if ("cor" %in% type) {
-	out$noise.cor <- lapply(resid, cor)	
-	if (!matrix.out) {
-		for (i in 1:m) {
+		if ("cor" %in% type) {
 			idx <- which(lower.tri(matrix(0, pp[i], pp[i]), diag = FALSE))
 			out$noise.cor[[i]] <- out$noise.cor[[i]][idx]	
 		}
-	}		
+	}
 }
 out
 }
 
 
-mcca.boot.single <- function(x, resample, target, call.args, unbiased.score.cov) {
+mcca.boot.single <- function(x, resample, target, call.args, 
+	unbiased.score.cov, unbiased.noise.cov) {
 	
 ## Data dimensions
 if (resample == "data") {
@@ -304,8 +331,8 @@ noise.target <- NULL
 if ("noise.cov" %in% target) noise.target <- "cov"
 if ("noise.cor" %in% target) noise.target <- c(noise.target, "cor")
 if (!is.null(noise.target)) 
-	out <- c(out, calculate.noise.cov(xstar, result, type = noise.target, 
-		matrix.out = FALSE))
+	out <- c(out, calculate.noise.cov(xstar, result, noise.target, 
+		unbiased.noise.cov, matrix.out = FALSE))
 
 out
 } 
