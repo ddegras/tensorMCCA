@@ -30,8 +30,11 @@ if (d == 1L) {
 if (d == 2L) {
 	RSpectra.flag <- all(p >= 3)
 	svdx <- if (RSpectra.flag) {
-		svds(x, max(r), r[1], r[2])	
-	} else svd(x, r[1], r[2])
+		tryCatch(svds(x, max(r), r[1], r[2]), 
+			error = function(e) NULL)	
+	} else NULL
+	if (is.null(svdx)) 
+		svdx <- svd(x, r[1], r[2])
 	return(list(factors = list(svdx$u, svdx$v), 
 		core = diag(svdx$d, r[1], r[2])))
 }
@@ -53,8 +56,10 @@ for (k in 1:d) {
 	## SVD
 	RSpectra.flag <- all(dim(core) > max(2, r[k]))
 	svdk <- if (RSpectra.flag) {
-		svds(core, r[k])
-	} else { svd(core, nu = r[k], nv = r[k]) }
+		tryCatch(svds(core, r[k]), error = function(e) NULL)
+	} else NULL
+	if (is.null(svdk))
+		svdk <- svd(core, nu = r[k], nv = r[k]) }
 	u[[k]] <- svdk$u
 	
 	## Reshape and permute core
