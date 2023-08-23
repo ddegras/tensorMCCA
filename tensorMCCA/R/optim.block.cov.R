@@ -190,7 +190,7 @@ if (length(lambda) == 0) { lambda <- lambda.opt }
 ## Find corresponding solutions z and objective values
 z <- b / outer(-delta, lambda, "+")
 nrmz <- sqrt(colSums(z^2))
-z <- sweep(z, 2, nrmz, "/")
+z <- sweep(z, 2L, nrmz, "/", FALSE)
 objective <- colSums(delta * z^2) + 2 * colSums(b * z)
 idx <- which.max(objective)
 if (objective[idx] > objective.best) { v <- P %*% z[,idx] }
