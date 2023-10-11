@@ -213,7 +213,7 @@ for (it in 1:maxit) {
 }
 
 s <- nrmv^(c(1/3, 1/3, -2/3))
-for (k in 1:3) v[[k]] <- v[[k]] * s[k] 
+for (k in 1:3) v[[k]] <- as.vector(v[[k]]) * s[k] 
 
 v	
 	
