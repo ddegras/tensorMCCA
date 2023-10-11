@@ -59,7 +59,7 @@ for (k in 1:d) {
 		tryCatch(svds(core, r[k]), error = function(e) NULL)
 	} else NULL
 	if (is.null(svdk))
-		svdk <- svd(core, nu = r[k], nv = r[k]) }
+		svdk <- svd(core, nu = r[k], nv = r[k]) 
 	u[[k]] <- svdk$u
 	
 	## Reshape and permute core
