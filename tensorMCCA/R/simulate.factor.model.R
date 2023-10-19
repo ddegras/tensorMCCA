@@ -111,7 +111,7 @@ v
 ################################
 
 simulate.factor.model <- function(dimx, r, scale.v = 1, score.cov = NULL, 
-	noise.cov = NULL, ortho.v = c("cyclical", "random", "alldim", "maxdim", "none"))
+	noise.cov = NULL, ortho.v = c("cyclical", "random", "alldim", "maxdim", "none"), center = TRUE)
 {
 ## Data dimensions
 d <- sapply(dimx, length) - 1L
@@ -209,6 +209,15 @@ for (i in 1:m) {
 	}
 	dim(noise) <- c(p[[i]], n)		
 	x[[i]] <- signal + noise
+}
+
+if (center) {
+	for (i in 1:m) {
+		xbar <- rowMeans(x[[i]], dims = d[i])
+		x[[i]] <- sweep(x[[i]], 1:d[i], xbar)
+	}
+	sbar <- colMeans(score)
+	score <- sweep(score, 2:3, sbar)
 }
 
 list(x = x, v = v, score = score)
