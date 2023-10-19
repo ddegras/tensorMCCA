@@ -11,7 +11,7 @@ This function generates tensor datasets from the block factor model or the globa
 
 \usage{
 simulate.factor.model(dimx, r, scale.v = 1, score.cov = NULL, noise.cov = NULL, 
-	ortho.v = c("cyclical", "random", "alldim", "maxdim", "none"))
+	ortho.v = c("cyclical", "random", "alldim", "maxdim", "none"), center = TRUE)
 }
 
 \arguments{
@@ -30,6 +30,7 @@ Covariance structure of noise terms. Can be specified as a numeric vector of len
 for \eqn{i=1,...,m,} where \eqn{P_i}{Pi} is the product of all elements in \code{dimx[[i]]} except the last.}
     \item{ortho.v}{modes in which the canonical weight tensors are orthogonal to each other. Can be specified as a string or as an integer vector of same length as \code{dimx}. 
 }
+\item{center}{Should the simulated data and scores be centered?}
 }
 
 \details{
