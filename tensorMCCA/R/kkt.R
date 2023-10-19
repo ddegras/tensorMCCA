@@ -24,10 +24,10 @@ n <- tail(dimx[[1]], 1L)
 r <- NCOL(v)
 
 ## Auxiliary function for gradient calculation
-if (ortho == "weight" && l > 1) {
+if (ortho == "weight" && r > 1) {
 	gradfun <- function(x, y) {
 	d <- length(x)
-	if (d == 1) return(y)
+	if (d == 1) return(y[[1]])
 	cp <- numeric(d)
 	for (k in 1:d) cp[k] <- sum(x[[k]] * y[[k]])
 	out <- vector("list", d)
@@ -47,12 +47,12 @@ for (i in 1:m) {
 		for (k in 1:d[i]) 
 			tvprod[[k]] <- tnsr.vec.prod(x = x[[i]], 
 				v = v[[i,l]][-k], modes = (1:d[i])[-k])
-		tvprod <- unlist(tvprod)
-		dim(tvprod) <- c(sump[i], n)
+		tvprod <- do.call(rbind, tvprod)
+		# dim(tvprod) <- c(sump[i], n)
 		tvprod <- tvprod - rowMeans(tvprod)
 		grad.obj[[i,l]] <- tvprod %*% score[,,l] %*% (w[,i] / n)
 		## Gradient of scaling constraint
-		mat <- matrix(, sump[i], l)
+		mat <- matrix(nrow = sump[i], ncol = l)
 		mat[,l] <- if (obj == "cor") {
 			tvprod %*% score[,i,l]	
 		} else {
