@@ -49,6 +49,7 @@ for (i in 1:m) {
 				v = v[[i,l]][-k], modes = (1:d[i])[-k])
 		tvprod <- unlist(tvprod)
 		dim(tvprod) <- c(sump[i], n)
+		tvprod <- tvprod - rowMeans(tvprod)
 		grad.obj[[i,l]] <- tvprod %*% score[,,l] %*% (w[,i] / n)
 		## Gradient of scaling constraint
 		mat <- matrix(, sump[i], l)
