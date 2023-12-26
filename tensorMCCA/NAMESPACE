@@ -2,6 +2,7 @@ export(
 "canon.scores",
 "check.arguments",
 "deflate.x",
+"hessian",
 "hosvd",
 "kkt",
 "mcca.boot",
