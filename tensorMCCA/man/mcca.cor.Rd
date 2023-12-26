@@ -76,5 +76,14 @@ A LIST with components
 D. Degras, Y. Shen, X. Chu (2022). Multiple canonical correlation analysis for mixed tensor data. \emph{Manuscript in progress.}	
 }
 
-% \examples{
-% }
+\examples{
+## Simulate three tensor datasets measured on 100 cases with 4 common factors
+m <- 3 
+n <- 100 
+r <- 4 
+dimx <- list(c(10,n), c(5,10,n), c(6,8,10,n)) 
+sim <- simulate.factor.model(dimx, r, score.cov = r:1, noise.cov = .5, ortho.v = 1)
+x <- sim$x
+
+fit <- mcca.cor(x, r)
+}
