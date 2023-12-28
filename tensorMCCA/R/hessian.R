@@ -15,20 +15,15 @@ grad <- grad$grad.constraints
 
 ## Auxiliary quantities
 r <- fit$call.args$r
+scale <- fit$call.args$scale
 if (scale == "block") {
 	m <- length(x)
 	dimx <- lapply(x, dim)
 	p <- lapply(dimx, function(x) if (is.null(x)) 1 else x[-length(x)])
-	d <- sapply(p, length) 
-	cumsump <- cumsum(c(0, unlist(p)))
-	idxH <- vector("list", m)
-	count <- 0
-	for (i in 1:m) {
-	for (k in 1:d[i]) {
-		count <- count + 1
-		idxH[[i]][[k]] <- (cumsump[count]+1):cumsump[count+1]
-	}}
-	idxH <- unlist(idxH, FALSE)
+	sump <- sapply(p, sum) 
+	cumsump <- cumsum(c(0, sump))
+	idxH <- mapply(seq, from = cumsump[1:m] + 1, to = cumsump[-1], 
+		SIMPLIFY = FALSE)
 }
 
 ## Calculate Hessian matrices of Lagrange function
@@ -36,34 +31,44 @@ H <- hessian.internal(x, fit, lambda)
 		
 ## Project Hessian matrices on orthogonal of constraint gradients
 projH <- vector("list", r)
-if (scale == "block") {
-	for (l in 1:r) {
-		UHU <- vector("list", m^2)
-		dim(UHU) <- c(m,m)
-		U <- vector("list",m)
-		for (i in 1:m) {
-			svdil <- svd(grad[[i,l]], nv = 0)
-			keep <- (svdil$d > max(1e-14, svdil$d[1] * 1e-8))
-			U[[i]] <- svdil$u[,keep]
-		}
-		for (i in 1:m) {
-		for (j in 1:i) {
-			UHU[[i,j]] <- crossprod(U[[i]], H[idxH[[i]], idxH[[j]], l] %*% U[[j]])
-			if (i > j) UHU[[j,i]] <- t(UHU[[i,j]])		
-		}}
-		for (j in 1:m)
-			UHU[[1,j]] <- do.call(rbind, UHU[,j])
-		nr <- nrow(UHU[[1]])
-		projH[[l]] <- matrix(unlist(UHU[1,]), nr, nr)	
-	}
-} else {
-	for (l in 1:r) {
-		svdl <- svd(grad[[l]], nv = 0)
-		keep <- (svdl$d > max(1e-14, svdl$d[1] * 1e-8))
-		U <- svdl$u[,keep]		
-		projH[[l]] <- crossprod(U, H[,,l] %*% U)
-	}	
+# if (scale == "block") {
+	# for (l in 1:r) {
+		# UHU <- vector("list", m^2)
+		# dim(UHU) <- c(m,m)
+		# U <- vector("list",m)
+		# for (i in 1:m) {
+			# svdil <- svd(grad[[i,l]], nu = sump[i], nv = 0)
+			# keep <- 1:sump[i]
+			# rmv <- which(svdil$d > max(1e-14, svdil$d[1] * 1e-8))
+			# if (length(rmv) > 0) keep <- keep[-rmv]
+			# U[[i]] <- if (length(keep) > 0) {
+				# svdil$u[,keep] } else numeric(sump[i])
+		# }
+		# for (i in 1:m) {
+		# for (j in 1:i) {
+			# UHU[[i,j]] <- crossprod(U[[i]], H[idxH[[i]], idxH[[j]], l] %*% U[[j]])
+			# if (i > j) UHU[[j,i]] <- t(UHU[[i,j]])		
+		# }}
+		# for (j in 1:m)
+			# UHU[[1,j]] <- do.call(rbind, UHU[,j])
+		# nr <- nrow(UHU[[1]])
+		# projH[[l]] <- matrix(unlist(UHU[1,]), nr, nr)	
+	# }
+# } else {
+pp <- cumsump[m+1]
+	# nr <- nrow(grad[[1]])
+for (l in 1:r) {
+	# svdl <- svd(grad[[l]], nu = nr, nv = 0)
+	# keep <- 1:nr
+	svdl <- svd(grad[[l]], nu = pp, nv = 0)
+	keep <- 1:pp
+	rmv <- which(svdl$d > max(1e-14, svdl$d[1] * 1e-8))
+	if (length(rmv) > 0) keep <- keep[-rmv]
+	U <- if (length(keep) > 0) {
+		svdl$u[,keep] } else numeric(pp) # numeric(nr)	
+	projH[[l]] <- crossprod(U, H[,,l] %*% U)
 }	
+# }	
 
 list(H = H, projH = projH)
 }
@@ -89,6 +94,9 @@ n <- if (is.null(dimx[[1]])) length(x[[1]]) else tail(dimx[[1]], 1)
 r <- fit$call.args$r
 
 ## Canonical weights + scores and objective weights
+objective <- fit$call.args$objective.type
+ortho <- fit$call.args$ortho.type
+scale <- fit$call.args$scale
 v <- fit$v
 score <- fit$block.score / n
 ortho.score.block <- (ortho == "score" && scale == "block")
@@ -111,7 +119,7 @@ pp <- cumsump[count+1]
 cpfun <- function(x,y) sum(x*y)
 
 ## Build Hessian matrices
-H <- array(0, c(pp,pp, r))
+H <- array(0, c(pp, pp, r))
 for (l in 1:r) {
 	tvprod <- vector("list", m)
 	
@@ -123,19 +131,22 @@ for (l in 1:r) {
 	}
 	
 	## Second pass
+	if (scale == "global") lam <- lambda[[l]]
 	for (i in 1:m) {	
 		vil <- v[[i,l]]
-		cp <- mapply(cpfun, x = unlist(v[i,1:l], FALSE), y = vil)
-		dim(cp) <- c(d[i], l)
-		lam <- switch(scale, block = lambda[[i,l]], global = lambda[[l]])
+		if (objective == "cov") {
+			cp <- mapply(cpfun, x = unlist(v[i,1:l], FALSE), y = vil)
+			dim(cp) <- c(d[i], l) }
+		if (scale == "block") lam <- lambda[[l]][i,]
 		# Right-multiplier vector for matrix terms x(i,t) x_(-(k,kk)) v(i,l)
 		scorei <- score[,,l] %*% w[,i]
 		if (objective == "cor")	
 			scorei <- scorei - lam[l] * score[,i,l]
 		if (ortho.score.block && l > 1)
-			scorei <- scorei - score[,i,-l, drop = FALSE] %*% lam[-l]
+			scorei <- scorei - as.matrix(score[,i, 1:(l-1)]) %*% lam[-l]
 		if (ortho.score.global && l > 1)
-			scorei <- scorei - global.score[,-l, drop = FALSE] %*% lam[-l]			
+			scorei <- scorei - as.matrix(global.score[,1:(l-1)]) %*% lam[-l]
+		scorei <- list(scorei)			
 		for (j in 1:i) {
 			# Multiplicative constant for matrix terms
 			# x(i,t) x_(-k) v(i,l) (x(j,t) x_(-kk) v(j,l))^T
@@ -146,7 +157,7 @@ for (l in 1:r) {
 				idxik <- idxH[[i]][[k]]
 				idxjkk <- idxH[[j]][[kk]]
 				Acc <- 0
-				if (w[i,j] > 0 || test) { # obj + scale (cor)
+				if (cst != 0) { # obj + scale (cor)
 					tcp <- tcrossprod(tvprod[[i]][[k]], tvprod[[j]][[kk]])
 					Acc <- cst * tcp
 				}
