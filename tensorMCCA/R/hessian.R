@@ -12,63 +12,23 @@ hessian <- function(x, fit, grad = NULL)
 if (is.null(grad)) grad <- kkt(x, fit)
 lambda <- grad$multipliers
 grad <- grad$grad.constraints
-
-## Auxiliary quantities
-r <- fit$call.args$r
-scale <- fit$call.args$scale
-if (scale == "block") {
-	m <- length(x)
-	dimx <- lapply(x, dim)
-	p <- lapply(dimx, function(x) if (is.null(x)) 1 else x[-length(x)])
-	sump <- sapply(p, sum) 
-	cumsump <- cumsum(c(0, sump))
-	idxH <- mapply(seq, from = cumsump[1:m] + 1, to = cumsump[-1], 
-		SIMPLIFY = FALSE)
-}
+pp <- nrow(grad[[1]])
 
 ## Calculate Hessian matrices of Lagrange function
 H <- hessian.internal(x, fit, lambda)		
 		
 ## Project Hessian matrices on orthogonal of constraint gradients
+r <- fit$call.args$r
 projH <- vector("list", r)
-# if (scale == "block") {
-	# for (l in 1:r) {
-		# UHU <- vector("list", m^2)
-		# dim(UHU) <- c(m,m)
-		# U <- vector("list",m)
-		# for (i in 1:m) {
-			# svdil <- svd(grad[[i,l]], nu = sump[i], nv = 0)
-			# keep <- 1:sump[i]
-			# rmv <- which(svdil$d > max(1e-14, svdil$d[1] * 1e-8))
-			# if (length(rmv) > 0) keep <- keep[-rmv]
-			# U[[i]] <- if (length(keep) > 0) {
-				# svdil$u[,keep] } else numeric(sump[i])
-		# }
-		# for (i in 1:m) {
-		# for (j in 1:i) {
-			# UHU[[i,j]] <- crossprod(U[[i]], H[idxH[[i]], idxH[[j]], l] %*% U[[j]])
-			# if (i > j) UHU[[j,i]] <- t(UHU[[i,j]])		
-		# }}
-		# for (j in 1:m)
-			# UHU[[1,j]] <- do.call(rbind, UHU[,j])
-		# nr <- nrow(UHU[[1]])
-		# projH[[l]] <- matrix(unlist(UHU[1,]), nr, nr)	
-	# }
-# } else {
-pp <- cumsump[m+1]
-	# nr <- nrow(grad[[1]])
 for (l in 1:r) {
-	# svdl <- svd(grad[[l]], nu = nr, nv = 0)
-	# keep <- 1:nr
 	svdl <- svd(grad[[l]], nu = pp, nv = 0)
 	keep <- 1:pp
 	rmv <- which(svdl$d > max(1e-14, svdl$d[1] * 1e-8))
 	if (length(rmv) > 0) keep <- keep[-rmv]
 	U <- if (length(keep) > 0) {
-		svdl$u[,keep] } else numeric(pp) # numeric(nr)	
+		svdl$u[,keep] } else numeric(pp) 	
 	projH[[l]] <- crossprod(U, H[,,l] %*% U)
 }	
-# }	
 
 list(H = H, projH = projH)
 }
@@ -154,15 +114,15 @@ for (l in 1:r) {
 			cst <- (w[i,j] - ifelse(test, lam[l], 0)) / n
 			for (k in 1:d[i]) {
 			for (kk in 1:d[j]) {
-				idxik <- idxH[[i]][[k]]
-				idxjkk <- idxH[[j]][[kk]]
+				idxrow <- idxH[[i]][[k]]
+				idxcol <- idxH[[j]][[kk]]
 				Acc <- 0
 				if (cst != 0) { # obj + scale (cor)
 					tcp <- tcrossprod(tvprod[[i]][[k]], tvprod[[j]][[kk]])
 					Acc <- cst * tcp
 				}
 				if (i > j) {
-					H[idxik,idxjkk,l] <- Acc
+					H[idxrow,idxcol,l] <- Acc
 					next
 				}
 				if (k != kk) { # obj + scale (cor) + ortho (score)
@@ -183,12 +143,12 @@ for (l in 1:r) {
 							val * v[[i,ll]][[k]], v[[i,ll]][[kk]])
 					}
 				}
-				H[idxik,idxjkk,l] <- Acc
+				H[idxrow,idxcol,l] <- Acc
 			}} # end k, kk loops			
 			if (i > j) {
-				idxi <- unlist(idxH[[i]])
-				idxj <- unlist(idxH[[j]])
-				H[idxj,idxi,l] <- t(H[idxi,idxj,l])	
+				idxrow <- unlist(idxH[[i]])
+				idxcol <- unlist(idxH[[j]])
+				H[idxcol,idxrow,l] <- t(H[idxrow,idxcol,l])	
 			}	
 		} # end j loop
 	} # end i loop
