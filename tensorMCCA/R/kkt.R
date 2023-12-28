@@ -27,6 +27,8 @@ p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 n <- tail(dimx[[1]], 1L)
 r <- NCOL(v)
 
+
+
 ## Auxiliary function for gradient calculation
 gradfun <- function(x, y = NULL) {
 if (is.null(y)) y <- x
@@ -41,14 +43,24 @@ unlist(out)
 
 
 ## Calculate gradients
-grad.obj <- grad.cnstr <- vector("list", m * r)
-dim(grad.obj) <- dim(grad.cnstr) <- c(m, r)
 sump <- sapply(p, sum)
+cumsump <- cumsum(c(0, sump))
+pp <- cumsump[m+1]
+grad.obj <- matrix(0, pp, r)
+grad.cnstr <- vector("list", r)
 score <- score / n
-global.score <- if (ortho == "score" && scale = "global") {
-	fit$global.score / n } else NULL
-for (i in 1:m) {
-	for (l in 1:r) {
+if (ortho == "score" && scale == "global") 
+	global.score <- fit$global.score / n
+for (l in 1:r) {
+	grad.cnstr[[l]] <- switch(scale, 
+		block = matrix(0, pp, l*m), 
+		global = matrix(0, pp, l))
+	for (i in 1:m) {
+		idxrow <- (cumsump[i]+1):cumsump[i+1]
+		idxcol <- switch(scale, 
+			block = seq(i, by = m, len = l),
+			global = 1:l)
+	
 		## Gradient of objective function
 		tvprod <- vector("list", d[i])
 		scorei <- score[,,l] %*% w[,i] 
@@ -60,7 +72,7 @@ for (i in 1:m) {
 		tvprod <- do.call(rbind, tvprod)
 		dim(tvprod) <- c(sump[i], n)
 		# tvprod <- tvprod - rowMeans(tvprod)
-		grad.obj[[i,l]] <- tvprod %*% scorei
+		grad.obj[idxrow,l] <- tvprod %*% scorei
 		
 		## Gradient of scaling constraint
 		mat <- matrix(nrow = sump[i], ncol = l)
@@ -71,58 +83,34 @@ for (i in 1:m) {
 		} else {
 			gradfun(v[[i,l]])
 		}
-		if (l == 1) {
-			grad.cnstr[[i,l]] <- mat
-			next
-		}	
 			
 		## Gradient of orthogonality constraints
-		if (ortho == "weight") {
-			for (ll in 1:(l-1))
-				mat[,ll] <- gradfun(v[[i,l]], v[[i,ll]])			
-		} else if (ortho == "score" && scale == "block") {
-			mat[,1:(l-1)] <- tvprod %*% score[,i,1:(l-1)]
-		} else { # ortho == "score" && scale == "global"
-			mat[,1:(l-1)] <- tvprod %*% global.score[,i,1:(l-1)] 
-		}		
-		grad.cnstr[[i,l]] <- mat			
+		if (l > 1) {
+			if (ortho == "weight") {
+				for (ll in 1:(l-1))
+					mat[,ll] <- gradfun(v[[i,l]], v[[i,ll]])			
+			} else if (ortho == "score" && scale == "block") {
+				mat[,1:(l-1)] <- tvprod %*% score[,i,1:(l-1)]
+			} else { # ortho == "score" && scale == "global"
+				mat[,1:(l-1)] <- tvprod %*% global.score[,i,1:(l-1)] 
+			}		
+		}
+		
+		grad.cnstr[[l]][idxrow,idxcol] <- mat
 	}
-}
-
-if (scale == "global") {
-	for (l in 1:r) {
-		grad.obj[[1,l]] <- do.call(rbind, grad.obj[,l])
-		grad.cnstr[[1,l]] <- do.call(rbind, grad.cnstr[,l])
-	}
-	grad.obj <- grad.obj[1,]
-	grad.cnstr <- grad.cnstr[1,]
 }
 
 ## Regress objective gradient against constraints gradients
-if (scale == "block") {
-	coefs <- vector("list", m * r)
-	dim(coefs) <- c(m, r)
-	residuals <- coefs
-	for (i in 1:m) {
-		for (l in 1:r) {
-			reg <- suppressWarnings(lsfit(grad.cnstr[[i,l]], 
-				grad.obj[[i,l]], NULL, FALSE))
-			coefs[[i,l]] <- reg$coefficients
-			residuals[[i,l]] <- reg$residuals
-		}
-	}
-	for (l in 1:r) 
-		residuals[[1,l]] <- unlist(residuals[,l])	
-	residuals <- residuals[1,]
-} else { # scale == "global"
-	coefs <- residuals <- vector("list", r)
-	for (l in 1:r) {
-		reg <- suppressWarnings(lsfit(grad.cnstr[[l]], 
-			grad.obj[[l]], NULL, FALSE))
-		coefs[[l]] <- reg$coefficients
-		residuals[[l]] <- reg$residuals
-	}
+coefs <- vector("list", r)
+residuals <- matrix(0, pp, r)
+for (l in 1:r) {
+	reg <- suppressWarnings(
+		lsfit(grad.cnstr[[l]], grad.obj[,l], NULL, FALSE))
+	coefs[[l]] <- reg$coefficients
+	if (scale == "block") dim(coefs[[l]]) <- c(m,l)
+	residuals[,l] <- reg$residuals
 }
+
 
 list(grad.objective = grad.obj, grad.constraints = grad.cnstr, 
 	multipliers = coefs, residuals = residuals)	
