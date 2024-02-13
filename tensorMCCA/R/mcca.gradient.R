@@ -1,6 +1,3 @@
-
-
-	
 mcca.gradient.scale <- function(x, v, w, type = c("norm", "var"), 
 	scale = c("block", "global"), maxit, tol, verbose)
 {
