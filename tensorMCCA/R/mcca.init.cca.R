@@ -36,7 +36,8 @@ if (sum(cnst.set | pp == 1) >= (m-1)) {
 }
 pp <- sapply(p, prod)
 d <- sapply(p, length)
-k <- if (is.null(k)) pmin(pp, n) else rep_len(k, m)
+k <- if (is.null(k)) 
+	pmin(pp, n) else pmin(rep_len(k, m), pp, n)
 
 ## Scaling constraints
 objective.type <- match.arg(objective)   
@@ -77,19 +78,10 @@ if (center) {
 ###########################
 
 
-## Find the ranks of unfolded datasets
-rankx <- integer(m)
-for (i in 1:m) {
-	rankx[i] <- if (center) {
-		qr(matrix(x[[i]], pp[i], n) - xbar[[i]])$rank			
-	} else { qr(matrix(x[[i]], pp[i], n))$rank }
-}
-
-## Effective rank of SVD 	
-k <- pmin(k, rankx)
 
 ## Calculate compact/truncated SVD of each unfolded dataset
-u <- v <- vector("list", m)
+ux <- vx <- vector("list", m)
+# nosvd <- if (objective == "cor") logical(m) else (k == pmin(n,p))
 for (i in 1:m) {
 	xmat <- if (center) { matrix(x[[i]] - xbar[[i]], pp[i], n)  
 		} else { matrix(x[[i]], pp[i], n) } 
@@ -98,14 +90,19 @@ for (i in 1:m) {
 		svdx <- tryCatch(svds(xmat, k[i]), error = function(e) NULL)
 	if (!test || is.null(svdx))
 		svdx <- svd(xmat, nu = k[i], nv = k[i])
+	pos <- (svdx$d > eps)
+	if (!all(pos)) {
+		k[i] <- sum(pos)
+		svdx$u <- svdx$u[,pos,drop=FALSE]
+		svdx$d <- svdx$d[pos]
+		svdx$v <- svdx$v[,pos,drop=FALSE]
+	}
 	if (objective.type == "cov") {
-		u[[i]] <- svdx$u
-		# v[[i]] <- sweep(svdx$v, 2, svdx$d[1:rankx[i]], "/")
-		v[[i]] <- sweep(svdx$v, 2, svdx$d[1:rankx[i]], "*")
+		ux[[i]] <- svdx$u
+		vx[[i]] <- sweep(svdx$v, 2, svdx$d, "*")
 	} else if (objective.type == "cor") {
-		# u[[i]] <- sweep(svdx$u, 2, svdx$d[1:rankx[i]], "*")
-		u[[i]] <- sweep(svdx$u, 2, svdx$d[1:rankx[i]], "/")
-		v[[i]] <- svdx$v		
+		ux[[i]] <- sweep(svdx$u, 2, svdx$d, "/")
+		vx[[i]] <- svdx$v		
 	}
 }
 rm(xmat, svdx)
@@ -128,14 +125,14 @@ for (i in 1:m) {
 			a[[i]][,i] <- u[[i]][,1] 
 			next
 		}
-		test <- all(k[c(i,j)] > 2)
-		if (test) 
-			svdij <- tryCatch(svds(crossprod(v[[i]], v[[j]]), k = 1), 
+		svdij <- NULL
+		if (all(k[c(i,j)] > 2)) 
+			svdij <- tryCatch(svds(crossprod(vx[[i]], vx[[j]]), k = 1), 
 				error = function(e) NULL)
-		if (!test || is.null(svdij)|| is.null(svdij$u))
-			svdij <- svd(crossprod(v[[i]], v[[j]]), nu = 1, nv = 1)		
-		a[[i]][,j] <- u[[i]] %*% svdij$u
-		a[[j]][,i] <- u[[j]] %*% svdij$v
+		if (is.null(svdij)) # || is.null(svdij$u)
+			svdij <- svd(crossprod(vx[[i]], vx[[j]]), nu = 1, nv = 1)		
+		a[[i]][,j] <- ux[[i]] %*% svdij$u
+		a[[j]][,i] <- ux[[j]] %*% svdij$v
 	}
 }
 
