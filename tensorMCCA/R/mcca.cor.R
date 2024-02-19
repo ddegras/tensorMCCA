@@ -71,15 +71,14 @@ test <- (is.list(control) && !is.null(control$init))
 init.args <- NULL
 if (identical(init, "cca")) {
 	init.args <- list(k = NULL, w = w, 
-		objective = "cor", scale = "block", center = FALSE, 
-		search = ifelse(m <= 5, "exhaustive", "approximate"))
+		objective = "cor", scale = "block", optim = NULL)
 	if (test) {
 		names. <- intersect(names(control), 
-			c("k", "search"))
+			c("k", "optim"))
 		init.args[names.] <- control[names.]
 	}
 } else if (identical(init, "svd")) {
-	init.args <- list(objective = "cor", center = FALSE)
+	init.args <- list(objective = "cor")
 } else if (identical(init, "random")) { 
 	init.args <- list(objective = "cor")
 }
