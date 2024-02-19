@@ -1,4 +1,4 @@
-mcca.init.cca <- function(x, k = NULL, w = 1, 
+mcca.init.cca <- function(x, k = NULL, w = NULL, 
 	objective = c("cov", "cor"), scale = c("block", "global"), 
 	optim = NULL, maxit = 100, tol = .0001)
 {
@@ -6,6 +6,7 @@ mcca.init.cca <- function(x, k = NULL, w = 1,
 ################
 # Preprocessing
 ################
+
 
 ## Check arguments x and w 
 test <- check.arguments(x, w = w)
@@ -26,19 +27,29 @@ optim <- if (is.null(optim)) {
 }
 
 ## Data dimensions
-m <- length(x) 
+m <- length(x)
+dimfun <- function(x) if (is.vector(x)) c(1,length(x)) else dim(x)
 dimx <- lapply(x, dim) 
 p <- lapply(dimx, function(idx) idx[-length(idx)]) 
-pp <- sapply(p, prod)
 n <- tail(dimx[[1]], 1)
+
+## Objective weights
+if (is.null(w)) {
+	w <- 1 - diag(m)
+} else if (length(w) == 1) {
+	w <- matrix(1, m, m)
+}
+if (objective == "cor") diag(w) <- 0
+w <- (w + t(w)) / (2 * sum(w)) 
 
 ## Check for constant datasets
 cnst.set <- sapply(x, function(xx) all(abs(xx - xx[1]) < eps))
+if (any(cnst.set)) ones <- function(len) rep(1/sqrt(len), len)
 if ((objective == "cov" && all(cnst.set)) || 
 	(objective == "cor" && sum(cnst.set) >= (m-1))) {
 	v <- vector("list", m)
 	for (i in 1:m) 
-		v[[i]] <- lapply(p[[i]], function(len) rep(1/sqrt(len), len))
+		v[[i]] <- lapply(p[[i]], ones)
 	return(v)
 } else if (any(cnst.set)) {
 	m0 <- m
@@ -47,23 +58,15 @@ if ((objective == "cov" && all(cnst.set)) ||
 	x <- x[!cnst.set]
 	m <- sum(!cnst.set)
 	p <- p[!cnst.set]
+	w <- w[!cnst.set, !cnst.set]
+	w <- w / sum(w)	
 }
 pp <- sapply(p, prod)
 d <- sapply(p, length)
 k <- if (is.null(k)) 
 	pmin(pp, n) else pmin(rep_len(k, m), pp, n)
 
-## Objective weights
-if (is.matrix(w)) 
-	w <- w[!cnst.set, !cnst.set]
-if (length(w) == 1) {
-	w <- matrix(1/m^2, m, m)
-} else {
-	w <- (w + t(w)) / (2 * sum(w))
-}
-if (objective == "cor") diag(w) <- 0
-
-## Data centering
+## Data means for centering
 xbar <- vector("list", m)
 for(i in 1:m) 
     xbar[[i]] <- as.vector(rowMeans(x[[i]], dims = d[i]))
@@ -75,17 +78,12 @@ for(i in 1:m)
 ###########################
 
 
-
 ## Calculate compact/truncated SVD of each unfolded dataset
 ux <- vx <- vector("list", m)
-# nosvd <- if (objective == "cor") logical(m) else (k == pmin(n,p))
 for (i in 1:m) {
-	xmat <- matrix(x[[i]] - xbar[[i]], pp[i], n)  
-	test <- (max(3, 2 * k[i]) <= min(pp[i], n))
-	if (test) 
-		svdx <- tryCatch(svds(xmat, k[i]), error = function(e) NULL)
-	if (!test || is.null(svdx))
-		svdx <- svd(xmat, nu = k[i], nv = k[i])
+	xmat <- 	matrix(x[[i]] - xbar[[i]], pp[i], n)
+	svdx <- tryCatch(suppressWarnings(svds(xmat, k[i])), 
+		error = function(e) svd(xmat, k[i], k[i]))
 	pos <- (svdx$d > eps)
 	if (!all(pos)) {
 		k[i] <- sum(pos)
@@ -109,6 +107,7 @@ rm(xmat, svdx)
 # Calculate CCA for each pair of datasets 	
 ##########################################
 
+
 ## Canonical vectors
 a <- lapply(pp, function(nr) matrix(0, nr, m)) 
 # a[[i]][,j] is the first left canonical vector associated to Xi Xj'
@@ -122,12 +121,9 @@ for (i in 1:m) {
 			a[[i]][,i] <- ux[[i]][,1] 
 			next
 		}
-		svdij <- NULL
-		if (all(k[c(i,j)] > 2)) 
-			svdij <- tryCatch(svds(crossprod(vx[[i]], vx[[j]]), k = 1), 
-				error = function(e) NULL)
-		if (is.null(svdij)) # || is.null(svdij$u)
-			svdij <- svd(crossprod(vx[[i]], vx[[j]]), nu = 1, nv = 1)		
+		vxivxj <- crossprod(vx[[i]], vx[[j]])
+		svdij <- tryCatch(supressWarnings(svds(vxivxj, k = 1)), 
+			error = function(e) svd(vxivxj, 1, 1))
 		a[[i]][,j] <- ux[[i]] %*% svdij$u
 		a[[j]][,i] <- ux[[j]] %*% svdij$v
 	}
@@ -138,7 +134,7 @@ rm(ux, vx, svdij)
 
 
 #####################################
-# greedy long canonical vectors 
+# Approximate long canonical vectors 
 # by rank-1 tensors 
 #####################################
 
@@ -149,12 +145,10 @@ for (i in 1:m) {
 	for (j in 1:m) {
 		aij <- a[[i]][,j]
 		if (d[i] > 1) dim(aij) <- p[[i]]
-		v[[i,j]] <- if (objective == "cov") {
-			tnsr.rk1(aij, scale = TRUE, 	maxit = maxit, tol = tol)
-		} else {
-			tnsr.rk1.score(aij, cnstr = x[[i]] - xbar[[i]], maxit = maxit, 
-				tol = tol)
-		}
+		v[[i,j]] <- switch(objective,
+			cov = tnsr.rk1(aij, scale = TRUE, maxit = maxit, tol = tol),
+			cor = tnsr.rk1.score(aij, cnstr = x[[i]] - xbar[[i]], 
+				maxit = maxit, tol = tol))
 	}
 }
 
@@ -171,7 +165,7 @@ for (i in 1:m) {
 
 
 score <- canon.scores(x, v)
-score <- score - rep(colMeans(score), each = n)
+score <- sweep(score, 2:3, colMeans(score))
 
 
 
@@ -197,7 +191,11 @@ for (i in flip)
 ####################################
 
 
-# >>> TO BE COMPLETED (OR NOT) <<<
+if (objective == "cov" && scale == "global") {
+	score <- canon.scores(x, v, FALSE)
+	s <- eigen(w * cov(score) * w, TRUE)$vectors[,1]
+	for (i in 1:m) v[[i]][[1]] <- s[i] * v[[i]][[1]]
+}
 
 
 
@@ -215,7 +213,7 @@ if (any(cnst.set)) {
 	vfull <- vector("list", m0)
 	vfull[!cnst.set] <- v
 	for (i in which(cnst.set))
-		vfull[[i]] <- lapply(p0[[i]], function(len) rep(1/sqrt(len), len))
+		vfull[[i]] <- lapply(p0[[i]], ones)
 	v <- vfull
 }
 
