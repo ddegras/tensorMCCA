@@ -18,7 +18,7 @@ dimx <- lapply(x, dimfun) # full data dimensions
 n <- tail(dimx[[1]], 1)
 p <- lapply(dimx, function(idx) idx[-length(idx)]) 
 pp <- sapply(p, prod)
-cpp <- cumsum(c(0,pp))
+cumpp <- cumsum(c(0,pp))
 
 
 ## Canonical weights 
@@ -27,10 +27,7 @@ v <- vector("list", m)
 ## Unfold data along last mode (individuals/objects)
 ## and transform matricized data by SVD if needed 
 test <- (objective == "cor" || all(pp > n))
-if (test) {
-	svdx <- vector("list", m)
-	rankx <- numeric(m)
-}
+if (test) svdx <- vector("list", m)
 xmat <- x
 for (i in 1:m) {
 	dim(xmat[[i]]) <- c(pp[i], n)
@@ -47,9 +44,8 @@ for (i in 1:m) {
 			cov = t(svdx[[i]]$v) * svdx[[i]]$d)
 	}	
 }
-nrx <- sapply(xmat, nrow) # numbers of rows in transformed datasets
-cnrx <- cumsum(c(0,nrx))
-
+nrowx <- sapply(xmat, nrow) # numbers of rows in transformed datasets
+cumnrowx <- cumsum(c(0,nrowx))
 
 ## Check separability of objective weights
 if (qr(w)$rank == 1) {
@@ -65,12 +61,12 @@ if (qr(w)$rank == 1) {
 	rm(xmat)
 } else {
 	# Nonseparable case: form pseudo-covariance matrix + EVD
-	covx <- matrix(0, cnrx[m+1], cnrx[m+1])
+	covx <- matrix(0, cumnrowx[m+1], cumnrowx[m+1])
 	for (i in 1:m) {
-		idxi <- (cnrx[i]+1): cnrx[i+1]
+		idxi <- (cumnrowx[i]+1):cumnrowx[i+1]
 		for (j in 1:i) {
 			if (w[i,j] == 0) next
-			idxj <- (cnrx[j]+1):cnrx[j+1]
+			idxj <- (cumnrowx[j]+1):cumnrowx[j+1]
 			covx[idxi,idxj] <- w[i,j] * tcrossprod(xmat[[i]], xmat[[j]])
 			if (j < i) covx[idxj,idxi] <- t(covx[idxi,idxj])
 		}
@@ -84,10 +80,10 @@ if (qr(w)$rank == 1) {
 ## Transform back singular/eigen-vector in original space if needed 
 if (test) {
 	phitmp <- phi
-	phi <- numeric(cpp[m+1])
+	phi <- numeric(cumpp[m+1])
 	for (i in 1:m) {
-		idxfull <- (cpp[i]+1):cpp[i+1]
-		idxsmall <- (cnrx[i]+1):cnrx[i+1]
+		idxfull <- (cumpp[i]+1):cumpp[i+1]
+		idxsmall <- (cumnrowx[i]+1):cumnrowx[i+1]
 		phi[idxfull] <- switch(objective,
 			cov = svdx[[i]]$u %*% phitmp[idxsmall],
 			cor = svdx[[i]]$u %*% (phitmp[idxsmall] / svdx[[i]]$d)
@@ -100,7 +96,7 @@ if (test) {
 ## and perform rank-1 approximation by HOSVD
 covblock <- (objective == "cov" && scale == "block")
 for (i in 1:m) {
-	idxi <- (cpp[i]+1):cpp[i+1]
+	idxi <- (cumpp[i]+1):cumpp[i+1]
 	phii <- array(phi[idxi], p[[i]])
 	svdi <- hosvd(phii, 1)
 	v[[i]] <- lapply(svdi$factors, as.numeric) 
@@ -119,8 +115,6 @@ if (center) score <- score - matrix(colMeans(score), n, m, TRUE)
 flip <- reorient(score, w)$flip
 for (i in which(flip))
 	v[[i]][[1]] <- (-v[[i]][[1]])
-
-
 
 v
 }
