@@ -1,8 +1,8 @@
-\name{simulate.factor.model}
-\alias{simulate.factor.model}
+\name{simulate.factor.model.cov}
+\alias{simulate.factor.model.cov}
 
 \title{
-Simulate Tensor Datasets based on Factor Model 
+Simulate Factor Model for Covariance-Based TMCCA
 }
 
 \description{
@@ -10,27 +10,27 @@ This function generates tensor datasets from the block factor model or the globa
 }
 
 \usage{
-simulate.factor.model(dimx, r, scale.v = 1, score.cov = NULL, noise.cov = NULL, 
+simulate.factor.model.cov(n, p, r, scale.v = 1, score.cov = NULL, noise.cov = NULL, 
 	ortho.v = c("cyclical", "random", "alldim", "maxdim", "none"), center = TRUE)
 }
 
 \arguments{
-  \item{dimx}{
-List of tensor dimensions as integer vectors. The last integer of each list element should be the same for all elements.}
-  \item{r}{
-Number of canonical components in model.}
-\item{scale.v}{
-	Norms of canonical weight tensors. Can be specified as a single number (to be recycled) or as a numerical vector of same length as \code{dimx}. 
+\item{n}{Sample size.}
+
+\item{p}{List of tensor dimensions as integer vectors. The last integer of each list element should be the same for all elements.}
+
+\item{r}{Number of canonical components in model.}
+
+\item{scale.v}{Norms of canonical weight tensors. Can be specified as a single number (to be recycled) or as a numerical vector of same length as \code{p}.}
+
+\item{score.cov}{Covariance structure of random scores. Can be specified as a numeric vector of length \code{r}, an array of dimensions \eqn{m}-by-\eqn{m}-by-\code{r} with \eqn{m} the length of \code{dimx} (number of datasets), or a list of \code{r} covariance matrices of size \eqn{m}-by-\eqn{m}. 
 }
-  \item{score.cov}{
-Covariance structure of random scores. Can be specified as a numeric vector of length \code{r}, an array of dimensions \eqn{m}-by-\eqn{m}-by-\code{r} with \eqn{m} the length of \code{dimx} (number of datasets), or a list of \code{r} covariance matrices of size \eqn{m}-by-\eqn{m}. 
+
+\item{noise.cov}{Covariance structure of noise terms. Can be specified as a numeric vector of length \eqn{m} or a list of \eqn{m} covariance matrices of size \eqn{P_i\times P_i}{(Pi,Pi)} for \eqn{i=1,...,m,} where \eqn{P_i}{Pi} is the product of all elements in \code{dimx[[i]]} except the last.}
+
+\item{ortho.v}{modes in which the canonical weight tensors are orthogonal to each other. Can be specified as a string or as an integer vector of same length as \code{dimx}. 
 }
-  \item{noise.cov}{
-Covariance structure of noise terms. Can be specified as a numeric vector of length \eqn{m} or a list of \eqn{m} covariance matrices of size \eqn{P_i\times P_i}{(Pi,Pi)} 
-for \eqn{i=1,...,m,} where \eqn{P_i}{Pi} is the product of all elements in \code{dimx[[i]]} except the last.}
-    \item{ortho.v}{modes in which the canonical weight tensors are orthogonal to each other. Can be specified as a string or as an integer vector of same length as \code{dimx}. 
-}
-\item{center}{Should the simulated data and scores be centered?}
+\item{center}{Center the simulated data and scores?}
 }
 
 \details{
