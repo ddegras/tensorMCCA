@@ -95,9 +95,9 @@ if (all(bzero)) {
 		P[,1] } else { as.vector(qq %*% P[,1]) }
 	return(list(v))
 } else if (any(bzero)) {
-	b <- b[!zero]
-	P <- P[,!zero]
-	delta <- delta[!zero]
+	b <- b[!bzero]
+	P <- P[,!bzero]
+	delta <- delta[!bzero]
 }
 
 ## Find Lagrange multiplier as root of rational function 
