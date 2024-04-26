@@ -1,7 +1,7 @@
 mcca.init.svd <- function(x, w = NULL, objective = c("cov", "cor"), 
 	scale = c("block", "global"), center = TRUE)
 {
-test <- check.arguments(x, w)
+test <- check.arguments(x, w = w)
 objective <- match.arg(objective) 
 scale <- match.arg(scale)
 eps <- 1e-14
