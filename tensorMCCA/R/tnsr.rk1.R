@@ -178,18 +178,14 @@ svdx <- if (all(p[2:3] > 2)) {
 v[[2]] <- svdx$u
 v[[3]] <- svdx$v
 s2 <- svdx$d
-iprod <- s1 * s2 # inner product between x and v
-if (maxit == 0) {
-	if (scale) { return(v) } 
-	return(lapply(v, "*", iprod^(1/3)))
-}
-# if (scale) v[[3]] <- v[[3]] * nrmv
-# kronv <- outer.prod.nodim(v)
-# kronv <- Reduce(kronecker, v)
+ipxv <- s1 * s2 # inner product between x and v
+if (!scale) 
+	v <- lapply(v, "*", ipxv^(1/3))
+if (maxit == 0) 
+	return(v) 
 
 for (it in 1:maxit) {
-	# kronv.old <- kronv
-	iprod.old <- iprod	
+	ipxv.prev <- ipxv	
 	dim(x) <- c(p[1] * p[2], p[3])
 	xv <- x %*% v[[3]]
 	dim(xv) <- c(p[1], p[2])
@@ -201,20 +197,18 @@ for (it in 1:maxit) {
 	xv <- crossprod(x, v[[1]])
 	dim(xv) <- p[2:3]
 	v[[3]] <- crossprod(xv, v[[2]]) 
-	iprod <- sum(v[[3]]^2)
-	if (scale) 
-		v[[3]] <- v[[3]] / sqrt(iprod)	
+	ipxv <- sum(v[[3]]^2)
+	v[[3]] <- v[[3]] / sqrt(ipxv)
 	# kronv <- outer.prod.nodim(v)	
 	# kronv <- Reduce(kronecker, v)
 	# e <- sqrt(sum((kronv - kronv.old)^2)) 
 	# if (e <= tol * max(nrmv, nrmv.old, 1)) break
-	if (iprod < (1+tol) * iprod.old) break
+	if (ipxv < (1+tol) * ipxv.prev) break
 
 }
 
-nrmv <- if (scale) 1 else sqrt(iprod)
-s <- nrmv^(c(1/3, 1/3, -2/3))
-for (k in 1:3) v[[k]] <- as.vector(v[[k]]) * s[k] 
+s <- ifelse(scale, 1, ipxv^(1/6)) 
+for (k in 1:3) v[[k]] <- as.vector(v[[k]]) * s 
 
 v	
 	
