@@ -178,18 +178,18 @@ svdx <- if (all(p[2:3] > 2)) {
 v[[2]] <- svdx$u
 v[[3]] <- svdx$v
 s2 <- svdx$d
-nrmv <- if (scale) 1 else s1 * s2
+iprod <- s1 * s2 # inner product between x and v
 if (maxit == 0) {
 	if (scale) { return(v) } 
-	return(lapply(v, "*", nrmv^(1/3)))
+	return(lapply(v, "*", iprod^(1/3)))
 }
-if (scale) v[[3]] <- v[[3]] * nrmv
-kronv <- outer.prod.nodim(v)
+# if (scale) v[[3]] <- v[[3]] * nrmv
+# kronv <- outer.prod.nodim(v)
 # kronv <- Reduce(kronecker, v)
 
 for (it in 1:maxit) {
-	kronv.old <- kronv
-	nrmv.old <- nrmv	
+	# kronv.old <- kronv
+	iprod.old <- iprod	
 	dim(x) <- c(p[1] * p[2], p[3])
 	xv <- x %*% v[[3]]
 	dim(xv) <- c(p[1], p[2])
@@ -201,17 +201,18 @@ for (it in 1:maxit) {
 	xv <- crossprod(x, v[[1]])
 	dim(xv) <- p[2:3]
 	v[[3]] <- crossprod(xv, v[[2]]) 
-	nrmv <- sqrt(sum(v[[3]]^2))	
-	if (scale) {
-		v[[3]] <- v[[3]] / nrmv	
-		nrmv <- 1
-	}	
-	kronv <- outer.prod.nodim(v)	
+	iprod <- sum(v[[3]]^2)
+	if (scale) 
+		v[[3]] <- v[[3]] / sqrt(iprod)	
+	# kronv <- outer.prod.nodim(v)	
 	# kronv <- Reduce(kronecker, v)
-	e <- sqrt(sum((kronv - kronv.old)^2)) 
-	if (e <= tol * max(nrmv, nrmv.old, 1)) break
+	# e <- sqrt(sum((kronv - kronv.old)^2)) 
+	# if (e <= tol * max(nrmv, nrmv.old, 1)) break
+	if (iprod < (1+tol) * iprod.old) break
+
 }
 
+nrmv <- if (scale) 1 else sqrt(iprod)
 s <- nrmv^(c(1/3, 1/3, -2/3))
 for (k in 1:3) v[[k]] <- as.vector(v[[k]]) * s[k] 
 
