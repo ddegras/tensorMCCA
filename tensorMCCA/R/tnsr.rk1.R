@@ -17,7 +17,7 @@ if (all(x == 0)) return(list(x))
 
 ## 1D case
 if (d == 1L) {
-	nrm <- if (scale) sqrt(sum(x^2)) else 1
+	nrmv <- if (scale) sqrt(sum(x^2)) else 1
 	v <- list(x / nrmv)
 	return(v)
 }
@@ -182,7 +182,8 @@ if (is.null(init)) {
 		svds(x, k = 1) 
 	} else { 
 		svd(x, nu = 1, nv = 1)
-	} 
+	}
+	dim(x) <- p
 	v[[1]] <- svdx$u
 	s1 <- svdx$d
 	svdx <- if (all(p[2:3] > 2)) {
