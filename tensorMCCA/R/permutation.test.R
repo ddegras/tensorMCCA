@@ -1,4 +1,4 @@
-permutation.test <- function(x, obj, nperm = 100, parallel = TRUE)
+permutation.test <- function(x, object, nperm = 100, parallel = TRUE)
 {
 ## Prepare MCCA
 test <- check.arguments(x)
@@ -10,17 +10,17 @@ d <- sapply(dimx, length) - 1
 fields <- c("init.val", "objective.type", "ortho.type", 
 	"ortho.cnstr", "r", "scale")
 for (name in fields) 
-	assign(name, obj$call.args[[name]])
+	assign(name, object$call.args[[name]])
 ortho <- ortho.type
 if (ortho == "weight" && scale == "block") {
 	ortho.mode <- ortho.cnstr
 	if (!is.null(init.val)) {
 		if (length(init.val) < m * r) 
-			obj$call.args$init.val <- rep_len(init.val, m * r)
-		dim(obj$call.args$init.val) <- c(m, r)
+			object$call.args$init.val <- rep_len(init.val, m * r)
+		dim(object$call.args$init.val) <- c(m, r)
 	}
 }
-v <- obj$v
+v <- object$v
 
 ## Center data
 for(i in 1:m) {
@@ -44,31 +44,31 @@ if (r > 1) {
 				mat = ortho.cnstr$mat, modes = ortho.cnstr$modes, 
 				SIMPLIFY = FALSE) 
 			if (!is.null(init.val)) 
-				obj$call.args$init.val[,l] <- tnsr.rk1.mat.prod(
-					v = obj$call.args$init.val[,l], transpose.mat = FALSE,
+				object$call.args$init.val[,l] <- tnsr.rk1.mat.prod(
+					v = object$call.args$init.val[,l], transpose.mat = FALSE,
 					mat = ortho.cnstr$mat, modes = ortho.cnstr$modes)
 		} else if (ortho == "weight" && scale == "global") {
 			xdfl[,l-1] <- deflate.x(x, v = v[, 1:(l-1)], 
 				check.args = FALSE)
 		} else if (ortho == "score" && scale == "block") {
 			xdfl[,l-1] <- deflate.x(x, 
-				score = obj$block.score[,,1:(l-1)],
+				score = object$block.score[,,1:(l-1)],
 				scope = "block", check.args = FALSE)	
 		} else if (ortho == "score" && scale == "global") {
 			xdfl[,l-1] <- deflate.x(x, 
-				score = obj$global.score[,1:(l-1)],
+				score = object$global.score[,1:(l-1)],
 				scope = "global", check.args = FALSE)			
 		}
 	}	
 }
 
 ## Scale initial canonical weights if provided
-objective.cov <- (objective.type == "cov")
+optim.cov <- (objective.type == "cov")
 if (!is.null(init.val)) {
 	for (l in 1:ncol(init.val)) 
-		obj$call.args$init.val[,l] <- scale.v(init.val[,l], 
-			type = if (objective.cov) "norm" else "var",
-			scale = scale, x = if (objective.cov) { NULL 
+		object$call.args$init.val[,l] <- scale.v(init.val[,l], 
+			type = if (optim.cov) "norm" else "var",
+			scale = scale, x = if (optim.cov) { NULL 
 			} else if (l == 1) { x } else { xdfl[,l-1] },
 			check.args = FALSE)
 }
@@ -87,7 +87,7 @@ if (parallel && require(foreach) && getDoParRegistered()) {
 				xx[[i]] <- xx[[i]][, sample(n)]
 				dim(xx[[i]]) <- c(p, n)
 			}
-			rhopermj[l] <- mcca.perm(xx, obj, l)
+			rhopermj[l] <- mcca.perm(xx, object, l)
 		}
 		rhopermj
 	}
@@ -104,18 +104,18 @@ if (parallel && require(foreach) && getDoParRegistered()) {
 				xx[[i]] <- xx[[i]][, sample(n)]
 				dim(xx[[i]]) <- c(p, n)
 			}	
-			rhoperm[j, l] <- mcca.perm(xx, obj, l)
+			rhoperm[j, l] <- mcca.perm(xx, object, l)
 		}
 	}
 }
 
 ## p-values
-pval.uncorrected <- rowMeans(t(abs(rhoperm)) > abs(obj$objective))
+pval.uncorrected <- rowMeans(t(abs(rhoperm)) > abs(object$objective))
 pval.corrected <- Reduce(max, pval.uncorrected, accumulate = TRUE)
 
 list(pval.corrected = pval.corrected, 
 	pval.uncorrected = pval.uncorrected,
-	objective = obj$objective, 
+	objective = object$objective, 
 	objective.perm = rhoperm)
 }
 
@@ -124,12 +124,12 @@ list(pval.corrected = pval.corrected,
 
 
 
-mcca.perm <- function(x, obj, l)
+mcca.perm <- function(x, object, l)
 {
 ## Define variables with shorter names for easier handling
-for (name in names(obj$call.args))
-	assign(name, obj$call.args[[name]])
-v <- obj$v
+for (name in names(object$call.args))
+	assign(name, object$call.args[[name]])
+v <- object$v
 normvar <- switch(objective.type, cov = "norm", cor = "var")
 if (ortho.type == "weight" && scale == "block") 
 	ortho.cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
@@ -140,10 +140,6 @@ if (!is.null(init.val)) {
 	v0 <- if (is.matrix(init.val)) {
 		init.val[, min(l, ncol(init.val))]
 	} else init.val
-	# if (ortho.type == "weight" && scale == "block" && l > 1) 
-		# v0 <- tnsr.rk1.mat.prod(v0, mat = ortho.cnstr$mat, 
-			# modes = ortho.cnstr$modes, transpose.mat = FALSE)
-		# v0 <- scale.v(v0, type = "var", x = x, check.args = FALSE)
 } else {
 	mcca.init <- switch(init.method, 
 		cca = mcca.init.cca, 
@@ -152,11 +148,18 @@ if (!is.null(init.val)) {
 	init.args$x <- x
 	v0 <- do.call(mcca.init, init.args)
 }
-if (ortho.type == "score" && l > 1) {
+## Apply orthogonality constraints
+if (ortho.type == "weight" && scale == "block" && l > 1) {
+	v0 <- tnsr.rk1.mat.prod(v0, mat = ortho.cnstr$mat, 
+		modes = ortho.cnstr$modes, transpose.mat = FALSE)
+} else if (ortho.type == "score" && l > 1) {
 	v0 <- tnsr.rk1.ortho(v0, ortho.cnstr[, 1:(l-1), drop = FALSE], 
 		maxit = 100L, tol = 1e-6)
-	v0 <- scale.v(v0, type = normvar, x = x, check.args = FALSE)
-}
+} # WHAT ABOUT THE CASE ortho.type == "weight" && scale = "global" ???
+## Apply scaling constraints
+v0 <- scale.v(v0, type = normvar, scale = scale, x = x, 
+	check.args = FALSE)
+
 
 ## Run MCCA
 out <- if (objective.type == "cov" && optim == "bca" && 
