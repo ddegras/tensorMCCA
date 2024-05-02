@@ -13,7 +13,10 @@ stopifnot(is.numeric(x))
 d <- max(1L, length(dim(x))) 
 
 ## Trivial case: null tensor
-if (all(x == 0)) return(list(x))
+if (all(x == 0)) {
+	p <- if (is.vector(x)) length(x) else dim(x)
+	return(lapply(p, numeric))
+}	
 
 ## 1D case
 if (d == 1L) {
@@ -45,7 +48,7 @@ if (is.null(init)) {
 } else {
 	v <- init
 	nrmv <- sapply(v, function(x) sqrt(sum(x^2)))
-	p <- sapply(v, length)
+	p <- dim(x)
 	if (any(nrmv == 0)) {
 		v <- if (scale) {
 			lapply(p, function(len) rep(1/sqrt(len), len))
