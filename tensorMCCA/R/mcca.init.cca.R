@@ -132,7 +132,6 @@ for (i in 1:m) {
 rm(ux, vx, svdij)
 
 
-
 #####################################
 # Approximate long canonical vectors 
 # by rank-1 tensors 
