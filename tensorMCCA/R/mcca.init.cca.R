@@ -1,6 +1,6 @@
-mcca.init.cca <- function(x, k = NULL, w = NULL, 
-	objective = c("cov", "cor"), scale = c("block", "global"), 
-	optim = NULL, maxit = 100, tol = .0001)
+mcca.init.cca <- function(x, w = NULL, objective = c("cov", "cor"), 
+	scope = c("block", "global"), k = NULL, optim = NULL, 
+	maxit = 100, tol = .0001)
 {
 	
 ################
@@ -14,10 +14,10 @@ eps <- 1e-14
 
 ## Scaling constraints
 objective <- match.arg(objective)   
-scale <- match.arg(scale) # block or global constraints
-if (objective == "cor" && scale == "global")
+scope <- match.arg(scope) # block or global constraints
+if (objective == "cor" && scope == "global")
 	stop(paste("Argument values 'objective = cor'", 
-		"and 'scale = global' are incompatible."))
+		"and 'scope = global' are incompatible."))
 
 ## Search method in combinatorial optimization
 optim <- if (is.null(optim)) {
@@ -43,33 +43,64 @@ if (objective == "cor") diag(w) <- 0
 w <- (w + t(w)) / (2 * sum(w)) 
 
 ## Check for constant datasets
-cnst.set <- sapply(x, function(xx) all(abs(xx - xx[1]) < eps))
-if (any(cnst.set)) ones <- function(len) rep(1/sqrt(len), len)
-if ((objective == "cov" && all(cnst.set)) || 
-	(objective == "cor" && sum(cnst.set) >= (m-1))) {
+cnst.set <- sapply(x, function(a) all(a == a[1]))
+w[,cnst.set] <- w[cnst.set,] <- 0
+wzero <- (colSums(w = 0) == m)
+wnzero <- !wzero
+cnstfun <- switch(objective, 
+	cov = function(len) numeric(len),
+	cor = function(len) rep(1,len))
+
+## Trivial case: all datasets are constant or associated weights are zero 
+if (all(wzero)) {
 	v <- vector("list", m)
-	for (i in 1:m) 
-		v[[i]] <- lapply(p[[i]], ones)
+	for (i in 1:m)
+		v[[i]] <- lapply(p[[i]], cnstfun)
+	if (objective == "cor")
+		v <- scale.v(v, type = "var", x = x, check.args = FALSE)
 	return(v)
-} else if (any(cnst.set)) {
-	m0 <- m
-	dimx0 <- dimx
-	p0 <- p
-	x <- x[!cnst.set]
-	m <- sum(!cnst.set)
-	p <- p[!cnst.set]
-	w <- w[!cnst.set, !cnst.set]
-	w <- w / sum(w)	
+}
+
+## Data means for centering
+xbar <- vector("list", m)
+uncentered <- logical(m)
+for(i in 1:m) {
+    xbar[[i]] <- as.vector(rowMeans(x[[i]], dims = d[i]))
+	uncentered[i] <- any(abs(xbar[[i]]) > eps)
+}
+
+## Trivial case: all but one dataset are constant 
+## or have associated weights equal to zero 
+if (sum(wnzero) == 1) {
+	v <- vector("list", m)
+	for (i in which(wzero)) 
+		v[[i]] <- lapply(p[[i]], numeric)
+	i <- which(wnzero)
+	v[[i]] <- tnsr.rk1(scale = TRUE,
+		x = if (uncentered[i]) {x[[i]] - xbar[[i]]} else x[[i]])
+		v[[i]] <- scale.v(v[[i]])
+	return(v)
+}
+
+## Remove any constant dataset
+if (any(wzero)) {
+	vfull <- vector("list", m)
+	for (i in which(wzero)) 
+		vfull[[i]] <- lapply(p[[i]], cnstfun)
+	if (objective == "cor")
+		vfull[wzero] <- scale.v(vfull[wzero], "var", x = x[wzero],
+			check.args = FALSE)
+	x <- x[wnzero]
+	m <- sum(wnzero)
+	p <- p[wnzero]
+	w <- w[wnzero, wnzero]
 }
 pp <- sapply(p, prod)
 d <- sapply(p, length)
 k <- if (is.null(k)) 
 	pmin(pp, n) else pmin(rep_len(k, m), pp, n)
 
-## Data means for centering
-xbar <- vector("list", m)
-for(i in 1:m) 
-    xbar[[i]] <- as.vector(rowMeans(x[[i]], dims = d[i]))
+
 
 
 
@@ -81,7 +112,9 @@ for(i in 1:m)
 ## Calculate compact/truncated SVD of each unfolded dataset
 ux <- vx <- vector("list", m)
 for (i in 1:m) {
-	xmat <- 	matrix(x[[i]] - xbar[[i]], pp[i], n)
+	xmat <- x[[i]] 
+	dim(xmat) <- c(pp[i], n)
+	if (uncentered[i]) xmat <- xmat - xbar[[i]] 
 	svdx <- tryCatch(suppressWarnings(svds(xmat, k[i])), 
 		error = function(e) svd(xmat, k[i], k[i]))
 	pos <- (svdx$d > eps)
@@ -190,7 +223,7 @@ for (i in flip)
 ####################################
 
 
-if (objective == "cov" && scale == "global") {
+if (objective == "cov" && scope == "global") {
 	score <- canon.scores(x, v, FALSE)
 	s <- eigen(w * cov(score) * w, TRUE)$vectors[,1]
 	for (i in 1:m) v[[i]][[1]] <- s[i] * v[[i]][[1]]
@@ -207,13 +240,18 @@ if (objective == "cov" && scale == "global") {
 for (i in 1:m)
 	v[[i]] <- lapply(v[[i]], drop)
 
-## Put back canonical tensors for constant datasets
-if (any(cnst.set)) {
-	vfull <- vector("list", m0)
-	vfull[!cnst.set] <- v
-	for (i in which(cnst.set))
-		vfull[[i]] <- lapply(p0[[i]], ones)
+## Put back any canonical weights for constant datasets
+if (any(wzero)) {
+	vfull[wnzero] <- v
 	v <- vfull
+}
+
+## Scale solution
+if (objective == "cor") {
+	v[wnzero] <- scale.v(v, x = x, check.args = FALSE,
+		type = switch(objective, cov = "norm", cor = "var"))
+} else {
+	v <- scale.v(v, "norm", scope, check.args = FALSE)
 }
 
 v
