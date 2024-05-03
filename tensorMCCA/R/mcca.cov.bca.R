@@ -76,7 +76,7 @@ for (it in 1:maxit) {
 		v[[i]] <- optim.block.cov(v[[i]], a, b, ortho[i,], maxit, tol)
 		
 		obj <- objective.cov(x,v,w) # DEBUG
-		if (obj < objprev) browser() # DEBUG
+		if (obj < objprev) stop() # DEBUG
 	}								
 	lastidx <- idxi[m]
 	
@@ -121,7 +121,8 @@ mcca.cov.bca.global <- function(x, v, w, ortho, sweep,
 {
 	
 ## Determine data dimensions
-dimx <- lapply(x, dim)
+dimfun <- function(x) if (is.vector(x)) c(1,length(x)) else dim(x)
+dimx <- lapply(x, dimfun)
 ndimx <- sapply(dimx, length)
 d <- ndimx - 1 # number of image dimensions for each dataset
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
@@ -311,7 +312,7 @@ for (it in 1:maxit) {
 	}
 									
 	## Balance canonical weight vectors  
-	v <- scale.v(v, type = "norm", scale = "global", 
+	v <- scale.v(v, type = "norm", scope = "global", 
 		check.args = FALSE)
 	objective[it+1] <- objective.internal(x, v, w)
 	if (verbose) 
