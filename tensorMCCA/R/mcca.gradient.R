@@ -1,10 +1,10 @@
 mcca.gradient.scale <- function(x, v, w, type = c("norm", "var"), 
-	scale = c("block", "global"), maxit, tol, verbose)
+	scope = c("block", "global"), maxit, tol, verbose)
 {
 
 ## Match arguments
 type <- match.arg(type)
-scale <- match.arg(scale)
+scope <- match.arg(scope)
 	
 ## Data dimensions
 dimx <- lapply(x, dim)
@@ -15,15 +15,15 @@ n <- tail(dimx[[1]], 1)
 
 ## Set up objective values and objective function
 objective <- numeric(maxit + 1L)
-v <- scale.v(v = v, type = type, scale = scale,
+v <- scale.v(v = v, type = type, scope = scope,
 	x = x, check.args = FALSE)
 objective[1] <- objective.internal(x, v, w)
 if (verbose) 
 	cat("\nIteration", 0, "Objective", objective[1])
-objective.fn <- function(alpha, v, grad, type, scale, x, w)
+objective.fn <- function(alpha, v, grad, type, scope, x, w)
 {
 	vnew <- relist(unlist(v) + alpha * unlist(grad), v)
-	vnew <- scale.v(v = vnew, scale = scale, type = type, 
+	vnew <- scale.v(v = vnew, scope = scope, type = type, 
 		x = x, check.args = FALSE)
 	objective.internal(x, vnew, w)
 }
@@ -39,14 +39,14 @@ for (it in 1:maxit) {
 	
 	## Grid search
 	vals <- sapply(alpha.grid, objective.fn, v = v, grad = grad, 
-		scale = scale, type = type, x = x, w = w)
+		scope = scope, type = type, x = x, w = w)
 	
 	## Line search 
 	idx <- which.max(vals)
 	lb <- alpha.grid[max(1L, idx - 1L)]
 	ub <- alpha.grid[min(nalpha, idx + 1L)]
 	optim.alpha <- optimize(objective.fn, c(lb, ub), v = v, 
-		grad = grad, scale = scale, type = type, x = x, w = w, 
+		grad = grad, scope = scope, type = type, x = x, w = w, 
 		maximum = TRUE, tol = 1e-7)
 
 	## Update solution and objective
@@ -58,7 +58,7 @@ for (it in 1:maxit) {
 		objective[it + 1L] <- vals[idx]
 	}
 	v <- relist(unlist(v) + alpha * unlist(grad), v)
-	v <- scale.v(v = v, scale = scale, type = type, 
+	v <- scale.v(v = v, scope = scope, type = type, 
 		x = x, check.args = FALSE)
 	if (verbose) 
 		cat("\nIteration", it, "Objective", objective[it + 1L])
@@ -89,7 +89,7 @@ n <- tail(dimx[[1]], 1)
 
 ## Set up objective values and objective function
 objective <- numeric(maxit + 1L)
-v <- scale.v(v = v, type = "norm", scale = "block", 
+v <- scale.v(v = v, type = "norm", scope = "block", 
 	check.args = FALSE)
 objective[1] <- objective.internal(x, v, w)
 if (verbose) 
