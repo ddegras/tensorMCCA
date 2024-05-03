@@ -71,7 +71,7 @@ test <- (is.list(control) && !is.null(control$init))
 init.args <- NULL
 if (identical(init, "cca")) {
 	init.args <- list(k = NULL, w = w, 
-		objective = "cor", scale = "block", optim = NULL)
+		objective = "cor", scope = "block", optim = NULL)
 	if (test) {
 		names. <- intersect(names(control), 
 			c("k", "optim"))
@@ -92,7 +92,7 @@ global.score <- matrix(0, n, r)
 objective <- rep(NA, r)
 iters <- numeric(r)
 call.args <- list(objective.type = "cor", r = NULL, w = w, 
-	scale = "block", ortho.type = ortho, ortho.cnstr = NULL, 
+	scope = "block", ortho.type = ortho, ortho.cnstr = NULL, 
 	optim = optim, init.method = NULL, init.args = init.args, 
 	init.val = NULL, maxit = maxit, tol = tol, sweep = sweep, 
 	control = control) 
@@ -201,7 +201,7 @@ for (l in 1:r) {
 		sweep = sweep, maxit = maxit, tol = tol, verbose = verbose)
 	} else { 
 		mcca.gradient.scale(x = x, v = v0, w = w[xnzero,xnzero], 
-			scale = "block", type = "var", maxit = maxit, 
+			scope = "block", type = "var", maxit = maxit, 
 			tol = tol, verbose = verbose)
 	}
 	objective[l] <- out$objective
