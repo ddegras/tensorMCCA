@@ -8,11 +8,11 @@ n <- tail(dim(x[[1]]), 1)
 dimx <- lapply(x, dim)
 d <- sapply(dimx, length) - 1
 fields <- c("init.val", "objective.type", "ortho.type", 
-	"ortho.cnstr", "r", "scale")
+	"ortho.cnstr", "r", "scope")
 for (name in fields) 
 	assign(name, object$call.args[[name]])
 ortho <- ortho.type
-if (ortho == "weight" && scale == "block") {
+if (ortho == "weight" && scope == "block") {
 	ortho.mode <- ortho.cnstr
 	if (!is.null(init.val)) {
 		if (length(init.val) < m * r) 
@@ -37,7 +37,7 @@ if (r > 1) {
 	xdfl <- vector("list", m * (r - 1))
 	dim(xdfl) <- c(m, r - 1)
 	for (l in 2:r) {
-		if (ortho == "weight" && scale == "block") {
+		if (ortho == "weight" && scope == "block") {
 			ortho.cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
 			xdfl[,l-1] <- mapply(tnsr.mat.prod, x = x, 
@@ -47,14 +47,14 @@ if (r > 1) {
 				object$call.args$init.val[,l] <- tnsr.rk1.mat.prod(
 					v = object$call.args$init.val[,l], transpose.mat = FALSE,
 					mat = ortho.cnstr$mat, modes = ortho.cnstr$modes)
-		} else if (ortho == "weight" && scale == "global") {
+		} else if (ortho == "weight" && scope == "global") {
 			xdfl[,l-1] <- deflate.x(x, v = v[, 1:(l-1)], 
 				check.args = FALSE)
-		} else if (ortho == "score" && scale == "block") {
+		} else if (ortho == "score" && scope == "block") {
 			xdfl[,l-1] <- deflate.x(x, 
 				score = object$block.score[,,1:(l-1)],
 				scope = "block", check.args = FALSE)	
-		} else if (ortho == "score" && scale == "global") {
+		} else if (ortho == "score" && scope == "global") {
 			xdfl[,l-1] <- deflate.x(x, 
 				score = object$global.score[,1:(l-1)],
 				scope = "global", check.args = FALSE)			
@@ -68,7 +68,7 @@ if (!is.null(init.val)) {
 	for (l in 1:ncol(init.val)) 
 		object$call.args$init.val[,l] <- scale.v(init.val[,l], 
 			type = if (optim.cov) "norm" else "var",
-			scale = scale, x = if (optim.cov) { NULL 
+			scope = scope, x = if (optim.cov) { NULL 
 			} else if (l == 1) { x } else { xdfl[,l-1] },
 			check.args = FALSE)
 }
@@ -131,7 +131,7 @@ for (name in names(object$call.args))
 	assign(name, object$call.args[[name]])
 v <- object$v
 normvar <- switch(objective.type, cov = "norm", cor = "var")
-if (ortho.type == "weight" && scale == "block") 
+if (ortho.type == "weight" && scope == "block") 
 	ortho.cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
 		modes = ortho.cnstr[, 1:(l-1), l])
 
@@ -149,7 +149,7 @@ if (!is.null(init.val)) {
 	v0 <- do.call(mcca.init, init.args)
 }
 ## Apply orthogonality constraints
-if (ortho.type == "weight" && scale == "block" && l > 1) {
+if (ortho.type == "weight" && scope == "block" && l > 1) {
 	v0 <- tnsr.rk1.mat.prod(v0, mat = ortho.cnstr$mat, 
 		modes = ortho.cnstr$modes, transpose.mat = FALSE)
 } else if (ortho.type == "score" && l > 1) {
@@ -157,20 +157,20 @@ if (ortho.type == "weight" && scale == "block" && l > 1) {
 		maxit = 100L, tol = 1e-6)
 } # WHAT ABOUT THE CASE ortho.type == "weight" && scale = "global" ???
 ## Apply scaling constraints
-v0 <- scale.v(v0, type = normvar, scale = scale, x = x, 
+v0 <- scale.v(v0, type = normvar, scope = scope, x = x, 
 	check.args = FALSE)
 
 
 ## Run MCCA
 out <- if (objective.type == "cov" && optim == "bca" && 
-	scale == "block") {
+	scope == "block") {
 	mcca.cov.bca.block(x = x, v = v0, w = w, 
 		ortho = if (ortho.type == "score" && l > 1) {
 		ortho.cnstr[,1:(l-1)] } else NULL, 
 		sweep = sweep, maxit = maxit, tol = tol, 
 		verbose = FALSE)
 } else if (objective.type == "cov" && optim == "bca" && 
-	scale == "global") { 
+	scope == "global") { 
 	mcca.cov.bca.global(x = x, v = v0, w = w, 
 		ortho = if (l == 1) { NULL 
 		} else if (ortho.type == "weight") { v[, 1:(l-1)] 
@@ -182,7 +182,7 @@ out <- if (objective.type == "cov" && optim == "bca" &&
 			ortho.cnstr[, 1:(l-1), drop = FALSE] } else NULL,
 		sweep = sweep, maxit = maxit, tol = tol, verbose = FALSE)	
 } else if (optim == "grad.scale") {
-	mcca.gradient.scale(x = x, v = v0, w = w, scale = scale, 
+	mcca.gradient.scale(x = x, v = v0, w = w, scope = scope, 
 		type = normvar, maxit = maxit, tol = tol, verbose = FALSE)
 } else if (optim == "grad.rotate") {  
 	mcca.gradient.rotate(x = x, v = v0, w = w, 
