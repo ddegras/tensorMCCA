@@ -47,16 +47,16 @@ if (is.character(init))
 
 ## Calculate tensor means across last dimension
 xbar <- vector("list", m)
-tocenter <- logical(m)
+uncentered <- logical(m)
 for(i in 1:m) {
     xbar[[i]] <- if (d[i] == 1) {
     	mean(x[[i]])
     } else {
 	    as.vector(rowMeans(x[[i]], dims = d[i]))
 	}
-	tocenter[i] <- any(abs(xbar) > eps)
+	uncentered[i] <- any(abs(xbar) > 1e-16)
 }
-tocenter <- which(tocenter)
+uncentered <- which(uncentered)
 
 # if (ortho == "weight") x0 <- x
 
@@ -128,9 +128,9 @@ for (l in 1:r) {
 	
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
 
-	## Create copy of original data to be centered and deflated 
+	## Create copy of original data before centering and deflating 
 	xl <- x
-	for (i in tocenter) 
+	for (i in uncentered) 
 		xl[[i]] <- xl[[i]] - xbar[[i]]
 	
 	## Deflate data as needed
@@ -159,11 +159,12 @@ for (l in 1:r) {
 		} 
 	}
 	
-	## More data preprocessing
 	## Remove datasets that are zero 
 	xzero <- sapply(xl, function(a) all(a == 0))
 	xnzero <- !xzero
 	if (any(xzero)) xl <- xl[xnzero]
+	wl <- w[xnzero, xnzero]
+	
 	## Drop singleton dimensions
 	for (i in seq_along(xl)) {	
 		dimxli <- dim(xl[[i]])
@@ -175,8 +176,6 @@ for (l in 1:r) {
 	if (all(xzero)) {
 		v[,l] <- relist(lapply(unlist(p), numeric), p)
 		objective[l] <- 0
-		block.score[,,l] <- 0
-		global.score[,l] <- 0
 		if (l > 1 && ortho == "weight" && scope == "block") 
 			next else break
 	}
@@ -185,7 +184,17 @@ for (l in 1:r) {
 	for (i in which(xzero)) 
 		v[[i,l]] <- lapply(p[[i]], numeric)
 
-
+	## Specify orthogonality constraints in optimization
+	cnstr <- if (l == 1) {
+	  NULL
+	} else if (scope == "block" && ortho == "weight") { 
+	  NULL 
+	} else if (scope == "global" && ortho == "weight") {
+	  v[xnzero,1:(l-1)]
+	} else if (ortho == "score") {
+	  ortho.cnstr[xnzero,1:(l-1)] 
+  }
+	
 	# ## Trivial case: all but one dataset are zero
 	# @@@@ FIGURE OUT WHAT TO DO HERE
 	# if (sum(xnzero) == 1) {
@@ -205,21 +214,8 @@ for (l in 1:r) {
 	## Initialize canonical weights
 	if (is.character(init)) {
 		init.args$x <- xl
-		# init.args$x <- if (l == 1) {
-			# x
-		# } else if (ortho == "weight" && scope == "block") {
-			# x 	
-		# } else if (ortho == "score" && scope == "block") {
-			# deflate.x(x, score = score[,xnzero,], 
-				# scope = "block", check.args = FALSE)
-		# } else if (ortho == "score" && scope == "global") {
-			# deflate.x(x, score = score, scope = "global", 
-				# check.args = FALSE)
-		# } else if (ortho == "weight" && scope == "global") {
-			# deflate.x(x, v = v[,1:(l-1)], check.args = FALSE)
-		# }
 		if (init %in% c("cca", "svd")) 
-			init.args$w <- w[xnzero, xnzero]	
+			init.args$w <- wl	
 		v0 <- do.call(mcca.init, init.args)
 	} else if (is.list(init)) {
 		v0 <- if (is.vector(init)) {
@@ -229,44 +225,33 @@ for (l in 1:r) {
 		}
 		if (l > 1 && ortho == "weight" && scope == "block") 
 			v0 <- tnsr.rk1.mat.prod(v0, mat = ortho.cnstr$mat[xnzero], 
-				modes = ortho.cnstr$modes[xnzero], transpose.mat = FALSE)		
-		# v0 <- scale.v(v0, type = "norm", scope = scope, check.args = FALSE)
+				modes = ortho.cnstr$modes[xnzero], transpose.mat = FALSE)
 	}
 	## Enforce scaling and orthogonality constraints
 	## @@@@ FINISH FUNCTION 'make.feasible' so that it handle 
 	## ALL combination of 'ortho' and 'scope' (= 'scale')
-	v0 <- make.feasible(v0, ortho = ..., scope = scope)
-	
-	
-	if (l > 1 && ortho == "score" && scope == "block") {
-		v0 <- tnsr.rk1.ortho(v0 = v0, maxit = 100L, tol = 1e-6, 
-			ortho = ortho.cnstr[xnzero, 1:(l-1), drop = FALSE])
-		v0 <- scale.v(v0, check.args = FALSE)
-	}	
-	if (all(unlist(v0) == 0)) {
-		v[,l] <- relist(lapply(unlist(p), numeric), p)
-		next
+	if (l > 1) {
+	  v0 <- tnsr.rk1.ortho(v0, cnstr, maxit = 100L, tol = 1e-6)
 	}
+	v0 <- scale.v(v0, type = "norm", scope = scope, check.args = FALSE)
+	
+	
 
-	## Run MCCA
+	## Run TMCCA
 	out <- if (optim == "bca" && scope == "block") {
-		mcca.cov.bca.block(x = x, v = v0, w = w[xnzero,xnzero], 
-			ortho = if (ortho == "score" && l > 1) {
-			ortho.cnstr[xnzero,1:(l-1)] } else NULL, 
-			sweep = sweep, maxit = maxit, tol = tol, 
-			verbose = verbose)
+		mcca.cov.bca.block(x = xl, v = v0, w = wl, 
+			ortho = cnstr, sweep = sweep, maxit = maxit, 
+			tol = tol, verbose = verbose)
 	} else if (optim == "bca" && scope == "global") { 
-		mcca.cov.bca.global(x = x, v = v0, w = w[xnzero,xnzero], 
-			ortho = if (l == 1) { NULL 
-			} else if (ortho == "weight") { v[xnzero, 1:(l-1)] 
-			} else ortho.cnstr[,1:(l-1)], sweep = sweep, 
-			maxit = maxit, tol = tol, verbose = verbose)
+		mcca.cov.bca.global(x = xl, v = v0, w = wl, 
+			ortho = cnstr, sweep = sweep, maxit = maxit, 
+			tol = tol, verbose = verbose)
 	} else if (optim == "grad.scale") {
-		mcca.gradient.scale(x = x, v = v0, w = w[xnzero,xnzero], 
+		mcca.gradient.scale(x = xl, v = v0, w = wl, 
 			scope = scope, type = "norm", maxit = maxit, 
 			tol = tol, verbose = verbose)
 	} else if (optim == "grad.rotate") {
-		mcca.gradient.rotate(x = x, v = v0, w = w[xnzero,xnzero], 
+		mcca.gradient.rotate(x = xl, v = v0, w = wl, 
 			maxit = maxit, tol = tol, verbose = verbose)
 	}	
 	objective[l] <- out$objective
@@ -297,7 +282,7 @@ for (l in 1:r) {
 	
 	## Check orientation of canonical weights (can the objective be
 	## increased by flipping the orientation of some canonical tensors?)
-	test <- reorient(out$score, w[xnzero,xnzero])
+	test <- reorient(out$score, wl)
 	if (any(test$flip)) {
 		objective[l] <- test$objective
 		for (i in which(test$flip)) {
