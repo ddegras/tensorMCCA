@@ -124,10 +124,7 @@ for (l in 1:r) {
 			}
 			x <- mapply(tnsr.mat.prod, x = x0, 
 				mat = ortho.cnstr$mat, modes = ortho.cnstr$modes, 
-				SIMPLIFY = FALSE)			
-				# x <- deflate.x(x = x0, v = v[,1:(l-1)],  
-				# ortho.mode = ortho.mode[,1:(l-1),l], 
-				# check.args = FALSE)
+				SIMPLIFY = FALSE)
 		} else if (ortho == "score") {
 			## Calculate orthogonality constraints explicitly	
 			for (i in 1:m)
