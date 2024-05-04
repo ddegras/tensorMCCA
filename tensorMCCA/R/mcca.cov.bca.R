@@ -24,6 +24,7 @@ objective <- numeric(maxit + 1L)
 objective[1] <- objective.internal(x, v, w)
 if (verbose) 
 	cat("\nIteration", 0, "Objective", objective[1])
+# The two lines below assume that the starting point is feasible
 vbest <- v
 objective.best <- objective[1]
 
@@ -34,18 +35,18 @@ if (sweep == "cyclical") idxi <- 1:m
 if (!is.null(ortho) && !is.matrix(ortho)) 
 	dim(ortho) <- c(m, 1)
 
-## Check if some datasets are zero
-eps <- 1e-14
-xzero <- logical(m)
-for (i in 1:m) {
-	xzero[i] <- all(abs(range(x[[i]])) <= eps)
-	if (xzero[i])
-		v[[i]] <- lapply(p[[i]], 
-			function(len) rep(1/sqrt(len), len))
-}
-if (all(xzero))
-	return(list(v = v, score = score, objective = 0, iters = 1, 
-		trace = 0))
+# ## Check if some datasets are zero
+# eps <- 1e-14
+# xzero <- logical(m)
+# for (i in 1:m) {
+	# xzero[i] <- all(abs(range(x[[i]])) <= eps)
+	# if (xzero[i])
+		# v[[i]] <- lapply(p[[i]], 
+			# function(len) rep(1/sqrt(len), len))
+# }
+# if (all(xzero))
+	# return(list(v = v, score = score, objective = 0, iters = 1, 
+		# trace = 0))
 obj <- objective[1] # DEBUG
 	
 ## Block coordinate ascent 
@@ -53,7 +54,7 @@ for (it in 1:maxit) {
 	if (sweep == "random") idxi <- sample(m)
 	for (ii in 1:m) { 	
 		i <- idxi[ii]	
-		if (xzero[i]) next
+		# if (xzero[i]) next
 		vprev <- v # DEBUG
 		objprev <- obj
 		## Calculate the scores <X_jt, v_j> 
@@ -67,10 +68,12 @@ for (it in 1:maxit) {
 		
 		## Set up quadratic program 
 		a <- if (w[i,i] == 0) 0 else x[[i]] # quadratic component
-		b <- tnsr.vec.prod(x[[i]], 
-			if (m == 2) { list(score[, -i] * (w[-i, i] / s[i]))
-			} else list(score[, -i] %*% (w[-i, i] / s[i])), 
-			d[i] + 1L) # linear component
+		b <- if (m == 1) {
+			array(0, p[[i]])
+		} else {
+			tnsr.vec.prod(x = x[[i]], modes = d[i] + 1L,
+				v = 	score[, -i, drop=FALSE] %*% (w[-i, i] / s[i]))
+		} # linear component
 		
 		## Update canonical vectors
 		v[[i]] <- optim.block.cov(v[[i]], a, b, ortho[i,], maxit, tol)
