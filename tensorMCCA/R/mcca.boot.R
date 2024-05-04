@@ -309,7 +309,7 @@ result <- if (call.args$objective.type == "cor") {
 		optim = call.args$optim, init = call.args$init.method, sweep = call.args$sweep,
 		maxit = call.args$maxit, tol = call.args$tol, control = call.args$control)
 } else {
-	mcca.cov(xstar, r = call.args$r, w = call.args$w, scale = call.args$scale, 
+	mcca.cov(xstar, r = call.args$r, w = call.args$w, scope = call.args$scope, 
 		ortho = call.args$ortho.type, optim = call.args$optim, init = call.args$init.method, 
 		sweep = call.args$sweep, maxit = call.args$maxit, tol = call.args$tol, 
 		control = call.args$control)
