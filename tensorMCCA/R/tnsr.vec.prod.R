@@ -1,10 +1,10 @@
-tnsr.vec.prod <- function(x, v, modes = NULL)
-{	
+tnsr.vec.prod <- function(x, v, modes)
+{
 if (length(v) == 0) return(x)
-p <- dim(x) 
+p <- if (is.vector(x)) length(x) else dim(x) 
 d <- length(p)
 if (!is.list(v)) v <- list(v)
-if (is.null(modes) && length(v) == d) modes <- 1:d
+if (missing(modes) && length(v) == d) modes <- 1:d
 stopifnot(length(v) == length(modes))
 modes <- as.integer(modes)
 nmodes <- length(modes)
@@ -13,7 +13,7 @@ if (nmodes > 1 && any(diff(modes) < 0)) {
 	v <- v[ord]
 	modes <- modes[ord]
 }
-if (is.null(p) || (d == 2 && p[2] == 1)) { 
+if (d == 1) { 
 	return(sum(x * v[[1]])) 
 }
 if (d == 2) {
