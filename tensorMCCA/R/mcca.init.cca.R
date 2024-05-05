@@ -28,7 +28,6 @@ optim <- if (is.null(optim)) {
 
 ## Data dimensions
 m <- length(x)
-dimfun <- function(x) if (is.vector(x)) c(1,length(x)) else dim(x)
 dimx <- lapply(x, dimfun) 
 p <- lapply(dimx, function(idx) idx[-length(idx)]) 
 n <- tail(dimx[[1]], 1)
