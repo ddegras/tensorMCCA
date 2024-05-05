@@ -13,8 +13,8 @@ mcca.cov.bca.block <- function(x, v, w, ortho, sweep,
 {
 	
 ## Determine data dimensions
-dimx <- lapply(x, dim)
-d <- sapply(dimx, length) - 1L
+dimx <- lapply(x, dimfun)
+d <- sapply(x, length) - 1L
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 m <- length(x)
 n <- tail(dimx[[1]], 1)
@@ -35,18 +35,7 @@ if (sweep == "cyclical") idxi <- 1:m
 if (!is.null(ortho) && !is.matrix(ortho)) 
 	dim(ortho) <- c(m, 1)
 
-# ## Check if some datasets are zero
-# eps <- 1e-14
-# xzero <- logical(m)
-# for (i in 1:m) {
-	# xzero[i] <- all(abs(range(x[[i]])) <= eps)
-	# if (xzero[i])
-		# v[[i]] <- lapply(p[[i]], 
-			# function(len) rep(1/sqrt(len), len))
-# }
-# if (all(xzero))
-	# return(list(v = v, score = score, objective = 0, iters = 1, 
-		# trace = 0))
+
 obj <- objective[1] # DEBUG
 	
 ## Block coordinate ascent 
@@ -68,12 +57,12 @@ for (it in 1:maxit) {
 		
 		## Set up quadratic program 
 		a <- if (w[i,i] == 0) 0 else x[[i]] # quadratic component
-		b <- if (m == 1) {
+		b <- if (m == 1) { # linear component
 			array(0, p[[i]])
 		} else {
 			tnsr.vec.prod(x = x[[i]], modes = d[i] + 1L,
-				v = 	score[, -i, drop=FALSE] %*% (w[-i, i] / s[i]))
-		} # linear component
+				v = score[, -i, drop=FALSE] %*% (w[-i, i] / s[i]))
+		} 
 		
 		## Update canonical vectors
 		v[[i]] <- optim.block.cov(v[[i]], a, b, ortho[i,], maxit, tol)
