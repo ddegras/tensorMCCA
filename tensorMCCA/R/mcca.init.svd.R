@@ -13,7 +13,6 @@ eps <- 1e-14
 
 ## Data dimensions
 m <- length(x) # number of datasets 
-dimfun <- function(x) if (is.vector(x)) c(1,length(x)) else dim(x)
 dimx <- lapply(x, dimfun) # full data dimensions
 n <- tail(dimx[[1]], 1)
 p <- lapply(dimx, function(idx) idx[-length(idx)])
