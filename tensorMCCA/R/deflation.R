@@ -21,8 +21,8 @@ for (idx in tovectorize)
 	ortho[[idx]] <- as.vector(ortho[[idx]])
 m <- length(x)
 r <- ncol(ortho)
-dimx <- lapply(x, dim)
-n <- ifelse(is.null(dimx[[1]]), length(x[[1]]), tail(dimx[[1]],1))
+dimx <- lapply(x, dimfun)
+n <- tail(dimx[[1]],1)
 pp <- sapply(dimx, function(dims) prod(dims[-length(dims)]))
 
 if (scope == "block") {	
