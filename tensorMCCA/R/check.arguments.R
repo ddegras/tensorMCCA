@@ -11,7 +11,6 @@ if (!(is.null(v) || length(x) == NROW(v)))
 	stop(paste("If specified, 'v' must be a vector of lists",
 	"of same length as 'x' or a matrix of lists with as many rows",
 	"as the length of 'x'."))
-dimfun <- function(x) if (is.vector(x)) c(1,length(x)) else dim(x)
 dimx <- lapply(x, dimfun) # full data dimensions
 m <- length(x)
 
