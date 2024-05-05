@@ -1,3 +1,16 @@
+##############################
+# Modified dimension function 
+##############################
+
+# Consider vector of length n as 1-by-n matrix
+
+dimfun <- function(x) 
+{
+dimx <- dim(x)
+if (length(dimx) <= 1) dimx <- c(1,length(x)) 
+dimx
+}
+
 
 ################################################
 # Function to calculate norms of rank-1 tensors
