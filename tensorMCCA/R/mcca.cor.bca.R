@@ -12,7 +12,7 @@ mcca.cor.bca <- function(x, v, w, ortho, sweep, maxit,
 {
 	
 ## Data dimensions
-dimx <- lapply(x, dim)
+dimx <- lapply(x, dimfun)
 d <- sapply(dimx, length) - 1L
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 m <- length(x)
@@ -27,17 +27,8 @@ objective.best <- objective[1]
 
 score <- matrix(0, n, m) # canonical scores <X_it, v_i>
 if (sweep == "cyclical") idxi <- 1:m
-
-## Check if some datasets are zero
-eps <- 1e-14
-xzero <- logical(m)
-for (i in 1:m) {
-	xzero[i] <- all(abs(range(x[[i]])) <= eps)
-	if (xzero[i])
-		v[[i]] <- lapply(p[[i]], 
-			function(len) rep(1/sqrt(len), len))
-}
-
+if (!is.null(ortho) && !is.matrix(ortho)) 
+	dim(ortho) <- c(m, 1)
 
 for (it in 1:maxit) {
 	if (sweep == "random") idxi <- sample(m)
@@ -54,13 +45,12 @@ for (it in 1:maxit) {
 			score[, j] <- tnsr.vec.prod(x[[j]], v[[j]], 1:d[j]) 
 		
 		## Set up linear program
-		a <- tnsr.vec.prod(x = x[[i]], modes = d[i] + 1L,
-			v = if (m == 2) {
-				list(score[, -i] * (w[-i, i] / n))
-			} else {
-				list(score[, -i] %*% (w[-i, i] / n))
-			}
-		)
+		a <- if (m == 1) { 
+			array(0, p[[i]]) 
+		} else {
+			tnsr.vec.prod(x = x[[i]], modes = d[i] + 1L,
+				v = score[, -i, drop = FALSE] %*% (w[-i, i] / n))
+		}
 		
 		## Update canonical vectors
 		v[[i]] <- optim.block.cor(v = v[[i]], obj = a, 
