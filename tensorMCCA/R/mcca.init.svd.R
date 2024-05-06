@@ -39,8 +39,8 @@ if (is.null(w)) {
 w <- (w + t(w)) / (2 * sum(w)) 
 
 ## Check for constant datasets
-cnst.set <- sapply(x, function(a) all(a == a[1]))
-w[,cnst.set] <- w[cnst.set,] <- 0
+constant <- sapply(x, function(a) all(a == a[1]))
+w[, constant] <- w[constant,] <- 0
 wzero <- apply(w == 0, 2, all)
 wnzero <- which(!wzero)
 
@@ -53,8 +53,12 @@ if (all(wzero)) {
 ## Data means for centering
 xbar <- vector("list", m)
 uncentered <- logical(m)
-for(i in 1:m) {
-    xbar[[i]] <- as.vector(rowMeans(x[[i]], dims = d[i]))
+for (i in 1:m) {
+	xbar[[i]] <- if (d[i] == 0L) { 
+		mean(x[[ii]])
+    } else {
+		as.vector(rowMeans(x[[ii]], dims = d[i]))
+	}
 	uncentered[i] <- any(abs(xbar[[i]]) > eps)
 }
 
@@ -65,7 +69,7 @@ if (any(wzero)) {
 		vfull[[i]] <- lapply(p[[i]], numeric)
 	d <- d[wnzero]
 	k <- k[wnzero]
-	m <- sum(wnzero)
+	m <- length(wnzero)
 	p <- p[wnzero]
 	pp <- pp[wnzero]
 	w <- w[wnzero, wnzero]
