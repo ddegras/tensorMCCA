@@ -44,35 +44,25 @@ if (!is.null(k)) {
 } else {
 	k <- pmin(pp, n)
 }
-	
+		
 ## Objective weights
 if (is.null(w)) {
 	w <- 1 - diag(m)
 } else if (length(w) == 1) {
 	w <- matrix(1, m, m)
 }
-# if (objective == "cor") diag(w) <- 0
 w <- (w + t(w)) / (2 * sum(w)) 
 
-## Check for constant datasets
-cnst.set <- sapply(x, function(a) all(a == a[1]))
-## Set their weights to zero
-w[,cnst.set] <- w[cnst.set,] <- 0
+## Identify constant datasets and set their weights to zero
+constant <- sapply(x, function(a) all(a == a[1]))
+w[, constant] <- w[constant,] <- 0
 wzero <- apply(w == 0, 2, all)
 wnzero <- which(!wzero)
 
-## Trivial case: all datasets have associated weights zero 
+## Trivial case: all weights are zero 
 if (all(wzero)) {
 	v <- relist(lapply(unlist(p), numeric), p)
 	return(v)
-}
-
-## Data means for centering
-xbar <- vector("list", m)
-uncentered <- logical(m)
-for(i in 1:m) {
-    xbar[[i]] <- as.vector(rowMeans(x[[i]], dims = d[i]))
-	uncentered[i] <- any(abs(xbar[[i]]) > 1e-16)
 }
 
 ## Remove any constant dataset
@@ -87,6 +77,15 @@ if (any(wzero)) {
 	p <- p[wnzero]
 	pp <- pp[wnzero]
 	w <- w[wnzero, wnzero]
+}
+
+## Calculate data means
+xbar <- vector("list", m)
+uncentered <- logical(m)
+for(i in 1:m) {
+	ii <- wnzero[i]
+    xbar[[i]] <- as.vector(rowMeans(x[[ii]], dims = d[i]))
+	uncentered[i] <- any(abs(xbar[[i]]) > 1e-16)
 }
 
 
@@ -108,7 +107,7 @@ for (i in 1:m) {
 	ii <- wnzero[i]
 	xmat <- x[[ii]] 
 	dim(xmat) <- c(pp[i], n)
-	if (uncentered[ii]) xmat <- xmat - xbar[[ii]] 
+	if (uncentered[i]) xmat <- xmat - xbar[[i]] 
 	svdx <- tryCatch(suppressWarnings(svds(xmat, k[i])), 
 		error = function(e) svd(xmat, k[i], k[i]))
 	pos <- (svdx$d > eps)
@@ -148,12 +147,12 @@ for (i in 1:m) {
 		ii <- wnzero[i]
 		xi <- x[[ii]]
 		dim(xi) <- c(pp[i],n)
-		if (uncentered[ii]) 
-			xi <- xi - xbar[[ii]]
+		if (uncentered[i]) 
+			xi <- xi - xbar[[i]]
 	}	
 	for (j in 1:i) {
 		if (w[i,j] == 0) next
-		if (j == i) {
+		if (i == j) {
 			if (objective == "cov")
 				a[[i]][,i] <- ux[[i]][,1] 
 			next
@@ -164,8 +163,8 @@ for (i in 1:m) {
 			jj <- wnzero[j]
 			xj <- x[[jj]]
 			dim(xj) <- c(pp[j],n)
-			if (uncentered[jj]) 
-				xj <- xj - xbar[[jj]]
+			if (uncentered[j]) 
+				xj <- xj - xbar[[j]]
 		}
 		svdij <- tryCatch(
 			supressWarnings(svds(crossprod(xi, xj), k = 1)), 
@@ -220,7 +219,7 @@ if (objective == "cov" && scope == "global") {
 #############################
 
 
-score <- canon.scores(x[wnzero], v, FALSE)
+score <- canon.scores(x[wnzero], v)
 score <- sweep(score, 2:3, colMeans(score))
 
 
@@ -248,7 +247,7 @@ for (i in flip)
 
 
 if (objective == "cov" && scope == "global") {
-	score <- canon.scores(x[xnzero], v, FALSE)
+	score <- canon.scores(x[xnzero], v)
 	s <- eigen(w * cov(score), TRUE)$vectors[,1]
 	s <- s * sqrt(length(x) / m) # account for constant datasets
 	for (i in 1:m) 
