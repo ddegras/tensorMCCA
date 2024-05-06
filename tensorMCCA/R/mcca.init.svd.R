@@ -36,7 +36,6 @@ if (is.null(w)) {
 } else if (length(w) == 1) {
 	w <- matrix(1, m, m)
 }
-if (objective == "cor") diag(w) <- 0
 w <- (w + t(w)) / (2 * sum(w)) 
 
 ## Check for constant datasets
@@ -114,8 +113,8 @@ cumnrowx <- cumsum(c(0,nrowx))
 ## Check separability of objective weights
 sepw <- separable(w, objective == "cor")
 
+# Separable case: concatenate data + SVD
 if (sepw$separable) {
-	# Separable case: concatenate data + SVD
 	a <- sepw$a # w = aa'
 	if (!all(a == a[1])) {
 		for (i in 1:m) 
@@ -126,7 +125,7 @@ if (sepw$separable) {
 		error = function(e) svd(xmat, 1, 0)$u)
 	rm(xmat)
 } else {
-	# Nonseparable case: form pseudo-covariance matrix + EVD
+# Nonseparable case: form pseudo-covariance matrix + EVD
 	covx <- matrix(0, cumnrowx[m+1], cumnrowx[m+1])
 	for (i in 1:m) {
 		idxi <- (cumnrowx[i]+1):cumnrowx[i+1]
@@ -169,12 +168,12 @@ for (i in 1:m) {
 ## Scale canonical weights 
 if (objective == "cor") {
 	v <- scale.v(v, type = "var", x = x[wnzero], check.args = FALSE)
-} else if (objective == "cov" && scope == "global") 
+} else if (objective == "cov" && scope == "global") {
 	v <-  scale.v(v, scope = "global", check.args = FALSE)
 }
 
 ## Calculate scores
-score <- canon.scores(x[wnzero], v, FALSE)
+score <- canon.scores(x[wnzero], v)
 if (any(uncentered[wnzero])) 
 	score <- sweep(score, 2L, colMeans(score), check.margin = FALSE)
 
@@ -182,12 +181,11 @@ if (any(uncentered[wnzero]))
 if (objective == "cov" && scope == "global") {
 	s <- eigen(w * cov(score) * w, TRUE)$vectors[,1]
 	for (i in 1:m) v[[i]][[1]] <- s[i] * v[[i]][[1]]
-
-	
 } else {
 	flip <- reorient(score, w)$flip
 	for (i in which(flip))
 		v[[i]][[1]] <- (-v[[i]][[1]])
+}
 
 ## Put back any canonical weights for constant datasets
 if (any(wzero)) {
