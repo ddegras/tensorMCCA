@@ -4,12 +4,12 @@
 
 # Consider vector of length n as 1-by-n matrix
 
-dimfun <- function(x) 
-{
-dimx <- dim(x)
-if (length(dimx) <= 1) dimx <- c(1,length(x)) 
-dimx
-}
+dimfun <- function(x) if (is.vector(x)) length(x) else dim(x)
+# {
+# dimx <- dim(x)
+# if (length(dimx) <= 1) dimx <- c(1,length(x)) 
+# dimx
+# }
 
 
 ################################################
