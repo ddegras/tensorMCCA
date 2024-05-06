@@ -12,7 +12,7 @@ deflate.x <- function(x, ortho, scope = c("block", "global"))
 scope <- match.arg(scope)
 stopifnot(length(x) == NROW(ortho))
 if (!is.matrix(ortho)) 
-	dim(ortho) <- c(NROW(ortho), 1L)
+	dim(ortho) <- c(length(ortho), 1L)
 toexpand <- which(sapply(ortho, is.list))
 for (idx in toexpand)
 	ortho[[idx]] <- outer.prod.nodim(ortho[[idx]])
@@ -44,7 +44,7 @@ if (scope == "global") {
 		idx <- (csumpp[i]+1):csumpp[i+1]
 		orthoall[idx,] <- do.call(cbind, ortho[i,])
 	}
-	qall <- qr(ortho.all)
+	qall <- qr(orthoall)
 	if (qall$rank == 0) return(x)
 	qall <- qr.Q(qall)[, 1:qall$rank, drop = FALSE]
 	for (i in 1:m) {
