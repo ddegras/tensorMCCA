@@ -22,6 +22,7 @@ m <- length(x)
 dimx <- lapply(x, dimfun)
 d <- sapply(dimx, length) - 1L 
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
+p[d == 0] <- 1
 n <- tail(dimx[[1]], 1L)
 r <- NCOL(v)
 
