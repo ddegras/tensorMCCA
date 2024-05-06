@@ -73,7 +73,7 @@ if (any(wzero)) {
 	# x <- x[wnzero] # unnecessarily creates a copy of x 
 	d <- d[wnzero]
 	k <- k[wnzero]
-	m <- sum(wnzero)
+	m <- length(wnzero)
 	p <- p[wnzero]
 	pp <- pp[wnzero]
 	w <- w[wnzero, wnzero]
@@ -84,7 +84,11 @@ xbar <- vector("list", m)
 uncentered <- logical(m)
 for(i in 1:m) {
 	ii <- wnzero[i]
-    xbar[[i]] <- as.vector(rowMeans(x[[ii]], dims = d[i]))
+    xbar[[i]] <- if (d[i] == 0L) { 
+    		mean(x[[ii]])
+    	} else {
+	    	as.vector(rowMeans(x[[ii]], dims = d[i]))
+	}
 	uncentered[i] <- any(abs(xbar[[i]]) > 1e-16)
 }
 
