@@ -14,9 +14,10 @@ mcca.cor.bca <- function(x, v, w, ortho, sweep, maxit,
 ## Data dimensions
 dimx <- lapply(x, dimfun)
 d <- sapply(dimx, length) - 1L
-p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 m <- length(x)
 n <- tail(dimx[[1]], 1) 
+p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
+p[d == 0] <- 1L
 
 objective <- numeric(maxit + 1L)
 objective[1] <- objective.internal(x, v, w)
