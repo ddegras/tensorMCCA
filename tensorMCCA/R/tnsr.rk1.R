@@ -43,18 +43,16 @@ if (is.null(init)) {
 	v <- svdx$factors
 	if (!scale) {
 		s <- as.numeric(svdx$core)^(1/d)
-		v <- lapply(v, "*", y = s)	
+		v <- lapply(v, "*", y = s) # vector balancing
 	}
 } else {
 	v <- init
 	nrmv <- sapply(v, function(x) sqrt(sum(x^2)))
 	p <- dim(x)
 	if (any(nrmv == 0)) {
-		v <- if (scale) {
-			lapply(p, function(len) rep(1/sqrt(len), len))
-		} else { lapply(p, numeric) }
+		v <- lapply(p, numeric) 
 	} else {
-		if (!scale) nrmv <- nrmv / prod(nrmv)^(1/d)
+		if (!scale) nrmv <- nrmv / prod(nrmv)^(1/d) # vector balancing
 		v <- mapply("/", x = v, y = nrmv, SIMPLIFY = FALSE)
 	}
 }
@@ -256,6 +254,11 @@ tnsr.rk1.ortho <- function(v0, ortho, maxit, tol)
 m <- length(v0)
 d <- sapply(v0, length)
 if (is.null(ortho)) return(v0)
+stopifnot((NROW(ortho) == length(v0)))
+if (!is.matrix(ortho)) 
+	dim(ortho) <- c(length(ortho), 1)
+if (is.list(ortho[[1]]))
+	ortho <- tnsr.rk1.expand(ortho)
 v <- v0
 cpfun <- function(x, y) sum(x * y) 
 
