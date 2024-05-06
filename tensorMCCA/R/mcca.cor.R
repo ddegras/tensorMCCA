@@ -17,6 +17,7 @@ m <- length(x)
 dimx <- lapply(x, dimfun) 
 d <- sapply(dimx, length) - 1L 
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
+p[d == 0] <- 1
 n <- tail(dimx[[1]], 1) 
 
 ## Objective weights
@@ -50,10 +51,9 @@ for(i in 1:m) {
     } else {
 	    as.vector(rowMeans(x[[i]], dims = d[i]))
 	}
-	uncentered[i] <- any(abs(xbar) > 1e-16)
+	uncentered[i] <- any(abs(xbar[[i]]) > 1e-16)
 }
 uncentered <- which(uncentered)
-# if (ortho == "weight") x0 <- x
 
 ## Adjust number of canonical components
 pp <- sapply(p, prod)
@@ -144,10 +144,11 @@ for (l in 1:r) {
 	wl <- w[xnzero, xnzero]
 
 	## Drop singleton dimensions
-	for (i in seq_along(xl)) {	
-		dimxli <- dim(xl[[i]])
-		if (is.null(dimxli) || all(dimxli > 1)) next
-		dim(xl[[i]]) <- drop(dimxli)
+	dimxl <- vector("list", sum(xnzero))
+	for (i in seq_along(xl)) {
+		dimxl[[i]] <- dim(xl[[i]])
+		if (is.null(dimxl[[i]]) || all(dimxl[[i]] > 1)) next
+		dim(xl[[i]]) <- drop(dimxl[[i]])
 	}
 
 	## Trivial case: all datasets equal to zero
