@@ -14,10 +14,11 @@ mcca.cov.bca.block <- function(x, v, w, ortho, sweep,
 	
 ## Determine data dimensions
 dimx <- lapply(x, dimfun)
-d <- sapply(x, length) - 1L
-p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
+d <- sapply(dimx, length) - 1L
 m <- length(x)
 n <- tail(dimx[[1]], 1)
+p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
+p[d == 0] <- 1
 
 ## Set up objective values
 objective <- numeric(maxit + 1L)
@@ -112,14 +113,13 @@ mcca.cov.bca.global <- function(x, v, w, ortho, sweep,
 	maxit, tol, verbose)
 {
 	
-## Determine data dimensions
-dimfun <- function(x) if (is.vector(x)) c(1,length(x)) else dim(x)
+## Data dimensions
 dimx <- lapply(x, dimfun)
-ndimx <- sapply(dimx, length)
-d <- ndimx - 1 # number of image dimensions for each dataset
-p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
+d <- sapply(dimx, length) - 1L 
 m <- length(x) # number of datasets
-n <- dimx[[1]][ndimx[1]] # number of individuals/objects
+n <- tail(dimx[[1]], 1) # number of cases/subjects
+p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
+p[d == 0] <- 1
 
 ## Set up objective values
 objective <- numeric(maxit+1)
@@ -128,12 +128,6 @@ if (verbose && is.null(ortho))
 	cat("\nIteration", 0, "Objective", objective[1])
 # Starting value typically not feasible so don't show its objective value
 
-## Catch trivial case
-if (all(unlist(x) == 0)) {
-	p <- unlist(p)
-	return(list(v = relist(rep(1/sqrt(p), p), v), 
-		score = matrix(0, n, m), objective = 0, iters = 1, trace = 0))
-}
 
 ## Identify type of orthogonality constraints
 ortho.type <- if (is.numeric(ortho[[1]])) { "score" 
