@@ -13,9 +13,10 @@ r <- as.integer(r)
 
 ## Data dimensions
 m <- length(x)
-dimx <- lapply(x, dimfun) 
+dimx <- lapply(x, dimfun)
 d <- sapply(dimx, length) - 1L 
-p <- mapply(head, dimx, d, SIMPLIFY = FALSE) 
+p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
+p[d == 0] <- 1
 n <- tail(dimx[[1]], 1) 
 
 ## Objective weights
@@ -48,12 +49,12 @@ if (is.character(init))
 xbar <- vector("list", m)
 uncentered <- logical(m)
 for(i in 1:m) {
-    xbar[[i]] <- if (d[i] == 1) {
+    xbar[[i]] <- if (d[i] == 0) {
     	mean(x[[i]])
     } else {
 	    as.vector(rowMeans(x[[i]], dims = d[i]))
 	}
-	uncentered[i] <- any(abs(xbar) > 1e-16)
+	uncentered[i] <- any(abs(xbar[[i]]) > 1e-16)
 }
 uncentered <- which(uncentered)
 
@@ -123,14 +124,15 @@ for (l in 1:r) {
 	
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
 
-	## Create copy of original data before centering and deflating 
+	## Create copy of original data for centering and deflating 
 	xl <- x
 	for (i in uncentered) 
 		xl[[i]] <- xl[[i]] - xbar[[i]]
 	
 	## Prepare orthogonality constraints and deflate data
-	if (l > 1) { 	
-		if (ortho == "score" && scope == "block") { 
+	if (l > 1) {
+		# browser()
+		if (ortho == "score" && scope == "block") {
 			for (i in 1:m)
 				ortho.cnstr[[i,l-1]] <- tnsr.vec.prod(xl[[i]], 
 					block.score[,i,l-1], d[i]+1)
@@ -142,7 +144,7 @@ for (l in 1:r) {
 			xl <- deflate.x(xl, ortho.cnstr[,1:(l-1)], "global")
 		} else if (ortho == "weight" && scope == "block") {
 			ortho.cnstr <- set.ortho.mat(v = v[,1:(l-1), drop=FALSE], 
-				modes = ortho.mode[, 1:(l-1), l, drop=FALSE])
+				modes = matrix(ortho.mode[, 1:(l-1), l], m, l-1))
 			for (i in 1:m)
 				xl[[i]] <- tnsr.mat.prod(xl[[i]], ortho.cnstr$mat[[i]],
 					ortho.cnstr$modes[[i]])	
@@ -167,8 +169,8 @@ for (l in 1:r) {
 	dimxl <- vector("list", sum(xnzero))
 	for (i in seq_along(xl)) {
 		dimxl[[i]] <- dim(xl[[i]])
-		if (is.null(dimxli) || all(dimxli > 1)) next
-		dim(xl[[i]]) <- drop(dimxli)
+		if (is.null(dimxl[[i]]) || all(dimxl[[i]] > 1)) next
+		dim(xl[[i]]) <- drop(dimxl[[i]])
 	}
 	
 	## Set canonical weights for datasets equal to zero
