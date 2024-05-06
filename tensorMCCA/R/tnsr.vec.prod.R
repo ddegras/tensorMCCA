@@ -1,7 +1,7 @@
 tnsr.vec.prod <- function(x, v, modes)
 {
 if (length(v) == 0) return(x)
-p <- if (is.vector(x)) length(x) else dim(x) 
+p <- dimfun(x) 
 d <- length(p)
 if (!is.list(v)) v <- list(v)
 if (missing(modes) && length(v) == d) modes <- 1:d
@@ -14,16 +14,19 @@ if (nmodes > 1 && any(diff(modes) < 0)) {
 	modes <- modes[ord]
 }
 if (d == 1) { 
-	return(sum(x * v[[1]])) 
+	out <- sum(x * v[[1]])
+	return(out) 
 }
 if (d == 2) {
-	if (identical(modes, 1L)) {
-		return(crossprod(x, v[[1]])) 
+	out <- if (identical(modes, 1L)) {
+		crossprod(x, v[[1]])
+	} else if (identical(modes, 2L)) {
+		x %*% v[[1]]
+	} else {
+		crossprod(v[[1]], x %*% v[[2]])
 	}
-	if (identical(modes, 2L)) {
-		return(x %*% v[[1]]) 
-	}
-	return(as.numeric(crossprod(v[[1]], x %*% v[[2]])))
+	dim(out) <- NULL
+	return(out)
 }
 first.modes <- identical(modes, 1:nmodes)
 last.modes <- identical(modes, tail(1:d, nmodes))
