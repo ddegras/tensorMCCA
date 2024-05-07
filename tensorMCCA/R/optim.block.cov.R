@@ -107,7 +107,7 @@ ub <- delta[1] + sqrt(sum(b^2))
 lambda <- if (lb < ub) uniroot(g, c(lb,ub), tol = 1e-8)$root else ub
 
 ## Recover primal solution 
-v <- P %*% (b / (lambda - d)) 
+v <- P %*% (b / (lambda - delta)) 
 if (!is.null(cc)) v <- qq %*% v
 dim(v) <- NULL
 list(v)
