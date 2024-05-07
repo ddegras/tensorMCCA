@@ -1,26 +1,26 @@
 \name{mcca.cor}
 \alias{mcca.cor}
 
-\title{Multiple CCA: Maximize Sum of Correlations}
+\title{TMCCA: Maximize Sum of Correlations}
 
-\description{Perform mCCA by maximizing sum of correlations between canonical scores. Optimization method: block coordinate ascent.}
+\description{Perform TMCCA by maximizing the sum of canonical correlations.}
 
 \usage{
-mcca.cor(x, r, w = 1, norm = c("block", "global"), 
-	ortho = c("score", "weight"), init = c("cca", "svd", "random"), 
+mcca.cor(x, r = 1L, w = 1, ortho = c("score", "weight"), 
+	optim = c("bca", "grad.scale"), init = c("cca", "svd", "random"), 
 	maxit = 1000, tol = 1e-6, sweep = c("cyclical", "random"), 
 	control = list(), verbose = FALSE)
 }
-
+	
 \arguments{
 \item{x}{list of data arrays. All arrays must have the same last dimension (= common measured individuals or objects).}
 \item{r}{integer number of sets of canonical components to calculate.}
 \item{w}{weight matrix for pairs of datasets. Can be specified as a single number (recycled) or as a square matrix with numbers of rows and columns equal to the length of \code{x}.}
-\item{norm}{character specifying the scope of orthogonality constraints for higher-order canonical components: within datasets (\code{block}) or across datasets (\code{global}).}
 \item{ortho}{character specifying whether orthogonality constraints for higher-order canonical components apply to canonical scores (\code{score}) or canonical tensors (\code{weight}).}
 \item{init}{character describing the initialization method or list of starting points for the optimization.}
 \item{maxit}{maximum number of algorithm iterations.}
 \item{tol}{numerical (relative and absolute) tolerance for algorithm convergence.}
+\item{sweep}{sweeping pattern in BCA optimization.}
 \item{control}{optional list of arguments for initialization and orthogonality constraints.}
 \item{verbose}{logical: display algorithm progress?}
 }
@@ -34,8 +34,8 @@ it will be reduced before the optimization to the largest theoretical number of 
 
 The objective weight matrix \code{w} must contain only nonnegative values (with at least one positive). It will be made symmetric and scaled so its elements add up to 1.
 
-The arguments \code{norm} and \code{ortho} respectively specify the scope and type of orthogonality constraints used to estimate higher-order canonical components (\eqn{2,...,r}). Details on these constraints can be found in the reference below. 
-The constraints are enforced by deflating/reducing the data arrays.  
+The argument \code{ortho} specifies the type of orthogonality constraints used to estimate higher-order canonical components (\eqn{2,...,r}). Details on these constraints can be found in the reference below. 
+The constraints are enforced implicitly by deflating the data arrays after each optimization stage, which leads to better starting points for the optimization. They are also accounted for explicitly during the optimization if necessary (when deflation alone does not produce an equivalent problem).  
 
 The argument \code{init} can either be a character specifying an initialization method or  
 or a list directly providing starting points for the optimization. In the former case, possible character values are \code{cca} (standard CCA between pairs of matricized datasets), \code{svd} (higher order SVD), or \code{random}. Refer to Degras et al. (2022) for details. If \code{init} is a list, it should either have vector type (no dimensions) and same length as \code{x} OR have matrix type with number of rows equal to the length of \code{x}. In all cases, \code{init[[i]]} or \code{init[[i,l]]} specifies the starting point for the \eqn{i}th dataset and \eqn{l}th round of optimization. Eachof these values should be a list of vectors whose lengths match (all but the last) dimensions of \code{x[[i]]}. If the dimensions of the list \code{init} are less than the effective value of \code{r}, then the values in \code{init} are recycled as necessary.   
