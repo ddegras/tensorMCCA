@@ -259,6 +259,7 @@ if (!is.matrix(ortho))
 	dim(ortho) <- c(length(ortho), 1)
 if (is.list(ortho[[1]]))
 	ortho <- tnsr.rk1.expand(ortho)
+for (i in 1:m) v0[[i]] <- lapply(v0[[i]], as.matrix)
 v <- v0
 cpfun <- function(x, y) sum(x * y) 
 
