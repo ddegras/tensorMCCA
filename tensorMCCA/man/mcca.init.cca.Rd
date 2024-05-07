@@ -22,7 +22,6 @@ mcca.init.cca(x, w = NULL, objective = c("cov", "cor"), scope = c("block",
 \item{objective}{character: maximize the sum of canonical covariances (\code{cov}) or canonical correlations (\code{cor})?
 }
 \item{scope}{Apply scaling constraints to canonical weights separately for each dataset (\code{block}) or across datasets (\code{global})?}
-
 \item{k}{Rank of truncated SVD to approximate each dataset. Default = \code{NULL} (full SVD).}
 \item{optim}{
 Type of search in a (possibly large) space of candidate solutions: \code{exhaustive} or \code{approximate}.}
