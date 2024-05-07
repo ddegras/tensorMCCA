@@ -6,11 +6,11 @@
 \description{Perform multiple CCA by maximizing sum of covariances between canonical scores.}
 
 \usage{
-mcca.cov(x, r = 1, w = NULL, scale = c("block", "global"), 
-	ortho = c("score", "weight"), optim = c("bca", "grad.scale", 
-	"grad.rotate"), init = c("cca", "svd", "random"), maxit = 1000, 
-	tol = 1e-6, sweep = c("cyclical", "random"), control = list(), 
-	verbose = FALSE)
+mcca.cov(x, r = 1L, w = NULL, scale = c("block", "global"), 
+    ortho = c("score", "weight"), optim = c("bca", "grad.scale", 
+        "grad.rotate"), init = c("cca", "svd", "random"), maxit = 1000, 
+    tol = 1e-06, sweep = c("cyclical", "random"), control = list(), 
+    verbose = FALSE) 
 }
 
 \arguments{
