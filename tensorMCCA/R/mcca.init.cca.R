@@ -1,6 +1,6 @@
 mcca.init.cca <- function(x, w = NULL, objective = c("cov", "cor"), 
 	scope = c("block", "global"), k = NULL, optim = NULL, 
-	maxit = 100, tol = .0001)
+	maxit = 100, tol = 1e-4)
 {
 	
 ################
@@ -67,27 +67,26 @@ if (all(wzero)) {
 
 ## Remove any constant dataset
 if (any(wzero)) {
+	x <- x[wnzero] 
+	w <- w[wnzero, wnzero]
 	vfull <- vector("list", m)
 	for (i in which(wzero)) 
 		vfull[[i]] <- lapply(p[[i]], numeric)
-	# x <- x[wnzero] # unnecessarily creates a copy of x 
 	d <- d[wnzero]
 	k <- k[wnzero]
 	m <- length(wnzero)
 	p <- p[wnzero]
 	pp <- pp[wnzero]
-	w <- w[wnzero, wnzero]
 }
 
 ## Calculate data means
 xbar <- vector("list", m)
 uncentered <- logical(m)
 for(i in 1:m) {
-	ii <- wnzero[i]
     xbar[[i]] <- if (d[i] == 0L) { 
-    		mean(x[[ii]])
+    		mean(x[[i]])
     	} else {
-	    	as.vector(rowMeans(x[[ii]], dims = d[i]))
+	    	as.vector(rowMeans(x[[i]], dims = d[i]))
 	}
 	uncentered[i] <- any(abs(xbar[[i]]) > 1e-16)
 }
@@ -108,8 +107,7 @@ reduce <- (k < pmin(pp,n)) | (k <= pp/2) |
 	(objective == "cor") | (diag(w) > 0)
 for (i in 1:m) {
 	if (!reduce[i]) next	
-	ii <- wnzero[i]
-	xmat <- x[[ii]] 
+	xmat <- x[[i]] 
 	dim(xmat) <- c(pp[i], n)
 	if (uncentered[i]) xmat <- xmat - xbar[[i]] 
 	svdx <- tryCatch(suppressWarnings(svds(xmat, k[i])), 
@@ -148,8 +146,7 @@ for (i in 1:m) {
 	if (reduce[i]) {
 		xi <- vx[[i]]
 	} else {
-		ii <- wnzero[i]
-		xi <- x[[ii]]
+		xi <- x[[i]]
 		dim(xi) <- c(pp[i],n)
 		if (uncentered[i]) 
 			xi <- xi - xbar[[i]]
@@ -164,8 +161,7 @@ for (i in 1:m) {
 		if (reduce[j]) {
 			xj <- vx[[j]]
 		} else {
-			jj <- wnzero[j]
-			xj <- x[[jj]]
+			xj <- x[[j]]
 			dim(xj) <- c(pp[j],n)
 			if (uncentered[j]) 
 				xj <- xj - xbar[[j]]
@@ -211,8 +207,7 @@ for (i in 1:m) {
 if (objective == "cov" && scope == "global") {
 	v <- scale.v(v, check.args = FALSE)
 } else if (objective == "cor") {
-	v <- scale.v(v, type = "var", x = x[wnzero], 
-		check.args = FALSE)
+	v <- scale.v(v, type = "var", x = x, check.args = FALSE)
 }
 
 
@@ -223,7 +218,7 @@ if (objective == "cov" && scope == "global") {
 #############################
 
 
-score <- canon.scores(x[wnzero], v)
+score <- canon.scores(x, v)
 score <- sweep(score, 2:3, colMeans(score))
 
 
@@ -251,11 +246,18 @@ for (i in flip)
 
 
 if (objective == "cov" && scope == "global") {
-	score <- canon.scores(x[xnzero], v)
-	s <- eigen(w * cov(score), TRUE)$vectors[,1]
-	s <- s * sqrt(length(x) / m) # account for constant datasets
-	for (i in 1:m) 
-		v[[i]] <- lapply(v[[i]], "*", y = s[i]^(1/d[i]))
+	score <- canon.scores(x, v)
+	s <- sqrt(m) * eigen(w * cov(score), TRUE)$vectors[,1]
+	sgns <- sign(s)
+	for (i in 1:m) {
+		if (d[i] <= 1) {
+			si <- s[i]
+		} else {
+			si <- rep(abs(s[i])^(1/d[i]), d[i])
+			si[1] <- si[1] * sgns[i]
+		}
+		v[[i]] <- mapply("*", x = v[[i]], y = si, SIMPLIFY = FALSE)
+	}
 }
 
 
