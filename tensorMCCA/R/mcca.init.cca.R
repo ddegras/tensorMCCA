@@ -121,10 +121,10 @@ for (i in 1:m) {
 	}
 	if (objective == "cov") {
 		ux[[i]] <- svdx$u
-		vx[[i]] <- sweep(svdx$v, 2, svdx$d, "*")
+		vx[[i]] <- t(svdx$v) * svdx$d
 	} else if (objective == "cor") {
 		ux[[i]] <- sweep(svdx$u, 2, svdx$d, "/")
-		vx[[i]] <- svdx$v		
+		vx[[i]] <- t(svdx$v)		
 	}
 }
 rm(xmat, svdx)
@@ -167,8 +167,8 @@ for (i in 1:m) {
 				xj <- xj - xbar[[j]]
 		}
 		svdij <- tryCatch(
-			supressWarnings(svds(crossprod(xi, xj), k = 1)), 
-			error = function(e) svd(crossprod(xi, xj), 1, 1))
+			supressWarnings(svds(tcrossprod(xi, xj), k = 1)), 
+			error = function(e) svd(tcrossprod(xi, xj), 1, 1))
 		a[[i]][,j] <- if (reduce[i]) {
 			ux[[i]] %*% svdij$u } else svdij$u	
 		a[[j]][,i] <- if (reduce[j]) {
