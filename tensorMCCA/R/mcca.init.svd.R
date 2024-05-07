@@ -1,5 +1,5 @@
 mcca.init.svd <- function(x, w = NULL, objective = c("cov", "cor"), 
-	scope = c("block", "global"), k = NULL)
+	scope = c("block", "global"), k = NULL, maxit = 100, tol = 1e-4)
 {
 	
 ################
@@ -50,18 +50,6 @@ if (all(wzero)) {
 	return(v)
 }
 
-## Data means for centering
-xbar <- vector("list", m)
-uncentered <- logical(m)
-for (i in 1:m) {
-	xbar[[i]] <- if (d[i] == 0L) { 
-		mean(x[[ii]])
-    } else {
-		as.vector(rowMeans(x[[ii]], dims = d[i]))
-	}
-	uncentered[i] <- any(abs(xbar[[i]]) > eps)
-}
-
 ## Remove any constant dataset
 if (any(wzero)) {
 	vfull <- vector("list", m)
@@ -73,8 +61,22 @@ if (any(wzero)) {
 	p <- p[wnzero]
 	pp <- pp[wnzero]
 	w <- w[wnzero, wnzero]
+	x <- x[wnzero]
 }
 cumpp <- c(0, cumsum(pp))
+
+
+## Calculate data means
+xbar <- vector("list", m)
+uncentered <- logical(m)
+for (i in 1:m) {
+	xbar[[i]] <- if (d[i] == 0L) { 
+		mean(x[[i]])
+    } else {
+		as.vector(rowMeans(x[[i]], dims = d[i]))
+	}
+	uncentered[i] <- any(abs(xbar[[i]]) > eps)
+}
 
 
 
@@ -90,15 +92,14 @@ v <- vector("list", m)
 reduce <- (k < pmin(pp,n)) | (k <= pp/2) | (objective == "cor")
 u <- xmat <- vector("list", m)
 for (i in 1:m) {
-	ii <- wnzero[i]
-	xmat[[i]] <- x[[ii]]
+	xmat[[i]] <- x[[i]]
 	dim(xmat[[i]]) <- c(pp[i], n)
-	if (uncentered[ii])
-		xmat[[i]] <- xmat[[i]] - xbar[[ii]]	
+	if (uncentered[i])
+		xmat[[i]] <- xmat[[i]] - xbar[[i]]	
 	if (reduce[i]) {
 		svdx <- svd(xmat[[i]])
 		pos <- (svdx$d > max(1e-8 * svdx$d[1], 1e-14))
-		u[[i]] <- svdx$u[,pos,drop=FALSE]
+		svdx$u <- svdx$u[,pos,drop=FALSE]
 		svdx$d <- svdx$d[pos]
 		svdx$v <- svdx$v[,pos,drop=FALSE]
 		if (objective == "cov") {
@@ -171,20 +172,30 @@ for (i in 1:m) {
 
 ## Scale canonical weights 
 if (objective == "cor") {
-	v <- scale.v(v, type = "var", x = x[wnzero], check.args = FALSE)
+	v <- scale.v(v, type = "var", x = x, check.args = FALSE)
 } else if (objective == "cov" && scope == "global") {
 	v <-  scale.v(v, scope = "global", check.args = FALSE)
 }
 
 ## Calculate scores
-score <- canon.scores(x[wnzero], v)
-if (any(uncentered[wnzero])) 
+score <- canon.scores(x, v)
+if (any(uncentered)) 
 	score <- sweep(score, 2L, colMeans(score), check.margin = FALSE)
 
 ## Find best rescaling or orientation for weights
 if (objective == "cov" && scope == "global") {
-	s <- eigen(w * cov(score) * w, TRUE)$vectors[,1]
-	for (i in 1:m) v[[i]][[1]] <- s[i] * v[[i]][[1]]
+	score <- canon.scores(x, v)
+	s <- sqrt(m) * eigen(w * cov(score), TRUE)$vectors[,1]
+	sgns <- sign(s)
+	for (i in 1:m) {
+		if (d[i] <= 1) {
+			si <- s[i]
+		} else {
+			si <- rep(abs(s[i])^(1/d[i]), d[i])
+			si[1] <- si[1] * sgns[i]
+		}
+		v[[i]] <- mapply("*", x = v[[i]], y = si, SIMPLIFY = FALSE)
+	}
 } else {
 	flip <- reorient(score, w)$flip
 	for (i in which(flip))
