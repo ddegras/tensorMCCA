@@ -33,7 +33,8 @@ the result of a call to \code{\link{kkt}}. }
 If not provided, \code{grad} will be calculated inside the function via the call \code{kkt(x, fit)}.  
 
 A necessary (second-order) condition for a MCCA solution \eqn{\hat{v}} to be a local maximizer is that for all vector \eqn{v} orthogonal to the gradients of the constraints at \eqn{\hat{v}}, \eqn{v^{T}Hv \le 0} where \eqn{H} is the Hessian of the objective function at \eqn{\hat{v}}. 
-If this quantity is strictly negative for all such (nonzero) vector \eqn{v}, then \eqn{\hat{v}} is a local optimizer. A more convenient sufficient condition that's 
+
+If \eqn{v^{T}Hv < 0} for all such (nonzero) vector \eqn{v}, then \eqn{\hat{v}} is a local maximizer (sufficient condition). A convenient way to assess this condition is to 1) find an orthogonal basis of the orthogonal space of the gradient constraints (e.g. by QR decomposition) and collect it in a matrix \eqn{Q}, 2) multiply \eqn{H} left and right by \eqn{Q^T} and \eqn{Q}, and 3) check that \eqn{Q^T H Q} is negative definite (i.e. has negative eigenvalues).  
 
 
 }
