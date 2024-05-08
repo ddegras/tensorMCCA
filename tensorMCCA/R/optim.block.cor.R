@@ -34,6 +34,8 @@ if (length(v) == 1L) {
 # and to C'v = 0 
 ##########################################
 
+# Note: this problem has unbounded solutions is a is not in the range of B.
+# In TMCCA, a is in the range of B the actual problem at hand is gua 
 
 ## Inputs: 
 ## a:	objective (vector)
