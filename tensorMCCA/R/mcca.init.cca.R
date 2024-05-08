@@ -19,13 +19,6 @@ if (objective == "cor" && scope == "global")
 	stop(paste("Argument values 'objective = cor'", 
 		"and 'scope = global' are incompatible."))
 
-## Search method in combinatorial optimization
-optim <- if (is.null(optim)) {
-	ifelse(m <= 5, "exact", "greedy")
-} else {
-	match.arg(optim, c("exact", "greedy")) 
-}
-
 ## Data dimensions
 m <- length(x)
 dimx <- lapply(x, dimfun)
@@ -33,6 +26,13 @@ d <- sapply(dimx, length) - 1L
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 p[d == 0] <- 1
 n <- tail(dimx[[1]], 1)
+
+## Search method in combinatorial optimization
+optim <- if (is.null(optim)) {
+	ifelse(m <= 5, "exact", "greedy")
+} else {
+	match.arg(optim, c("exact", "greedy")) 
+}
 
 ## Truncation order in SVD
 pp <- sapply(p, prod)
