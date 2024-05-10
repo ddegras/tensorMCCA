@@ -11,9 +11,9 @@ if (!(test1 || test2)) {
 	"whose number of rows equals the length of 'x'")) }
 
 m <- length(x)
-dimx <- lapply(x, dim)
+dimx <- lapply(x, dimfun)
 n <- tail(dimx[[1]], 1) 
-d <- sapply(dimx, length) - 1  
+d <- pmax(sapply(dimx, length) - 1L, 1L)  
 r <- NCOL(v)
 if (r == 1) {
 	score <- matrix(nrow = n, ncol = m)
