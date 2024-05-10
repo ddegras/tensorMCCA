@@ -37,7 +37,7 @@ if (!is.null(ortho) && !is.matrix(ortho))
 	dim(ortho) <- c(m, 1)
 
 
-obj <- objective[1] # DEBUG
+# obj <- objective[1] # DEBUG
 	
 ## Block coordinate ascent 
 for (it in 1:maxit) {
