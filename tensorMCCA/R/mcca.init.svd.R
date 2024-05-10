@@ -106,7 +106,7 @@ for (i in 1:m) {
 			u[[i]] <- svdx$u
 			xmat[[i]] <- t(svdx$v) * svdx$d			
 		} else if (objective == "cor") {
-			u[[i]] <- sweep(u[[i]], 2, svdx$d, "/")
+			u[[i]] <- svdx$u
 			xmat[[i]] <- t(svdx$v)
 		} 
 	}	
