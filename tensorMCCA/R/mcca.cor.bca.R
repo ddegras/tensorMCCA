@@ -35,7 +35,6 @@ for (it in 1:maxit) {
 	if (sweep == "random") idxi <- sample(m)
 	for (ii in 1:m) { 	
 		i <- idxi[ii]	
-		if (xzero[i]) next
 		## Calculate the inner products <X_jt, v_j> 
 		## After the first algorithm iteration (it = 1), in each 
 		## iteration of the i loop, only the inner products associated 
