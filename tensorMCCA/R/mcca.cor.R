@@ -44,7 +44,7 @@ if (is.character(init))
 xbar <- vector("list", m)
 uncentered <- logical(m)
 for(i in 1:m) {
-    xbar[[i]] <- if (d[i] == 1) {
+    xbar[[i]] <- if (d[i] == 0) {
     	mean(x[[i]])
     } else {
 	    as.vector(rowMeans(x[[i]], dims = d[i]))
@@ -127,7 +127,7 @@ for (l in 1:r) {
 	if (l > 1) {
 		if (ortho == "score") {
 			for (i in 1:m)
-				ortho.cnstr[[i,l-1]] <- tnsr.vec.prod(x[[i]], 
+				ortho.cnstr[[i,l-1]] <- tnsr.vec.prod(xl[[i]], 
 					block.score[,i,l-1], d[i]+1)
 			xl <- deflate.x(xl, ortho.cnstr[,1:(l-1)])
 		} else if (ortho == "weight") {
@@ -141,6 +141,11 @@ for (l in 1:r) {
 
 	## Remove datasets that are zero 
 	xzero <- sapply(xl, function(a) all(a == 0))
+	if (all(xzero)) {
+		v[,l] <- relist(lapply(unlist(p), numeric), p)
+		objective[l] <- 0
+		if (l > 1 && ortho == "weight") next else break
+	}
 	xnzero <- !xzero
 	if (any(xzero)) xl <- xl[xnzero]
 	wl <- w[xnzero, xnzero]
@@ -153,12 +158,6 @@ for (l in 1:r) {
 		# dim(xl[[i]]) <- drop(dimxl[[i]])
 	# }
 
-	## Trivial case: all datasets equal to zero
-	if (all(xzero)) {
-		v[,l] <- relist(lapply(unlist(p), numeric), p)
-		objective[l] <- 0
-		if (l > 1 && ortho == "weight") next else break
-	}
 	
 	## Set canonical weights for datasets equal to zero
 	for (i in which(xzero)) 
@@ -192,14 +191,14 @@ for (l in 1:r) {
 	if (l > 1) {
 		v0 <- tnsr.rk1.ortho(v0, cnstr, maxit = 100L, tol = 1e-6)
 	}
-	v0 <- scale.v(v0, type = "var", x = x, check.args = FALSE)
+	v0 <- scale.v(v0, type = "var", x = xl, check.args = FALSE)
 	
 	## Run TMCCA
 	out <- if (optim == "bca") {
-		mcca.cor.bca(x = x, v = v0, w = wl, ortho = cnstr,
+		mcca.cor.bca(x = xl, v = v0, w = wl, ortho = cnstr,
 		sweep = sweep, maxit = maxit, tol = tol, verbose = verbose)
 	} else { 
-		mcca.gradient.scale(x = x, v = v0, w = wl, 
+		mcca.gradient.scale(x = xl, v = v0, w = wl, 
 			scope = "block", type = "var", maxit = maxit, 
 			tol = tol, verbose = verbose)
 	}
