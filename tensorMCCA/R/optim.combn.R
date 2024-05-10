@@ -8,10 +8,9 @@ if (m == 2) {
 	a <- matrix(0, m, m)
 	for (i in 1:m)
 	for (j in 1:m)
-		a[i,j] <- w[1,1] * sum(score[,1,i] * score[,1,i]) +
-			w[1,2] * sum(score[,1,i] * score[,2,j]) +
-			w[2,1] * sum(score[,2,j] * score[,1,i]) +
-			w[2,2] * sum(score[,2,j] * score[,2,j])
+		a[i,j] <- w[1,1] * sum(score[,1,i]^2) +
+			(w[1,2] + w[2,1]) * sum(score[,1,i] * score[,2,j]) +
+			w[2,2] * sum(score[,2,j]^2)
 	idx <- arrayInd(which.max(a), dim(a))
 	return(list(idx = c(idx), sign = c(1,1), objective = a[idx]/n))
 } 
