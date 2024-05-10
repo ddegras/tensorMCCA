@@ -23,6 +23,9 @@ objective <- numeric(maxit + 1L)
 objective[1] <- objective.internal(x, v, w)
 if (verbose) 
 	cat("\nIteration", 0, "Objective", objective[1])
+	
+## The next two lines assume that the TMCCA starting point 
+## is feasible, which is enforced in mcca.cor
 vbest <- v
 objective.best <- objective[1]
 
