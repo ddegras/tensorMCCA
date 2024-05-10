@@ -127,7 +127,8 @@ for (i in 1:m) {
 		vx[[i]] <- t(svdx$v)		
 	}
 }
-rm(xmat, svdx)
+if (any(reduce))	
+	rm(xmat, svdx)
 
 
 
@@ -167,7 +168,7 @@ for (i in 1:m) {
 				xj <- xj - xbar[[j]]
 		}
 		svdij <- tryCatch(
-			supressWarnings(svds(tcrossprod(xi, xj), k = 1)), 
+			suppressWarnings(svds(tcrossprod(xi, xj), k = 1)), 
 			error = function(e) svd(tcrossprod(xi, xj), 1, 1))
 		a[[i]][,j] <- if (reduce[i]) {
 			ux[[i]] %*% svdij$u } else svdij$u	
