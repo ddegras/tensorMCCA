@@ -19,19 +19,19 @@ if (objective == "cor" && scale == "global")
 	stop(paste("Argument values 'objective = cor'", 
 		"and 'scale = global' are incompatible."))
 
-## Search method in combinatorial optimization
-optim <- if (is.null(optim)) {
-	ifelse(m <= 5, "exact", "greedy")
-} else {
-	match.arg(optim, c("exact", "greedy")) 
-}
-
 ## Data dimensions
 m <- length(x)
 dimfun <- function(x) if (is.vector(x)) c(1,length(x)) else dim(x)
 dimx <- lapply(x, dim) 
 p <- lapply(dimx, function(idx) idx[-length(idx)]) 
 n <- tail(dimx[[1]], 1)
+
+## Search method in combinatorial optimization
+optim <- if (is.null(optim)) {
+	ifelse(m <= 5, "exact", "greedy")
+} else {
+	match.arg(optim, c("exact", "greedy")) 
+}
 
 ## Objective weights
 if (is.null(w)) {
