@@ -7,8 +7,6 @@ mcca.cor <- function(x, r = 1L, w = 1, ortho = c("score", "weight"),
 ## Check arguments
 test <- check.arguments(x = x, w = w, 
 	v = if (is.list(init)) init else NULL)
-eps <- 1e-14
-# r0 <- r 
 r <- as.integer(r)
 stopifnot(r > 0)
 
@@ -86,8 +84,12 @@ if (identical(init, "cca")) {
 	}
 } else if (identical(init, "svd")) {
 	init.args <- list(objective = "cor")
+	if (test) {
+	names. <- intersect(names(control$init), c("k"))
+	init.args[names.] <- control$init[names.]
+	}
 } else if (identical(init, "random")) { 
-	init.args <- list(objective = "cor")
+	init.args <- list(objective = "cor", scope = "block")
 }
 
 ## Create output objects 
@@ -143,13 +145,13 @@ for (l in 1:r) {
 	if (any(xzero)) xl <- xl[xnzero]
 	wl <- w[xnzero, xnzero]
 
-	## Drop singleton dimensions
-	dimxl <- vector("list", sum(xnzero))
-	for (i in seq_along(xl)) {
-		dimxl[[i]] <- dim(xl[[i]])
-		if (is.null(dimxl[[i]]) || all(dimxl[[i]] > 1)) next
-		dim(xl[[i]]) <- drop(dimxl[[i]])
-	}
+	# ## Drop singleton dimensions
+	# dimxl <- vector("list", sum(xnzero))
+	# for (i in seq_along(xl)) {
+		# dimxl[[i]] <- dim(xl[[i]])
+		# if (is.null(dimxl[[i]]) || all(dimxl[[i]] > 1)) next
+		# dim(xl[[i]]) <- drop(dimxl[[i]])
+	# }
 
 	## Trivial case: all datasets equal to zero
 	if (all(xzero)) {
@@ -206,20 +208,21 @@ for (l in 1:r) {
 	global.score[,l] <- rowMeans(block.score[,xnzero,l])	
 	iters[l] <- out$iters	
 	
-	## Post-process canonical weights
-	for (i in seq_along(xl)) {
-		dimxli <- dimxl[[i]]
-		if (is.null(dimxli) || all(dimxli > 1)) next
-		vil <- vector("list", length(dimxli))
-		vil[dimxli == 1] <- list(1)
-		vil[dimxli > 1] <- out$v[[i]]		
-		out$v[[i]] <- vil		
-	}
+	# ## Post-process canonical weights
+	# for (i in seq_along(xl)) {
+		# dimxli <- dimxl[[i]]
+		# if (is.null(dimxli) || all(dimxli > 1)) next
+		# vil <- vector("list", length(dimxli))
+		# vil[dimxli == 1] <- list(1)
+		# vil[dimxli > 1] <- out$v[[i]]		
+		# out$v[[i]] <- vil		
+	# }
 	
 	## Transform back canonical weights to original search space 
 	if (ortho == "weight" && l > 1) {
 		out$v <- tnsr.rk1.mat.prod(v = out$v, 
-			mat = ortho.cnstr$mat[xnzero], modes = ortho.cnstr$modes[xnzero], 
+			mat = ortho.cnstr$mat[xnzero], 
+			modes = ortho.cnstr$modes[xnzero], 
 			transpose.mat = TRUE)
 	}
 	v[xnzero,l] <- out$v
