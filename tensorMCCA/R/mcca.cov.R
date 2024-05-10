@@ -8,8 +8,8 @@ mcca.cov <- function(x, r = 1L, w = NULL, scope = c("block", "global"),
 ## Check arguments
 test <- check.arguments(x = x, w = w, 
 	v = if (is.list(init)) init else NULL)
-eps <- 1e-14
 r <- as.integer(r)
+stopifnot(r > 0)
 
 ## Data dimensions
 m <- length(x)
@@ -90,13 +90,18 @@ if (identical(init, "cca")) {
 		scope = scope, optim = NULL)
 	if (test) {
 		names. <- intersect(names(control$init), 
-			c("k", "scope", "optim"))
+			c("k", "optim", "maxit", "tol"))
 		init.args[names.] <- control$init[names.]
 	}
 } else if (identical(init, "svd")) {
 	init.args <- list(objective = "cov", scope = scope)
+	if (test) {
+		names. <- intersect(names(control$init), 
+			c("k", "optim", "maxit", "tol"))
+		init.args[names.] <- control$init[names.]
+	}
 } else if (identical(init, "random")) {
-	init.args <- list(objective = "cov")
+	init.args <- list(objective = "cov", scope = scope)
 }
 
 ## Create output objects 
@@ -123,7 +128,7 @@ if (is.character(init)) {
 for (l in 1:r) {	
 	
 	if (verbose) cat("\n\nMCCA: Component", l, "\n")
-
+	
 	## Create copy of original data for centering and deflating 
 	xl <- x
 	for (i in uncentered) 
@@ -165,13 +170,13 @@ for (l in 1:r) {
 			next else break
 	}
 
-	## Drop singleton dimensions
-	dimxl <- vector("list", sum(xnzero))
-	for (i in seq_along(xl)) {
-		dimxl[[i]] <- dim(xl[[i]])
-		if (is.null(dimxl[[i]]) || all(dimxl[[i]] > 1)) next
-		dim(xl[[i]]) <- drop(dimxl[[i]])
-	}
+	# ## Drop singleton dimensions
+	# dimxl <- vector("list", sum(xnzero))
+	# for (i in seq_along(xl)) {
+		# dimxl[[i]] <- dim(xl[[i]])
+		# if (is.null(dimxl[[i]]) || all(dimxl[[i]] > 1)) next
+		# xl[[i]] <- drop(xl[[i]])
+	# }
 	
 	## Set canonical weights for datasets equal to zero
 	for (i in which(xzero)) 
@@ -193,6 +198,7 @@ for (l in 1:r) {
 		init.args$x <- xl
 		if (init %in% c("cca", "svd")) 
 			init.args$w <- wl	
+		# if (l == r) debug(mcca.init)
 		v0 <- do.call(mcca.init, init.args)
 	} else if (is.list(init)) {
 		v0 <- if (is.vector(init)) {
@@ -236,23 +242,26 @@ for (l in 1:r) {
 	block.score[,,l] <- out$score
 	global.score[,l] <- rowMeans(block.score[,,l]) 
 	iters[l] <- out$iters
-	
-	## Post-process canonical weights
-	for (i in seq_along(xl)) {
-		dimxli <- dimxl[[i]]
-		if (is.null(dimxli) || all(dimxli > 1)) next
-		vil <- vector("list", length(dimxli))
-		vil[dimxli == 1] <- list(1)
-		vil[dimxli > 1] <- out$v[[i]]		
-		out$v[[i]] <- vil		
-	}
+
+	# ## Post-process canonical weights
+	# for (i in seq_along(xl)) {
+		# dimxli <- dimxl[[i]]
+		# if (length(dimxli) <= 2 || all(dimxli > 1)) next
+		# vil <- vector("list", length(dimxli))
+		# vil[dimxli == 1] <- list(1)
+		# vil[dimxli > 1] <- out$v[[i]]		
+		# out$v[[i]] <- vil		
+	# }	
 	
 	## Transform back canonical weights to original search space 
 	if (l > 1 && ortho == "weight" && scope == "block") {
 		out$v <- tnsr.rk1.mat.prod(v = out$v, 
-			mat = ortho.cnstr$mat[xnzero], modes = ortho.cnstr$modes[xnzero], 
+			mat = ortho.cnstr$mat[xnzero], 
+			modes = ortho.cnstr$modes[xnzero], 
 			transpose.mat = TRUE)
 	}	
+	
+	
 	v[xnzero,l] <- out$v
 	
 	## Check orientation of canonical weights (can the objective be
