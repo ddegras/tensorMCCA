@@ -45,8 +45,8 @@ for (it in 1:maxit) {
 	for (ii in 1:m) { 	
 		i <- idxi[ii]	
 		# if (xzero[i]) next
-		vprev <- v # DEBUG
-		objprev <- obj
+		# vprev <- v # DEBUG
+		# objprev <- obj
 		## Calculate the scores <X_jt, v_j> 
 		## After the first algorithm iteration (it = 1), in each 
 		## iteration of the i loop, only the inner products associated 
@@ -68,8 +68,8 @@ for (it in 1:maxit) {
 		## Update canonical vectors
 		v[[i]] <- optim.block.cov(v[[i]], a, b, ortho[i,], maxit, tol)
 		
-		obj <- objective.cov(x,v,w) # DEBUG
-		if (obj < objprev) stop() # DEBUG
+		# obj <- objective.cov(x,v,w) # DEBUG
+		# if (obj < objprev) stop() # DEBUG
 	}								
 	lastidx <- idxi[m]
 	
