@@ -16,7 +16,7 @@
 
 objective.internal <- function(x, v, w)
 {
-n <- tail(dim(x[[1]]), 1) 
+n <- tail(dimfun(x[[1]]), 1) 
 score <- canon.scores(x, v)
 r <- NCOL(v)
 if (r == 1) 
