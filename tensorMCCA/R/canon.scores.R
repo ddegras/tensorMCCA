@@ -1,20 +1,19 @@
-canon.scores <- function(x, v, check.args = TRUE)
+canon.scores <- function(x, v)
 {
 if (!is.list(x)) x <- list(x)
 if (!is.list(v)) v <- list(v)
-if (check.args) {
-	stopifnot(is.vector(v) || is.matrix(v))
-	test1 <- (is.vector(v) && length(v) == length(x))
-	test2 <- (is.matrix(v) && nrow(v) == length(x))
-	if (!(test1 || test2)) {
-		stop(paste("'v' must either be a vector of type 'list'",
-		"having same length as 'x' or a matrix of type 'list'",
-		"whose number of rows equals the length of 'x'")) }
-}
+stopifnot(is.vector(v) || is.matrix(v))
+test1 <- (is.vector(v) && length(v) == length(x))
+test2 <- (is.matrix(v) && nrow(v) == length(x))
+if (!(test1 || test2)) {
+	stop(paste("'v' must either be a vector of type 'list'",
+	"having same length as 'x' or a matrix of type 'list'",
+	"whose number of rows equals the length of 'x'")) }
+
 m <- length(x)
-dimx <- lapply(x, dim)
+dimx <- lapply(x, dimfun)
 n <- tail(dimx[[1]], 1) 
-d <- sapply(dimx, length) - 1  
+d <- pmax(sapply(dimx, length) - 1L, 1L)  
 r <- NCOL(v)
 if (r == 1) {
 	score <- matrix(nrow = n, ncol = m)

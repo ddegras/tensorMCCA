@@ -2,14 +2,14 @@
 \alias{check.arguments}
 
 \title{
-Check Data and Initial Canonical Tensors for Multiple CCA
+Check Data and Starting Points for TMCCA
 }
 
 \description{
 %%  ~~ A concise (1-5 lines) description of what the function does. ~~
 }
 
-\usage{check.arguments(x, v = NULL)}
+\usage{check.arguments(x, v = NULL, w = NULL)}
 
 \arguments{
   \item{x}{
@@ -18,6 +18,9 @@ Data: list of arrays.
 \item{v}{
 Canonical vectors (optional): list of lists of vectors/matrices. 
 }
+\item{w}{Objective weight matrix.
+	
+}
 }
 
 \details{
@@ -25,7 +28,7 @@ Canonical vectors (optional): list of lists of vectors/matrices.
 }
 
 \value{
-0 in case of successful test, error message otherwise
+The function invisibly returns NULL. It is used for its side-effect of producing an error message when the arguments are incorrectly specified. 
 }
 
 \examples{

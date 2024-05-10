@@ -94,9 +94,10 @@ if (all(bzero)) {
 	v <- if (is.null(cc)) {
 		P[,1] } else { as.vector(qq %*% P[,1]) }
 	return(list(v))
-} else if (any(bzero)) {
+} 
+if (any(bzero)) {
 	b <- b[!bzero]
-	P <- P[,!bzero]
+	P <- P[,!bzero,drop=FALSE]
 	delta <- delta[!bzero]
 }
 
@@ -244,7 +245,8 @@ return(v)
 ######################################################
 # Maximize (1/n) sum_{t=1:n} < v,A(t) >^2 + 2 < v,B > 
 # subject to < v,v > = 1 and < C(l),v > = 0 for l=1,2,...
-# with A(t), B, v 3rd order tensor arrays, v rank-1
+# with A(t), B, C(l), v 3rd order tensor arrays, 
+# v rank-1
 ######################################################
 
 
@@ -259,7 +261,8 @@ optim3D.cov <- function(v, a, b, cc, maxit = 1000, tol = 1e-6)
 	
 ## Trivial case
 if (all(a == 0) && is.null(cc)) 
-	return(tnsr3d.rk1(b, scale = TRUE, maxit, tol))
+	return(tnsr3d.rk1(x = b, scale = TRUE, init = v, 
+		maxit = maxit, tol = tol))
 
 ## Data dimensions
 p <- dim(b)

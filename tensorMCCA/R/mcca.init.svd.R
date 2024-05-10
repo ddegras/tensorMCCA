@@ -1,56 +1,126 @@
 mcca.init.svd <- function(x, w = NULL, objective = c("cov", "cor"), 
-	scale = c("block", "global"), center = TRUE)
+	scope = c("block", "global"), k = NULL, maxit = 100, tol = 1e-4)
 {
+	
+################
+# Preprocessing
+################
+
 test <- check.arguments(x, w = w)
 objective <- match.arg(objective) 
-scale <- match.arg(scale)
+scope <- match.arg(scope)
 eps <- 1e-14
-w <- if (is.null(w)) {
-	matrix(1/m^2, m, m) 
-} else {
-	(w + t(w)) / (2 * sum(w))
-}
 
 ## Data dimensions
 m <- length(x) # number of datasets 
-dimfun <- function(x) if (is.vector(x)) c(1,length(x)) else dim(x)
 dimx <- lapply(x, dimfun) # full data dimensions
+d <- sapply(dimx, length) - 1L
+p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
+p[d == 0] <- 1
 n <- tail(dimx[[1]], 1)
-p <- lapply(dimx, function(idx) idx[-length(idx)]) 
-pp <- sapply(p, prod)
-cumpp <- cumsum(c(0,pp))
 
+## Truncation order in SVD
+pp <- sapply(p, prod)
+if (!is.null(k)) {
+	k <- as.integer(k)
+	stopifnot(all(k > 0))
+	k <- rep_len(k, m)
+	k <- pmin(k, pp, n)
+} else {
+	k <- pmin(pp, n)
+}
+
+## Objective weights
+if (is.null(w)) {
+	w <- 1 - diag(m)
+} else if (length(w) == 1) {
+	w <- matrix(1, m, m)
+}
+w <- (w + t(w)) / (2 * sum(w)) 
+
+## Check for constant datasets
+constant <- sapply(x, function(a) all(a == a[1]))
+w[, constant] <- w[constant,] <- 0
+wzero <- apply(w == 0, 2, all)
+wnzero <- which(!wzero)
+
+## Trivial case: all datasets have associated weights zero 
+if (all(wzero)) {
+	v <- relist(lapply(unlist(p), numeric), p)
+	return(v)
+}
+
+## Remove any constant dataset
+if (any(wzero)) {
+	vfull <- vector("list", m)
+	for (i in which(wzero)) 
+		vfull[[i]] <- lapply(p[[i]], numeric)
+	d <- d[wnzero]
+	k <- k[wnzero]
+	m <- length(wnzero)
+	p <- p[wnzero]
+	pp <- pp[wnzero]
+	w <- w[wnzero, wnzero]
+	x <- x[wnzero]
+}
+cumpp <- c(0, cumsum(pp))
+
+
+## Calculate data means
+xbar <- vector("list", m)
+uncentered <- logical(m)
+for (i in 1:m) {
+	xbar[[i]] <- if (d[i] == 0L) { 
+		mean(x[[i]])
+    } else {
+		as.vector(rowMeans(x[[i]], dims = d[i]))
+	}
+	uncentered[i] <- any(abs(xbar[[i]]) > eps)
+}
+
+
+
+#######################################
+# Perform SVD/EVD of concatenated data 
+#######################################
 
 ## Canonical weights 
 v <- vector("list", m)
 
 ## Unfold data along last mode (individuals/objects)
 ## and transform matricized data by SVD if needed 
-test <- (objective == "cor" || all(pp > n))
-if (test) svdx <- vector("list", m)
-xmat <- x
+reduce <- (k < pmin(pp,n)) | (k <= pp/2) | (objective == "cor")
+u <- xmat <- vector("list", m)
 for (i in 1:m) {
+	xmat[[i]] <- x[[i]]
 	dim(xmat[[i]]) <- c(pp[i], n)
-	if (center)
-		xmat[[i]] <- xmat[[i]] - rowMeans(xmat[[i]])	
-	if (test) {
-		svdx[[i]] <- svd(xmat[[i]])
-		pos <- (svdx[[i]]$d > max(svdx[[i]]$d[1] * 1e-8, eps))
-		svdx[[i]]$u <- svdx[[i]]$u[,pos,drop=FALSE]
-		svdx[[i]]$d <- svdx[[i]]$d[pos]
-		svdx[[i]]$v <- svdx[[i]]$v[,pos,drop=FALSE]
-		xmat[[i]] <- switch(objective, 
-			cor = t(svdx[[i]]$v)	, 
-			cov = t(svdx[[i]]$v) * svdx[[i]]$d)
+	if (uncentered[i])
+		xmat[[i]] <- xmat[[i]] - xbar[[i]]	
+	if (reduce[i]) {
+		svdx <- svd(xmat[[i]])
+		pos <- (svdx$d > max(1e-8 * svdx$d[1], 1e-14))
+		svdx$u <- svdx$u[,pos,drop=FALSE]
+		svdx$d <- svdx$d[pos]
+		svdx$v <- svdx$v[,pos,drop=FALSE]
+		if (objective == "cov") {
+			u[[i]] <- svdx$u
+			xmat[[i]] <- t(svdx$v) * svdx$d			
+		} else if (objective == "cor") {
+			u[[i]] <- sweep(u[[i]], 2, svdx$d, "/")
+			xmat[[i]] <- t(svdx$v)
+		} 
 	}	
 }
-nrowx <- sapply(xmat, nrow) # numbers of rows in transformed datasets
+suppressWarnings(rm(svdx))
+nrowx <- sapply(xmat, NROW) # numbers of rows in transformed datasets
 cumnrowx <- cumsum(c(0,nrowx))
 
 ## Check separability of objective weights
-if (qr(w)$rank == 1) {
-	# Separable case: concatenate data + SVD
-	a <- colSums(w) # w = aa'
+sepw <- separable(w, objective == "cor")
+
+# Separable case: concatenate data + SVD
+if (sepw$separable) {
+	a <- sepw$a # w = aa'
 	if (!all(a == a[1])) {
 		for (i in 1:m) 
 			xmat[[i]] <- a[i] * xmat[[i]]
@@ -60,7 +130,7 @@ if (qr(w)$rank == 1) {
 		error = function(e) svd(xmat, 1, 0)$u)
 	rm(xmat)
 } else {
-	# Nonseparable case: form pseudo-covariance matrix + EVD
+# Nonseparable case: form pseudo-covariance matrix + EVD
 	covx <- matrix(0, cumnrowx[m+1], cumnrowx[m+1])
 	for (i in 1:m) {
 		idxi <- (cumnrowx[i]+1):cumnrowx[i+1]
@@ -77,44 +147,68 @@ if (qr(w)$rank == 1) {
 	rm(covx)
 }
 
-## Transform back singular/eigen-vector in original space if needed 
-if (test) {
-	phitmp <- phi
-	phi <- numeric(cumpp[m+1])
-	for (i in 1:m) {
-		idxfull <- (cumpp[i]+1):cumpp[i+1]
-		idxsmall <- (cumnrowx[i]+1):cumnrowx[i+1]
-		phi[idxfull] <- switch(objective,
-			cov = svdx[[i]]$u %*% phitmp[idxsmall],
-			cor = svdx[[i]]$u %*% (phitmp[idxsmall] / svdx[[i]]$d)
-		)
-	}
-	rm(svdx)	
+## Map back singular/eigen-vector to original space if needed 
+if (any(reduce)) {
+	phi <- split(phi, rep(1:m, nrowx))
+	for (i in which(reduce)) 
+		phi[[i]] <- u[[i]] %*% phi[[i]]
+	phi <- unlist(phi)
 }
 
-## Split eigenvector according to dataset dimensions, tensorize, 
-## and perform rank-1 approximation by HOSVD
-covblock <- (objective == "cov" && scale == "block")
+
+
+#######################################################
+# Split eigenvector according to dataset dimensions, 
+# tensorize, and perform rank-1 approximation by HOSVD
+#######################################################
+
+covblock <- (objective == "cov" && scope == "block")
 for (i in 1:m) {
 	idxi <- (cumpp[i]+1):cumpp[i+1]
 	phii <- array(phi[idxi], p[[i]])
-	svdi <- hosvd(phii, 1)
-	v[[i]] <- lapply(svdi$factors, as.numeric) 
-	if (!covblock)
-		v[[i]][[1]] <- v[[i]][[1]] * as.numeric(svdi$core)
+	v[[i]] <- tnsr.rk1(phii, scale = covblock, 
+		maxit = maxit, tol = tol)
 }
 
-## Scale canonical weights and reorient as needed
-if (!covblock) {
-	v <- if (objective == "cov") {
-		scale.v(v, scale = scale, check.args = FALSE)
-	} else scale.v(v, "var", scale, x, FALSE)
+## Scale canonical weights 
+if (objective == "cor") {
+	v <- scale.v(v, type = "var", x = x, check.args = FALSE)
+} else if (objective == "cov" && scope == "global") {
+	v <-  scale.v(v, scope = "global", check.args = FALSE)
 }
-score <- canon.scores(x, v, FALSE)
-if (center) score <- score - matrix(colMeans(score), n, m, TRUE)
-flip <- reorient(score, w)$flip
-for (i in which(flip))
-	v[[i]][[1]] <- (-v[[i]][[1]])
+
+## Calculate scores
+score <- canon.scores(x, v)
+if (any(uncentered)) 
+	score <- sweep(score, 2L, colMeans(score), check.margin = FALSE)
+
+## Find best rescaling or orientation for weights
+if (objective == "cov" && scope == "global") {
+	score <- canon.scores(x, v)
+	s <- sqrt(m) * eigen(w * cov(score), TRUE)$vectors[,1]
+	sgns <- sign(s)
+	for (i in 1:m) {
+		if (d[i] <= 1) {
+			si <- s[i]
+		} else {
+			si <- rep(abs(s[i])^(1/d[i]), d[i])
+			si[1] <- si[1] * sgns[i]
+		}
+		v[[i]] <- mapply("*", x = v[[i]], y = si, SIMPLIFY = FALSE)
+	}
+} else {
+	flip <- reorient(score, w)$flip
+	for (i in which(flip))
+		v[[i]][[1]] <- (-v[[i]][[1]])
+}
+
+## Put back any canonical weights for constant datasets
+if (any(wzero)) {
+	vfull[wnzero] <- v
+	v <- vfull
+	if (objective == "cov" && scope == "global")
+		v <- scale.v(v, "norm", "global")
+}
 
 v
 }

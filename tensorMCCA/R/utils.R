@@ -1,3 +1,16 @@
+##############################
+# Modified dimension function 
+##############################
+
+# Consider vector of length n as 1-by-n matrix
+
+dimfun <- function(x) if (is.vector(x)) length(x) else dim(x)
+# {
+# dimx <- dim(x)
+# if (length(dimx) <= 1) dimx <- c(1,length(x)) 
+# dimx
+# }
+
 
 ################################################
 # Function to calculate norms of rank-1 tensors
@@ -27,14 +40,17 @@ sqrt(colMeans(out))
 #######################################
 
 
-tnsr.rk1.cp <- function(v, v2 = NULL)
+tnsr.rk1.cp <- function(v1, v2 = NULL)
 {
-stopifnot(is.list(v) && (is.null(v2) || is.list(v2)))
+stopifnot(is.list(v1))
+stopifnot(is.null(v2) || is.list(v2))
+stopifnot(is.null(v2) || length(v1) == length(v2))
+
 cpfun <- function(x, y) sum(x * y)
 if (is.null(v2)) {
-	if (!is.matrix(v)) v <- as.matrix(v)
-	m <- nrow(v)
-	r <- ncol(v)
+	m <- NROW(v1)
+	r <- NCOL(v1)
+	if (!is.matrix(v1)) dim(v1) <- c(m,r)
 	out <- array(dim = c(r, r, m))
 	for (i in 1:m) {
 		for (k in 1:r) {
@@ -45,12 +61,11 @@ if (is.null(v2)) {
 		}
 	}
 } else {
-	stopifnot(length(v) == length(v2))
-	m <- length(v)
+	m <- length(v1)
 	out <- numeric(m)
 	for (i in 1:m)
-		out[i] <- prod(mapply(cpfun, v[[i]], v2[[i]]))
-	dim(out) <- dim(v)
+		out[i] <- prod(mapply(cpfun, v1[[i]], v2[[i]]))
+	dim(out) <- dim(v1)
 }
 out
 }
@@ -76,7 +91,7 @@ for (k in 2:d) {
 out
 }
 
-## Regular outer prodict of vectors
+## Regular outer product of vectors
 outer.prod <- function(v) {
 stopifnot(is.list(v)) 
 d <- length(v)
@@ -100,17 +115,11 @@ out
 tnsr.rk1.expand <- function(v)
 {
 stopifnot(is.list(v))
-single <- is.numeric(v[[1]])
-if (single) v <- list(v)
-for (i in seq_along(v)) {
-	# dims <- sapply(v[[i]], length)
-	v[[i]] <- outer.prod(v[[i]])
-	# v[[i]] <- if (length(dims) == 1) {
-		# unlist(v[[i]]) } else {
-		# array(Reduce(kronecker, rev(v[[i]])), dims)	}
-}
-if (single) v <- unlist(v, FALSE)
-v	
+if (is.numeric(v[[1]])) 
+	return(outer.prod(v))
+out <- lapply(v, outer.prod)
+dim(out) <- dim(v)
+out
 }
 
 

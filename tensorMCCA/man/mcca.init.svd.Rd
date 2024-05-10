@@ -1,23 +1,26 @@
 \name{mcca.init.svd}
 \alias{mcca.init.svd}
 
-\title{Initialize Canonical Tensors by SVD (Quick Rank 1)}
+\title{Initialize TMCCA Optimization by SVD}
 
 \description{
 %%  ~~ A concise (1-5 lines) description of what the function does. ~~
 }
 
 \usage{
-mcca.init.svd(x, objective = c("cov", "cor"), cnstr = c("block", "global"), 
-	center = TRUE, balance = TRUE)
+mcca.init.svd(x, w = NULL, objective = c("cov", "cor"), scope = c("block", 
+    "global"), k = NULL, maxit = 100, tol = 1e-04) 
 }
 
 \arguments{
-\item{x}{Data: list of arrays. All arrays must have the same number of dimensions in their last mode (= individual or object).}
-\item{objective}{Maximize the sum of covariances or sum of correlations?}
-\item{cnstr}{Scaling of canonical tensors: block constraints (i.e. for each dataset) or global constraints?}
-\item{center}{Center the data?}
-\item{balance}{Should the vectors making up the rank-1 tensors have equal norm?}
+\item{x}{List of data arrays. All arrays must have the same value for their last dimension (= individual or object).}
+\item{w}{Matrix of weights for pairs of datasets in objective function.}
+\item{objective}{Maximize the sum of canonical covariances or correlations?}
+\item{scope}{Apply scaling constraints to canonical weights separately for each dataset (\code{block}) or across datasets (\code{global})?}
+\item{k}{Rank of truncated SVD to approximate each dataset. Default = \code{NULL} (full SVD).}
+\item{maxit}{Maximum number of iterations in rank-1 tensor approximation.}
+\item{tol}{Numerical tolerance in rank-1 tensor approximation.}
+
 }
 
 \details{

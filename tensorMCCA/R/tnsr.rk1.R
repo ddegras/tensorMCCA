@@ -6,59 +6,72 @@
 ##############################################
  
 
-tnsr.rk1 <- function(x, scale = FALSE, maxit = 100, tol = 1e-6)
+tnsr.rk1 <- function(x, scale = FALSE, init = NULL, maxit = 100, 
+	tol = 1e-6)
 {
 stopifnot(is.numeric(x))
-# stopifnot(maxit > 0 && tol >= 0)
-d <- length(dim(x)) 
-if (d <= 1) {
-	if (scale) {
-		nrm <- sqrt(sum(x^2))
-		if (nrm > 0) {
-			return(list(x / nrm))
-		} else {
-			return(list(rep.int(0, length(x))))
-		}
-	} else {
-		return(list(x))
-	}
-}
-if (all(x == 0))
-	return(lapply(dim(x), numeric))
+d <- max(1L, length(dim(x))) 
 
-if (d == 3L) { return(tnsr3d.rk1(x, scale, maxit, tol)) }
-svdx <- hosvd(x, 1) 
-nrmv <- if (scale) 1 else as.numeric(svdx$core)
-v <- svdx$factors
-if (d == 2L || maxit == 0) {
-	if (scale) {
-		return(v)
+## Trivial case: null tensor
+if (all(x == 0)) {
+	p <- if (is.vector(x)) length(x) else dim(x)
+	return(lapply(p, numeric))
+}	
+
+## 1D case
+if (d == 1L) {
+	nrmv <- if (scale) sqrt(sum(x^2)) else 1
+	v <- list(x / nrmv)
+	return(v)
+}
+
+## 2D case
+if (d == 2L) {
+	svdx <- if (all(dim(x) > 2)) svds(x, 1) else svd(x, 1, 1)
+	s <- if (scale) 1 else sqrt(svdx$d[1])
+	v <- list(svdx$u * s, svdx$v * s) 
+	return(v)
+}
+
+## 3D case
+if (d == 3L) 
+	return(tnsr3d.rk1(x, scale, init, maxit, tol))
+
+## Initialization
+if (is.null(init)) {
+	svdx <- hosvd(x, 1) 
+	v <- svdx$factors
+	if (!scale) {
+		s <- as.numeric(svdx$core)^(1/d)
+		v <- lapply(v, "*", y = s) # vector balancing
+	}
+} else {
+	v <- init
+	nrmv <- sapply(v, function(x) sqrt(sum(x^2)))
+	p <- dim(x)
+	if (any(nrmv == 0)) {
+		v <- lapply(p, numeric) 
 	} else {
-		return(lapply(v, "*", y = nrmv^(1/d)))		
+		if (!scale) nrmv <- nrmv / prod(nrmv)^(1/d) # vector balancing
+		v <- mapply("/", x = v, y = nrmv, SIMPLIFY = FALSE)
 	}
 }
-if (!scale) v[[d]] <- v[[d]] * nrmv
-kronv <- outer.prod.nodim(v)
-# kronv <- Reduce(kronecker, v)
-for (it in 1:maxit) {
-	nrmv.old <- nrmv
-	kronv.old <- kronv
+objective <- tnsr.vec.prod(x, v, 1:d)
+iters <- if (maxit == 0) NULL else (1:maxit)
+for (it in iters) {
+	objective.prev <- objective
 	for (k in 1:d) {
 		v[[k]] <- tnsr.vec.prod(x, v[-k], (1:d)[-k])
 		nrmv <- sqrt(sum(v[[k]]^2))
-		if (k < d || scale) v[[k]] <- v[[k]] / nrmv
+		v[[k]] <- v[[k]] / nrmv
 	}
-	kronv <- outer.prod.nodim(v)
-	# kronv <- Reduce(kronecker, v)
-	e <- sqrt(sum((kronv - kronv.old)^2))
-	if (e <= tol * max(nrmv, nrmv.old, 1)) break
+	objective <- nrmv^2
+	if (objective <= (1+tol) * objective.prev) break
 }
 
-if (scale) {
-	return(v)
-}
-s <- c(rep.int(nrmv^(1/d), d - 1), nrmv^(1/d - 1))
-for (k in 1:d) v[[k]] <- v[[k]] * s[k] 
+if (scale) return(v)
+s <- nrmv^(1/d)
+v <- lapply(v, "*", y = s)
 v	
 }
 
@@ -145,78 +158,78 @@ v
 # by a rank-1 tensor
 ##############################################
 
-tnsr3d.rk1 <- function(x, scale = FALSE, maxit = 100, tol = 1e-6)
+tnsr3d.rk1 <- function(x, scale = FALSE, init = NULL, maxit = 100, 
+	tol = 1e-6)
 {
 stopifnot(is.array(x) && length(dim(x)) == 3)
 p <- dim(x)
 if (all(x == 0)) {
 	if (scale) {
-		return(lapply(p, 
-			function(xx) rep.int(1/sqrt(length(xx)), length(xx))))
+		return(lapply(p, function(xx) rep(1/sqrt(xx), xx)))
 	} else {	
 		return(lapply(p, numeric))
 	}
 }
-v <- vector("list", 3)
 maxit <- as.integer(maxit)
 stopifnot(maxit >= 0)
+scalefun <- function(x) x / sqrt(sum(x^2))
 
-## Rank-1 HOSVD
-dim(x) <- c(p[1], p[2] * p[3]) 
-svdx <- if (all(dim(x) > 2)) {
-	svds(x, k = 1) 
-} else { 
-	svd(x, nu = 1, nv = 1)
-} 
-v[[1]] <- svdx$u
-s1 <- svdx$d
-svdx <- if (all(p[2:3] > 2)) {
-	svds(matrix(svdx$v, p[2], p[3]), k = 1) 
+## Initialization 
+if (is.null(init)) {
+	## Rank-1 HOSVD
+	v <- vector("list", 3)
+	dim(x) <- c(p[1], p[2] * p[3]) 
+	svdx <- if (all(dim(x) > 2)) {
+		svds(x, k = 1) 
+	} else { 
+		svd(x, nu = 1, nv = 1)
+	}
+	dim(x) <- p
+	v[[1]] <- svdx$u
+	s1 <- svdx$d
+	svdx <- if (all(p[2:3] > 2)) {
+		svds(matrix(svdx$v, p[2], p[3]), k = 1) 
+	} else {
+		svd(matrix(svdx$v, p[2], p[3]), nu = 1, nv = 1)
+	}
+	v[[2]] <- svdx$u
+	v[[3]] <- svdx$v
+	s2 <- svdx$d
+	if (!scale) 
+		v <- lapply(v, "*", y = (s1*s2)^(1/3))
 } else {
-	svd(matrix(svdx$v, p[2], p[3]), nu = 1, nv = 1)
+	stopifnot(length(init) == 3)
+	v <- init
+	nrmv <- sapply(v, function(x) sqrt(sum(x^2)))
+	s <- if (scale) nrmv else nrmv / prod(nrmv)^(1/3)
+	s[s == 0] <- 1
+	v <- mapply("/", x = v, y = nrmv, SIMPLIFY = FALSE)
 }
-v[[2]] <- svdx$u
-v[[3]] <- svdx$v
-s2 <- svdx$d
-nrmv <- if (scale) 1 else s1 * s2
-if (maxit == 0) {
-	if (scale) { return(v) } 
-	return(lapply(v, "*", nrmv^(1/3)))
-}
-if (scale) v[[3]] <- v[[3]] * nrmv
-kronv <- outer.prod.nodim(v)
-# kronv <- Reduce(kronecker, v)
+objective <- tnsr.vec.prod(x, v, 1:3)
 
-for (it in 1:maxit) {
-	kronv.old <- kronv
-	nrmv.old <- nrmv	
+iters <- if (maxit == 0) NULL else (1:maxit)
+for (it in iters) {
+	objective.prev <- objective	
 	dim(x) <- c(p[1] * p[2], p[3])
 	xv <- x %*% v[[3]]
 	dim(xv) <- c(p[1], p[2])
-	v[[1]] <- xv %*% v[[2]] 
-	v[[1]] <- v[[1]] / sqrt(sum(v[[1]]^2))
-	v[[2]] <- crossprod(xv, v[[1]]) 
-	v[[2]] <- v[[2]] / sqrt(sum(v[[2]]^2))
+	v[[1]] <- scalefun(xv %*% v[[2]])
+	v[[2]] <- scalefun(crossprod(xv, v[[1]]))
 	dim(x) <- c(p[1], p[2] * p[3])
 	xv <- crossprod(x, v[[1]])
 	dim(xv) <- p[2:3]
 	v[[3]] <- crossprod(xv, v[[2]]) 
-	nrmv <- sqrt(sum(v[[3]]^2))	
-	if (scale) {
-		v[[3]] <- v[[3]] / nrmv	
-		nrmv <- 1
-	}	
-	kronv <- outer.prod.nodim(v)	
-	# kronv <- Reduce(kronecker, v)
-	e <- sqrt(sum((kronv - kronv.old)^2)) 
-	if (e <= tol * max(nrmv, nrmv.old, 1)) break
+	objective <- sum(v[[3]]^2)
+	nrmv <- sqrt(objective)
+	v[[3]] <- v[[3]] / nrmv
+	if (objective < (1+tol) * objective.prev) break
 }
+s <- ifelse(scale, 1, nrmv^(1/3)) 
+v[[1]] <- as.vector(v[[1]]) * s 
+v[[2]] <- as.vector(v[[2]]) * s 
+v[[3]] <- as.vector(v[[3]]) * s 
 
-s <- nrmv^(c(1/3, 1/3, -2/3))
-for (k in 1:3) v[[k]] <- as.vector(v[[k]]) * s[k] 
-
-v	
-	
+v		
 }
 
 
@@ -241,6 +254,12 @@ tnsr.rk1.ortho <- function(v0, ortho, maxit, tol)
 m <- length(v0)
 d <- sapply(v0, length)
 if (is.null(ortho)) return(v0)
+stopifnot((NROW(ortho) == length(v0)))
+if (!is.matrix(ortho)) 
+	dim(ortho) <- c(length(ortho), 1)
+if (is.list(ortho[[1]]))
+	ortho <- tnsr.rk1.expand(ortho)
+for (i in 1:m) v0[[i]] <- lapply(v0[[i]], as.matrix)
 v <- v0
 cpfun <- function(x, y) sum(x * y) 
 

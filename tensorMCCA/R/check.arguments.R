@@ -2,6 +2,9 @@ check.arguments <- function(x, v = NULL, w = NULL)
 {
 ## Check argument types
 stopifnot(is.list(x))
+test <- all(sapply(x, is.numeric))
+if (!test)
+	stop("Components of 'x' must be numerical arrays.")
 if (!(is.null(v) || is.list(v)))
 	stop("Argument 'v' must be left unspecified (NULL) or be a list.")
 stopifnot(is.null(w) || is.numeric(w))
@@ -11,7 +14,7 @@ if (!(is.null(v) || length(x) == NROW(v)))
 	stop(paste("If specified, 'v' must be a vector of lists",
 	"of same length as 'x' or a matrix of lists with as many rows",
 	"as the length of 'x'."))
-dimx <- lapply(x, dim) # full data dimensions
+dimx <- lapply(x, dimfun) # full data dimensions
 m <- length(x)
 
 ## Check that all datasets have same number of instances/individuals
@@ -21,8 +24,8 @@ if (!all(n == n[1L]))
 		"the same dimension in the last mode."))
 
 ## Check that there are at least 2 datasets and 2 instances 
-if (length(x) < 2L)
-	stop("Make sure that 'x' has length at least 2 (number of datasets).")
+# if (length(x) < 2L)
+	# stop("Make sure that 'x' has length at least 2 (number of datasets).")
 if (n[1] < 2L) 
 	stop(paste("Make sure that the arrays in 'x'",
 		"have their last dimension at least 2 (number of instances)."))
@@ -34,10 +37,15 @@ if (any(test))
 
 ## Check optional argument 'v'
 if (length(v) > 0) {
+	if (NROW(v) != m) 
+		stop("Argument 'v' must have its number of rows (if matrix) ",
+			"or length (if vector) equal to the length of 'x'.")
 	r <- NCOL(v)
 	if (!is.matrix(v)) dim(v) <- c(m, r)
-	p <- lapply(dimx, function(idx) idx[-length(idx)]) 
-	d <- sapply(p, length)
+	d <- sapply(dimx, length) - 1L
+	p <- mapply(head, dimx, d)
+	p[d == 0] <- 1
+	d[d == 0] <- 1 
 	for (i in 1:m) {
 		for (l in 1:r) {
 			if (length(v[[i, l]]) != d[i])

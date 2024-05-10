@@ -6,10 +6,10 @@
 #########################################
 
 scale.v <- function(v, type = c("norm", "var"), 
-	scale = c("block", "global"), x = NULL, check.args = TRUE)
+	scope = c("block", "global"), x = NULL, check.args = TRUE)
 {
 type <- match.arg(type) 
-scale <- match.arg(scale)
+scope <- match.arg(scope)
 stopifnot(type == "norm" || !is.null(x))
 stopifnot(is.list(v))
 islist.v1 <- is.list(v[[1]])
@@ -38,7 +38,7 @@ for (i in 1:m) {
 	}
 }
 
-if (type == "norm" && scale == "block") {
+if (type == "norm" && scope == "block") {
 	## rescale each canonical vector by its norm
 	zero <- (nrmt < eps)
 	scalefun <- function(x,y) as.numeric(x) / y
@@ -51,7 +51,7 @@ if (type == "norm" && scale == "block") {
 			}
 		}
 	}
-} else if (type == "norm" && scale == "global") {
+} else if (type == "norm" && scope == "global") {
 	## rescale each canonical tensor by the same factor 
 	## in a way that its canonical vectors are balanced 
 	sl <- sqrt(colMeans(nrmt^2)) # grand scaling factor

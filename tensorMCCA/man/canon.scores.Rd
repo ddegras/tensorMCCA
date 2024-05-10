@@ -5,15 +5,16 @@
 Calculate Canonical Scores
 }
 \description{
-Calculate the canonical scores of observed individuals/objects for given datasets and canonical tensors. 
+Calculate the canonical scores of observed individuals/objects for given datasets and canonical weights. 
 }
 \usage{
 canon.scores(x, v)
 }
 
 \arguments{
-  \item{x}{list of data arrays.}
-  \item{v}{list of lists. Each sublist is a list of single vectors that specify a canonical tensor.}
+  \item{x}{List of data arrays.}
+  \item{v}{List of canonical weights in matrix format with as many rows as datasets and as many columns as canonical components. Typically the result of a call to \code{\link{mcca.cov}} or \code{\link{mcca.cor}}. Each list component is itself a 
+list of single vectors whose outer product is a rank-1 tensor of canonical weights.}
 }
 
 \details{
