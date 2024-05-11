@@ -45,11 +45,17 @@ for (it in 1:maxit) {
 		idxj <- if (it == 1 && ii == 1) { idxi[-1] 
 			} else if (ii == 1) { lastidx } else idxi[ii-1]
 		for (j in idxj) 
-			score[, j] <- tnsr.vec.prod(x[[j]], v[[j]], 1:d[j]) 
+			score[, j] <- if (d[j] == 0) {
+				x[[j]] * unlist(v[[j]])
+			} else {
+				tnsr.vec.prod(x[[j]], v[[j]], 1:d[j]) 
+			}
 		
 		## Set up linear program
 		a <- if (m == 1) { 
 			array(0, p[[i]]) 
+		} else if (d[i] == 0) {
+			sum(x[[i]] * (score[, -i, drop = FALSE] %*% w[-i, i])) / n
 		} else {
 			tnsr.vec.prod(x = x[[i]], modes = d[i] + 1L,
 				v = score[, -i, drop = FALSE] %*% (w[-i, i] / n))
