@@ -67,7 +67,7 @@ if (!is.null(v0)) {
 			cnstr <- set.ortho.mat(v = v[,1:(l-1)], 
 				modes = ortho.mode[, 1:(l-1), l])
 			v0[,l] <- tnsr.rk1.mat.prod(v = v0[,l],
-				mat = ortho.cnstr$mat, modes = ortho.cnstr$modes)
+				mat = cnstr$mat, modes = cnstr$modes)
 		} else {	
 			cnstr <- switch(ortho, 
 				weight = v[,1:(l-1),drop=FALSE],
