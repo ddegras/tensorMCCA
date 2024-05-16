@@ -1,7 +1,7 @@
 Package: tensorMCCA
 Type: Package
 Title: Tensor-Based Multiple Canonical Correlation Analysis
-Version: 2.0
+Version: 1.0
 Date: 2024-05-12
 Author: David Degras
 Maintainer: David Degras <david.degras@umb.edu>
