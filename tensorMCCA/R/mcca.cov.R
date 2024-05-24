@@ -32,18 +32,22 @@ w <- if (is.null(w)) {
 scope <- match.arg(scope)
 ortho <- match.arg(ortho)
 optim <- match.arg(optim)
+if (is.character(init)) 
+	init <- match.arg(init)
 sweep <- match.arg(sweep)
-if (is.character(init)) init <- match.arg(init)
-if (optim %in% c("grad.scale", "grad.rotate") && 
-	ortho == "score" && r > 1)
+if (optim %in% c("grad.scale", "grad.rotate") && r > 1 &&
+	(ortho == "score" || scope == "global"))
 	stop("The gradient-based methods do not support orthogonality ",
-	"constraints on canonical scores. If 'optim' is set to 'grad.scale' ",
-	"or 'grad.rotate', 'ortho' must be set to 'weight' or 'r' to 1.")
+	"constraints on canonical scores nor do they support global ",
+	"orthogonality constraints. If 'optim' is set to 'grad.scale' ",
+	"or 'grad.rotate', please either set 'r = 1' or set ",
+	"'ortho = weight' and 'scope = block'.")
 
 ## Set initialization method
 if (is.character(init)) 
 	mcca.init <- switch(init, cca = mcca.init.cca, 
 		svd = mcca.init.svd, random = mcca.init.random)
+
 
 ## Calculate tensor means across last dimension
 xbar <- vector("list", m)
