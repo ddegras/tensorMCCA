@@ -5,7 +5,6 @@ Version: 1.0
 Date: 2024-05-12
 Author: David Degras
 Maintainer: David Degras <david.degras@umb.edu>
-Description: A package for multiple canonical correlation analysis with data tensors (TMCCA) measured on the same individuals/objects. The goal is to find canonical variables, i.e. 
-linear combinations of the original variables, that maximize the sum of covariances or correlations between pairs of datasets. The coefficients of the linear combinations, or canonical weights, are constrained to be rank-1 tensors. The package contains functions to initialize and to carry out the TMCCA optimization, to select the number of canonical components to retain (permutation tests), and to infer canonical components (bootstrap confidence intervals). 
+Description: A package for multiple canonical correlation analysis with data tensors (TMCCA) measured on the same individuals/objects. The goal is to find canonical variables, i.e. linear combinations of the original variables, that maximize the sum of covariances or correlations between pairs of datasets. The coefficients of the linear combinations, or canonical weights, are constrained to be rank-1 tensors. The package contains functions to initialize and to carry out the TMCCA optimization, to select the number of canonical components to retain (permutation tests), and to infer canonical components (bootstrap confidence intervals). 
 License: GPL-3.0
 Imports: RSpectra, foreach, MASS
