@@ -152,7 +152,7 @@ if (!is.null(cc)) {
 azero <- all(a == 0) 
 if (azero && is.null(cc)) {
 	if (all(b == 0)) 
-		return(lapply(p, function(len) rep(1/sqrt(len), len)))
+		return(lapply(p, numeric))
 	svdb <- NULL
 	if (min(p) > 2) 
 		svdb <- tryCatch(svds(b, 1), error = function(e) NULL) 
