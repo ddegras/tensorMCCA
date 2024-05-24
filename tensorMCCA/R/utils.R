@@ -50,12 +50,12 @@ cpfun <- function(x, y) sum(x * y)
 if (is.null(v2)) {
 	m <- NROW(v1)
 	r <- NCOL(v1)
-	if (!is.matrix(v1)) dim(v1) <- c(m,r)
+	if (!is.matrix(v1)) dim(v1) <- c(m, r)
 	out <- array(dim = c(r, r, m))
 	for (i in 1:m) {
 		for (k in 1:r) {
 			for (l in 1:k) {
-				out[k,l,i] <- prod(mapply(cpfun, v[[i,k]], v[[i,l]]))
+				out[k,l,i] <- prod(mapply(cpfun, v1[[i,k]], v1[[i,l]]))
 				out[l,k,i] <- out[k,l,i]
 			}
 		}
