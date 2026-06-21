@@ -56,11 +56,11 @@ r <- fit$call.args$r
 ## Canonical weights + scores and objective weights
 objective <- fit$call.args$objective.type
 ortho <- fit$call.args$ortho.type
-scale <- fit$call.args$scale
+scope <- fit$call.args$scope
 v <- fit$v
 score <- fit$block.score / n
-ortho.score.block <- (ortho == "score" && scale == "block")
-ortho.score.global <- (ortho == "score" && scale == "global")
+ortho.score.block <- (ortho == "score" && scope == "block")
+ortho.score.global <- (ortho == "score" && scope == "global")
 if (ortho.score.global) global.score <- fit$global.score / n
 w <- fit$call.args$w
 
@@ -91,13 +91,13 @@ for (l in 1:r) {
 	}
 	
 	## Second pass
-	if (scale == "global") lam <- lambda[[l]]
+	if (scope == "global") lam <- lambda[[l]]
 	for (i in 1:m) {	
 		vil <- v[[i,l]]
 		if (objective == "cov") {
 			cp <- mapply(cpfun, x = unlist(v[i,1:l], FALSE), y = vil)
 			dim(cp) <- c(d[i], l) }
-		if (scale == "block") lam <- lambda[[l]][i,]
+		if (scope == "block") lam <- lambda[[l]][i,]
 		# Right-multiplier vector for matrix terms x(i,t) x_(-(k,kk)) v(i,l)
 		scorei <- score[,,l] %*% w[,i]
 		if (objective == "cor")	

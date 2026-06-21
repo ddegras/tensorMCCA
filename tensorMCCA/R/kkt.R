@@ -13,7 +13,7 @@ test <- check.arguments(x, fit$v, fit$call.args$w)
 v <- fit$v
 score <- fit$block.score
 w <- fit$call.args$w
-scale <- fit$call.args$scale
+scope <- fit$call.args$scope
 ortho <- fit$call.args$ortho.type
 objective <- fit$call.args$objective.type
 
@@ -48,15 +48,15 @@ pp <- cumsump[m+1]
 grad.obj <- matrix(0, pp, r)
 grad.cnstr <- vector("list", r)
 score <- score / n
-if (ortho == "score" && scale == "global") 
+if (ortho == "score" && scope == "global") 
 	global.score <- fit$global.score / n
 for (l in 1:r) {
-	grad.cnstr[[l]] <- switch(scale, 
+	grad.cnstr[[l]] <- switch(scope, 
 		block = matrix(0, pp, l*m), 
 		global = matrix(0, pp, l))
 	for (i in 1:m) {
 		idxrow <- (cumsump[i]+1):cumsump[i+1]
-		idxcol <- switch(scale, 
+		idxcol <- switch(scope, 
 			block = seq(i, by = m, len = l),
 			global = 1:l)
 	
@@ -77,7 +77,7 @@ for (l in 1:r) {
 		mat <- matrix(nrow = sump[i], ncol = l)
 		mat[,l] <- if (objective == "cor") {
 			tvprod %*% score[,i,l]	
-		} else if (objective == "cov" && scale == "block") {
+		} else if (objective == "cov" && scope == "block") {
 			unlist(v[[i,l]])
 		} else {
 			gradfun(v[[i,l]])
@@ -88,9 +88,9 @@ for (l in 1:r) {
 			if (ortho == "weight") {
 				for (ll in 1:(l-1))
 					mat[,ll] <- gradfun(v[[i,l]], v[[i,ll]])			
-			} else if (ortho == "score" && scale == "block") {
+			} else if (ortho == "score" && scope == "block") {
 				mat[,1:(l-1)] <- tvprod %*% score[,i,1:(l-1)]
-			} else { # ortho == "score" && scale == "global"
+			} else { # ortho == "score" && scope == "global"
 				mat[,1:(l-1)] <- tvprod %*% global.score[,i,1:(l-1)] 
 			}		
 		}
@@ -106,7 +106,7 @@ for (l in 1:r) {
 	reg <- suppressWarnings(
 		lsfit(grad.cnstr[[l]], grad.obj[,l], NULL, FALSE))
 	coefs[[l]] <- reg$coefficients
-	if (scale == "block") dim(coefs[[l]]) <- c(m,l)
+	if (scope == "block") dim(coefs[[l]]) <- c(m,l)
 	residuals[,l] <- reg$residuals
 }
 

@@ -32,12 +32,11 @@ if (is.character(init))
 	init <- match.arg(init)
 sweep <- match.arg(sweep)
 if (optim %in% c("grad.scale", "grad.rotate") && r > 1 &&
-	(ortho == "score" || scope == "global"))
+	ortho == "score")
 	stop("The gradient-based methods do not support orthogonality ",
-	"constraints on canonical scores nor do they support global ",
-	"orthogonality constraints. If 'optim' is set to 'grad.scale' ",
+	"constraints on canonical scores. If 'optim' is set to 'grad.scale' ",
 	"or 'grad.rotate', please either set 'r = 1' or set ",
-	"'ortho = weight' and 'scope = block'.")
+	"'ortho = weight'.")
 
 ## Set initialization method
 if (is.character(init)) {
