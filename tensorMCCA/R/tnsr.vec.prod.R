@@ -14,7 +14,7 @@ if (nmodes > 1 && any(diff(modes) < 0)) {
 	modes <- modes[ord]
 }
 if (d == 1) { 
-	out <- sum(x * v[[1]])
+	out <- x * v[[1]]
 	return(out) 
 }
 if (d == 2) {
