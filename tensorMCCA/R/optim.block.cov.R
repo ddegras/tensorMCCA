@@ -46,7 +46,7 @@ dim(b) <- NULL
 
 ## Trivial case: v scalar
 if (p == 1L) {
-	test <- (is.null(cc) || all(abs(cc) <= eps))
+	test <- (is.null(cc) || all(abs(unlist(cc)) <= eps))
 	v <- if (test && b >= 0) { 1
 	} else if (test && b < 0) { -1
 	} else { 0 }

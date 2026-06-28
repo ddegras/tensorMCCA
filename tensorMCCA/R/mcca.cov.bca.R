@@ -19,6 +19,9 @@ m <- length(x)
 n <- tail(dimx[[1]], 1)
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 p[d == 0] <- 1
+d[d == 0] <- 1
+
+
 
 ## Set up objective values
 objective <- numeric(maxit + 1L)
@@ -253,19 +256,17 @@ for (it in 1:maxit) {
 		} else {
 			# Case: objective weight matrix nonseparable (EVD)
 			xv <- tcrossprod(xv)
-			s <- m * w / n / tcrossprod(nrmt.mk)
-			# vv <- vector("list", groupsize)
+			# s <- m * w / n / tcrossprod(nrmt.mk)
 			for (ii in 1:groupsize) {
 				i <- idxg[ii]
-				# vv[[i]] <- v[[i]][[group[i,g]]] * nrmt.mk[i] / sqrt(m)
-				# debugging
 				rows <- start[ii]:end[ii] 
 				for (jj in 1:groupsize) {
 					j <- idxg[jj]
 					cols <- start[jj]:end[jj]
-					xv[rows, cols] <- s[i,j] * xv[rows, cols]
+					xv[rows, cols] <- w[i,j] * xv[rows, cols]
 				}
 			}
+
 			## Debugging
 			# vv <- unlist(vv)
 			# objective.implicit <- crossprod(vv, xv %*% vv)
@@ -274,11 +275,25 @@ for (it in 1:maxit) {
 				# objective.explicit) < 1e-6)
 			# print(paste("Test: objective (before ortho)", objective.test.1))
 			
-			if (!is.null(ortho)) { # project on orthogonality constraints
+			# Project on orthogonality constraints
+			if (!is.null(ortho)) { 
 				QQtxv <- Q %*% crossprod(Q, xv)
 				xv <- xv - QQtxv - t(QQtxv) + 
 					tcrossprod(QQtxv %*% Q, Q)
-			}				
+			}
+			
+			# Change of variable --> scaling constraints 
+			for (ii in 1:groupsize) {
+				i <- idxg[ii]
+				rows <- start[ii]:end[ii] 
+				for (jj in 1:groupsize) {
+					j <- idxg[jj]
+					cols <- start[jj]:end[jj]
+					xv[rows, cols] <- xv[rows, cols] / nrmt.mk[i] / nrmt.mk[j]
+				}
+			}
+			
+			# EVD	
 			eigxv <- if (all(dim(xv) > 2)) {
 				eigs_sym(xv, k = 1, which = "LA") 
 			} else { eigen(xv, TRUE) }
@@ -286,16 +301,16 @@ for (it in 1:maxit) {
 			if (all(is.nan(vg)))
 				vg <- rep(1/sqrt(length(vg)), length(vg))
 		}
-							
+				
 		## Update canonical weight vectors
 		for (ii in 1:groupsize) {
 			i <- idxg[ii]
 			k <- group[i,g]
 			idx <- start[ii]:end[ii]
-			v[[i]][[k]] <- vg[idx] * (sqrt(m) / nrmt.mk[i])
-			nrm2v[[i]][k] <- sum(v[[i]][[k]]^2)
+			v[[i]][[k]] <- vg[idx] / nrmt.mk[i]
 		}
-		
+		v <- scale.v(v, type = "norm", scope = "global", 
+			check.args = FALSE)
 	}
 									
 	## Balance canonical weight vectors  

@@ -13,10 +13,12 @@ stopifnot(r > 0)
 
 ## Data dimensions
 m <- length(x)
+for (i in 1:m) { # matricize any vector dataset
+	if (is.vector(x[[i]])) dim(x[[i]]) <- c(1, length(x[[i]]))
+}
 dimx <- lapply(x, dimfun)
 d <- sapply(dimx, length) - 1L 
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
-p[d == 0] <- 1
 n <- tail(dimx[[1]], 1) 
 
 ## Objective weights
@@ -140,7 +142,6 @@ for (l in 1:r) {
 	
 	## Prepare orthogonality constraints and deflate data
 	if (l > 1) {
-		# browser()
 		if (ortho == "score" && scope == "block") {
 			for (i in 1:m)
 				ortho.cnstr[[i,l-1]] <- tnsr.vec.prod(xl[[i]], 
@@ -160,31 +161,7 @@ for (l in 1:r) {
 		} 
 	}
 	
-	## Remove datasets that are zero 
-	xzero <- sapply(xl, function(a) all(a == 0))
-	xnzero <- !xzero
-	if (any(xzero)) xl <- xl[xnzero]
-	wl <- w[xnzero, xnzero]
-	
-	## Trivial case: all datasets equal to zero
-	if (all(xzero)) {
-		v[,l] <- relist(lapply(unlist(p), numeric), p)
-		objective[l] <- 0
-		if (l > 1 && ortho == "weight" && scope == "block") 
-			next else break
-	}
 
-	# ## Drop singleton dimensions
-	# dimxl <- vector("list", sum(xnzero))
-	# for (i in seq_along(xl)) {
-		# dimxl[[i]] <- dim(xl[[i]])
-		# if (is.null(dimxl[[i]]) || all(dimxl[[i]] > 1)) next
-		# xl[[i]] <- drop(xl[[i]])
-	# }
-	
-	## Set canonical weights for datasets equal to zero
-	for (i in which(xzero)) 
-		v[[i,l]] <- lapply(p[[i]], numeric)
 
 	## Specify orthogonality constraints in optimization
 	cnstr <- if (l == 1) {
@@ -192,27 +169,27 @@ for (l in 1:r) {
 	} else if (scope == "block" && ortho == "weight") { 
 		NULL 
 	} else if (scope == "global" && ortho == "weight") {
-		v[xnzero,1:(l-1)]
+		v[,1:(l-1)]
 	} else if (ortho == "score") {
-		ortho.cnstr[xnzero,1:(l-1)] 
+		ortho.cnstr[,1:(l-1)] 
   }
 	
 	## Initialize canonical weights
 	if (is.character(init)) {
 		init.args$x <- xl
 		if (init %in% c("cca", "svd")) 
-			init.args$w <- wl	
+			init.args$w <- w	
 		# if (l == r) debug(mcca.init)
 		v0 <- do.call(mcca.init, init.args)
 	} else if (is.list(init)) {
 		v0 <- if (is.vector(init)) {
-			init[xnzero] 
+			init 
 		} else { 
-			init[xnzero, min(l, ncol(init))] 
+			init[, min(l, ncol(init))] 
 		}
 		if (l > 1 && ortho == "weight" && scope == "block") 
-			v0 <- tnsr.rk1.mat.prod(v0, mat = ortho.cnstr$mat[xnzero], 
-				modes = ortho.cnstr$modes[xnzero], transpose.mat = FALSE)
+			v0 <- tnsr.rk1.mat.prod(v0, mat = ortho.cnstr$mat, 
+				modes = ortho.cnstr$modes, transpose.mat = FALSE)
 	}
 	
 	## Enforce scaling and orthogonality constraints
@@ -227,50 +204,40 @@ for (l in 1:r) {
 
 	## Run TMCCA
 	out <- if (optim == "bca" && scope == "block") {
-		mcca.cov.bca.block(x = xl, v = v0, w = wl, 
+		mcca.cov.bca.block(x = xl, v = v0, w = w, 
 			ortho = cnstr, sweep = sweep, maxit = maxit, 
 			tol = tol, verbose = verbose)
 	} else if (optim == "bca" && scope == "global") { 
-		mcca.cov.bca.global(x = xl, v = v0, w = wl, 
+		mcca.cov.bca.global(x = xl, v = v0, w = w, 
 			ortho = cnstr, sweep = sweep, maxit = maxit, 
 			tol = tol, verbose = verbose)
 	} else if (optim == "grad.scale") {
-		mcca.gradient.scale(x = xl, v = v0, w = wl, 
+		mcca.gradient.scale(x = xl, v = v0, w = w, 
 			scope = scope, type = "norm", maxit = maxit, 
 			tol = tol, verbose = verbose)
 	} else if (optim == "grad.rotate") {
-		mcca.gradient.rotate(x = xl, v = v0, w = wl, 
+		mcca.gradient.rotate(x = xl, v = v0, w = w, 
 			maxit = maxit, tol = tol, verbose = verbose)
 	}	
 	objective[l] <- out$objective
 	block.score[,,l] <- out$score
 	global.score[,l] <- rowMeans(block.score[,,l]) 
 	iters[l] <- out$iters
-
-	# ## Post-process canonical weights
-	# for (i in seq_along(xl)) {
-		# dimxli <- dimxl[[i]]
-		# if (length(dimxli) <= 2 || all(dimxli > 1)) next
-		# vil <- vector("list", length(dimxli))
-		# vil[dimxli == 1] <- list(1)
-		# vil[dimxli > 1] <- out$v[[i]]		
-		# out$v[[i]] <- vil		
-	# }	
 	
 	## Transform back canonical weights to original search space 
 	if (l > 1 && ortho == "weight" && scope == "block") {
 		out$v <- tnsr.rk1.mat.prod(v = out$v, 
-			mat = ortho.cnstr$mat[xnzero], 
-			modes = ortho.cnstr$modes[xnzero], 
+			mat = ortho.cnstr$mat, 
+			modes = ortho.cnstr$modes, 
 			transpose.mat = TRUE)
 	}	
 	
 	
-	v[xnzero,l] <- out$v
+	v[,l] <- out$v
 	
 	## Check orientation of canonical weights (can the objective be
 	## increased by flipping the orientation of some canonical tensors?)
-	test <- reorient(out$score, wl)
+	test <- reorient(out$score, w)
 	if (any(test$flip)) {
 		objective[l] <- test$objective
 		for (i in which(test$flip)) {
