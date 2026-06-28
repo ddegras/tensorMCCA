@@ -214,13 +214,13 @@ for (l in 1:r) {
 			v0 <- tnsr.rk1.mat.prod(v0, mat = ortho.cnstr$mat[xnzero], 
 				modes = ortho.cnstr$modes[xnzero], transpose.mat = FALSE)
 	}
-
+	
 	## Enforce scaling and orthogonality constraints
 	## @@@@ FINISH FUNCTION 'make.feasible' so that it handle 
 	## ALL combination of 'ortho' and 'scope' (= 'scale')
-	if (l > 1) {
-	  v0 <- tnsr.rk1.ortho(v0, cnstr, maxit = 100L, tol = 1e-6)
-	}
+	# if (l > 1) {
+	  # v0 <- tnsr.rk1.ortho(v0, cnstr, maxit = 100L, tol = 1e-6)
+	# }
 	v0 <- scale.v(v0, type = "norm", scope = scope, check.args = FALSE)
 	
 	

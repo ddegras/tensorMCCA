@@ -183,24 +183,25 @@ if (any(uncentered))
 	score <- sweep(score, 2L, colMeans(score), check.margin = FALSE)
 
 ## Find best rescaling or orientation for weights
-if (objective == "cov" && scope == "global") {
-	score <- canon.scores(x, v)
-	s <- sqrt(m) * eigen(w * cov(score), TRUE)$vectors[,1]
-	sgns <- sign(s)
-	for (i in 1:m) {
-		if (d[i] <= 1) {
-			si <- s[i]
-		} else {
-			si <- rep(abs(s[i])^(1/d[i]), d[i])
-			si[1] <- si[1] * sgns[i]
-		}
-		v[[i]] <- mapply("*", x = v[[i]], y = si, SIMPLIFY = FALSE)
-	}
-} else {
-	flip <- reorient(score, w)$flip
-	for (i in which(flip))
-		v[[i]][[1]] <- (-v[[i]][[1]])
-}
+## IS THIS NECESSARY?
+# if (objective == "cov" && scope == "global") {
+	# score <- canon.scores(x, v)
+	# s <- sqrt(m) * eigen(w * cov(score), TRUE)$vectors[,1]
+	# sgns <- sign(s)
+	# for (i in 1:m) {
+		# if (d[i] <= 1) {
+			# si <- s[i]
+		# } else {
+			# si <- rep(abs(s[i])^(1/d[i]), d[i])
+			# si[1] <- si[1] * sgns[i]
+		# }
+		# v[[i]] <- mapply("*", x = v[[i]], y = si, SIMPLIFY = FALSE)
+	# }
+# } else {
+	# flip <- reorient(score, w)$flip
+	# for (i in which(flip))
+		# v[[i]][[1]] <- (-v[[i]][[1]])
+# }
 
 ## Put back any canonical weights for constant datasets
 if (any(wzero)) {

@@ -115,11 +115,12 @@ mcca.cov.bca.global <- function(x, v, w, ortho, sweep,
 	
 ## Data dimensions
 dimx <- lapply(x, dimfun)
-d <- sapply(dimx, length) - 1L 
+d <- sapply(dimx, length) - 1L
 m <- length(x) # number of datasets
 n <- tail(dimx[[1]], 1) # number of cases/subjects
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 p[d == 0] <- 1
+d[d == 0] <- 1
 
 ## Set up objective values
 objective <- numeric(maxit+1)

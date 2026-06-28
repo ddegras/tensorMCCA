@@ -1,6 +1,6 @@
 ###########################################################
 # This internal function tests whether a symmetric matrix 
-# with nonnegative entries and at least one postive entry 
+# with nonnegative entries and at least one positive entry 
 # is separable
 ###########################################################
 
@@ -28,7 +28,7 @@ m <- ncol(x)
 if (!freediag) {
 	eigx <- eigen(x, TRUE)
 	eigvals <- eigx$values 
-	out <- if (all(eigvals[-1] <= max(1e-15, 1e-12 * eigvals[1]))) {
+	out <- if (all(abs(eigvals[-1]) <= max(1e-15, 1e-12 * abs(eigvals[1])))) {
 		list(separable = TRUE, a = sqrt(eigvals[1]) * abs(eigx$vectors[,1]))
 	} else {
 		list(separable = FALSE, a = NULL)
