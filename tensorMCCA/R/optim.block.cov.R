@@ -233,7 +233,7 @@ for (it in 1:maxit) {
 	
 	## Check convergence 
 	if (it > 1 && abs(objective[it] - objective[it-1]) <= 
-	    	tol * max(1, objective[it-1])) break
+	    	max(1e-15, tol * objective[it-1])) break
 }
 
 return(v)
@@ -352,7 +352,7 @@ for (it in 1:maxit) {
 	
 	## Check convergence 
 	if (it > 1 && abs(objective[it] - objective[it-1]) <= 
-	    	tol * max(1, objective[it-1])) break
+	    	max(1e-15, tol * objective[it-1])) break
 }
 
 return(v)
@@ -410,7 +410,7 @@ for (it in 1:maxit) {
 	
 	## Check convergence 
 	if (abs(objective - objective.old) <= 
-	    	tol * max(1, objective.old)) break
+	    max(1e-15, tol * abs(objective.old))) break
 }
 
 v

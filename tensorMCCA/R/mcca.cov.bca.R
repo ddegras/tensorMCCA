@@ -18,10 +18,6 @@ d <- sapply(dimx, length) - 1L
 m <- length(x)
 n <- tail(dimx[[1]], 1)
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
-p[d == 0] <- 1
-d[d == 0] <- 1
-
-
 
 ## Set up objective values
 objective <- numeric(maxit + 1L)
@@ -86,8 +82,11 @@ for (it in 1:maxit) {
 		cat("\nIteration", it, "Objective", objective[it + 1L])
 	
 	## Check convergence 
-	if (it > 1 && abs(objective[it + 1] - objective[it]) <= 
-	    	tol * max(1, objective[it])) break
+	if (it > 1) {
+		delta <- abs(objective[it + 1] - objective[it])
+		rel_tol <- max(1e-15, tol * abs(objective[it]))
+		if (delta <= rel_tol) break
+	}
 }
 
 list(v = vbest, score = canon.scores(x, vbest), 
@@ -122,8 +121,6 @@ d <- sapply(dimx, length) - 1L
 m <- length(x) # number of datasets
 n <- tail(dimx[[1]], 1) # number of cases/subjects
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
-p[d == 0] <- 1
-d[d == 0] <- 1
 
 ## Set up objective values
 objective <- numeric(maxit+1)
@@ -321,8 +318,11 @@ for (it in 1:maxit) {
 		cat("\nIteration", it, "Objective", objective[it+1])
 	
 	## Check convergence 
-	if (it > 1 && abs(objective[it+1] - objective[it]) <= 
-		max(1, tol) * abs(objective[it])) break
+	if (it > 1) {
+		delta <- abs(objective[it + 1] - objective[it])
+		rel_tol <- max(1e-15, tol * abs(objective[it]))
+		if (delta <= rel_tol) break
+	}
 }
 
 list(v = v, score = canon.scores(x, v), objective = objective[it+1], 
