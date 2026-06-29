@@ -8,6 +8,12 @@ mcca.init.cca <- function(x, w = NULL, objective = c("cov", "cor"),
 ################
 
 
+m <- length(x) # number of datasets 
+## Matricize any vector dataset
+for (i in 1:m) {
+	if (is.vector(x[[i]])) dim(x[[i]]) <- c(1, length(x[[i]]))
+}
+
 ## Check arguments x and w 
 test <- check.arguments(x, w = w)
 eps <- 1e-14
@@ -21,10 +27,9 @@ if (objective == "cor" && scope == "global")
 
 ## Data dimensions
 m <- length(x)
-dimx <- lapply(x, dimfun)
+dimx <- lapply(x, dim)
 d <- sapply(dimx, length) - 1L
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
-p[d == 0] <- 1
 n <- tail(dimx[[1]], 1)
 
 ## Search method in combinatorial optimization
