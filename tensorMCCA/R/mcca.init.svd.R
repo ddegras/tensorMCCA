@@ -6,17 +6,20 @@ mcca.init.svd <- function(x, w = NULL, objective = c("cov", "cor"),
 # Preprocessing
 ################
 
+m <- length(x) # number of datasets 
+## Matricize any vector dataset
+for (i in 1:m) {
+	if (is.vector(x[[i]])) dim(x[[i]]) <- c(1, length(x[[i]]))
+}
 test <- check.arguments(x, w = w)
 objective <- match.arg(objective) 
 scope <- match.arg(scope)
 eps <- 1e-14
 
 ## Data dimensions
-m <- length(x) # number of datasets 
-dimx <- lapply(x, dimfun) # full data dimensions
+dimx <- lapply(x, dim) # full data dimensions
 d <- sapply(dimx, length) - 1L
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
-p[d == 0] <- 1
 n <- tail(dimx[[1]], 1)
 
 ## Truncation order in SVD
