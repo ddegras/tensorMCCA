@@ -9,9 +9,9 @@ mcca.init.cca <- function(x, w = NULL, objective = c("cov", "cor"),
 
 
 m <- length(x) # number of datasets 
-## Matricize any vector dataset
-for (i in 1:m) {
-	if (is.vector(x[[i]])) dim(x[[i]]) <- c(1, length(x[[i]]))
+for (i in 1:m) { # Matricize any vector dataset
+	if (is.vector(x[[i]])) 
+		dim(x[[i]]) <- c(1, length(x[[i]]))	
 }
 
 ## Check arguments x and w 
@@ -30,7 +30,16 @@ m <- length(x)
 dimx <- lapply(x, dim)
 d <- sapply(dimx, length) - 1L
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
+pp <- sapply(p, prod)
 n <- tail(dimx[[1]], 1)
+
+## Reshape and center data
+for (i in 1:m) {
+	dim(x[[i]]) <- c(pp[i], n)
+	xbar <- rowMeans(x[[i]])
+	if (any(abs(xbar) > 1e-16)) 
+		x[[i]] <- sweep(x[[i]], 2, xbar, "-")
+}
 
 ## Search method in combinatorial optimization
 optim <- if (is.null(optim)) {
@@ -40,14 +49,13 @@ optim <- if (is.null(optim)) {
 }
 
 ## Truncation order in SVD
-pp <- sapply(p, prod)
-if (!is.null(k)) {
+if (is.null(k)) {
+	k <- pmin(pp, n)
+} else {	
 	k <- as.integer(k)
 	stopifnot(all(k > 0))
 	k <- rep_len(k, m)
 	k <- pmin(k, pp, n)
-} else {
-	k <- pmin(pp, n)
 }
 		
 ## Objective weights
@@ -55,46 +63,11 @@ if (is.null(w)) {
 	w <- 1 - diag(m)
 } else if (length(w) == 1) {
 	w <- matrix(1, m, m)
-}
-w <- (w + t(w)) / (2 * sum(w)) 
-
-## Identify constant datasets and set their weights to zero
-constant <- sapply(x, function(a) all(a == a[1]))
-w[, constant] <- w[constant,] <- 0
-wzero <- apply(w == 0, 2, all)
-wnzero <- which(!wzero)
-
-## Trivial case: all weights are zero 
-if (all(wzero)) {
-	v <- relist(lapply(unlist(p), numeric), p)
-	return(v)
+} else {
+	w <- (w + t(w)) / 2  
 }
 
-## Remove any constant dataset
-if (any(wzero)) {
-	x <- x[wnzero] 
-	w <- w[wnzero, wnzero]
-	vfull <- vector("list", m)
-	for (i in which(wzero)) 
-		vfull[[i]] <- lapply(p[[i]], numeric)
-	d <- d[wnzero]
-	k <- k[wnzero]
-	m <- length(wnzero)
-	p <- p[wnzero]
-	pp <- pp[wnzero]
-}
 
-## Calculate data means
-xbar <- vector("list", m)
-uncentered <- logical(m)
-for(i in 1:m) {
-    xbar[[i]] <- if (d[i] == 0L) { 
-    		mean(x[[i]])
-    	} else {
-	    	as.vector(rowMeans(x[[i]], dims = d[i]))
-	}
-	uncentered[i] <- any(abs(xbar[[i]]) > 1e-16)
-}
 
 
 
@@ -112,11 +85,8 @@ reduce <- (k < pmin(pp,n)) | (k <= pp/2) |
 	(objective == "cor") | (diag(w) > 0)
 for (i in 1:m) {
 	if (!reduce[i]) next	
-	xmat <- x[[i]] 
-	dim(xmat) <- c(pp[i], n)
-	if (uncentered[i]) xmat <- xmat - xbar[[i]] 
-	svdx <- tryCatch(suppressWarnings(svds(xmat, k[i])), 
-		error = function(e) svd(xmat, k[i], k[i]))
+	svdx <- tryCatch(suppressWarnings(svds(x[[i]], k[i])), 
+		error = function(e) svd(x[[i]], k[i], k[i]))
 	pos <- (svdx$d > eps)
 	if (!all(pos)) {
 		k[i] <- sum(pos)
@@ -149,29 +119,14 @@ a <- lapply(pp, function(nr) matrix(0, nr, m))
 # associated to Xi Xj' 
  
 for (i in 1:m) {	
-	if (reduce[i]) {
-		xi <- vx[[i]]
-	} else {
-		xi <- x[[i]]
-		dim(xi) <- c(pp[i],n)
-		if (uncentered[i]) 
-			xi <- xi - xbar[[i]]
-	}	
+	xi <- if (reduce[i]) vx[[i]] else x[[i]]
 	for (j in 1:i) {
 		if (w[i,j] == 0) next
 		if (i == j) {
-			if (objective == "cov")
-				a[[i]][,i] <- ux[[i]][,1] 
+			a[[i]][,i] <- ux[[i]][,1]
 			next
 		}
-		if (reduce[j]) {
-			xj <- vx[[j]]
-		} else {
-			xj <- x[[j]]
-			dim(xj) <- c(pp[j],n)
-			if (uncentered[j]) 
-				xj <- xj - xbar[[j]]
-		}
+		xj <- if (reduce[j]) vx[[j]] else x[[j]]
 		svdij <- tryCatch(
 			suppressWarnings(svds(tcrossprod(xi, xj), k = 1)), 
 			error = function(e) svd(tcrossprod(xi, xj), 1, 1))
@@ -201,31 +156,17 @@ for (i in 1:m) {
 		if (d[i] > 1) dim(aij) <- p[[i]]
 		v[[i,j]] <- tnsr.rk1(aij, scale = covblock, 
 			maxit = maxit, tol = tol)
-		# v[[i,j]] <- switch(objective,
-			# cov = tnsr.rk1(aij, scale = TRUE, maxit = maxit, tol = tol),
-			# cor = tnsr.rk1.score(aij, cnstr = x[[i]] - xbar[[i]], 
-				# maxit = maxit, tol = tol))
 	}
 }
 
-## Scale tensors according to norm (objective = covariance)
-## or variance (objective = correlation)
-if (objective == "cov" && scope == "global") {
-	v <- scale.v(v, check.args = FALSE)
-} else if (objective == "cor") {
+## Reshape original data
+for (i in 1:m) 
+	dim(x[[i]]) <- dimx[[i]]
+
+## Scale canonical tensors if needed
+if (objective == "cor") {
 	v <- scale.v(v, type = "var", x = x, check.args = FALSE)
 }
-
-
-
-
-#############################
-# Calculate canonical scores 
-#############################
-
-
-score <- canon.scores(x, v)
-score <- sweep(score, 2:3, colMeans(score))
 
 
 
@@ -235,11 +176,12 @@ score <- sweep(score, 2:3, colMeans(score))
 #####################################
 
 
-opt <- switch(optim, 
+score <- canon.scores(x, v)
+best <- switch(optim, 
 	exact = optim.combn.exact(score, w),
 	greedy = optim.combn.greedy(score, w))
-v <- v[cbind(1:m, opt$idx)]
-flip <- which(opt$sign == -1)
+v <- v[cbind(1:m, best$idx)]
+flip <- which(best$sign == -1)
 for (i in flip) 
 	v[[i]][[1]] <- -v[[i]][[1]] 
 
@@ -277,11 +219,7 @@ if (objective == "cov" && scope == "global") {
 for (i in 1:m)
 	v[[i]] <- lapply(v[[i]], drop)
 
-## Put back any canonical weights for constant datasets
-if (any(wzero)) {
-	vfull[wnzero] <- v
-	v <- vfull
-}
+
 
 
 v
