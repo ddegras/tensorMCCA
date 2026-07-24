@@ -16,12 +16,9 @@
 
 objective.internal <- function(x, v, w)
 {
-n <- tail(dimfun(x[[1]]), 1) 
+n <- tail(dim(x[[1]]), 1) 
 score <- canon.scores(x, v)
 r <- NCOL(v)
-if (r == 1) 
-	return(sum(w * crossprod(score)) / n)	
-
 out <- numeric(r)
 for (l in 1:r) 
 	out[l] <- sum(w * crossprod(score[, , l])) / n
@@ -36,18 +33,15 @@ sum(out)
 ############################################
 
 
-objective.cor <- function(x, v, w = 1)
+objective.cor <- function(x, v, w = NULL)
 {
 test <- check.arguments(x, v, w)
 m <- length(x)
-n <- tail(dim(x[[1]]), 1)
 r <- NCOL(v)
-w <- if (length(w) == 1) { 1 / (m^2)
-} else { w <- (w + t(w)) / (2 * sum(w)) }
+if (is.null(w)) 
+	w <- 1 - diag(m)
+
 score <- canon.scores(x, v)
-if (r == 1) {
-	return(sum(w * cor(score)))
-}
 out <- numeric(r)
 for (l in 1:r) 
 	out[l] <- sum(w * cor(score[, , l]))
@@ -62,18 +56,20 @@ sum(out)
 ############################################
 
 
-objective.cov <- function(x, v, w = 1)
+objective.cov <- function(x, v, w = NULL)
 {
 test <- check.arguments(x, v, w)
 m <- length(x)
 n <- tail(dim(x[[1]]), 1)
 r <- NCOL(v)
-w <- if (length(w) == 1) { 1 / (m^2) 
-} else { w <- (w + t(w)) / (2 * sum(w)) }
+if (is.null(w)) {
+	w <- 1 - diag(m)
+} else if (length(w) == 1) { 
+	w <- matrix(w, m, m)
+} else { 
+	w <- (w + t(w)) / 2 
+}
 score <- canon.scores(x, v)
-if (r == 1) {
-	return(sum(w * cov(score)) * (n - 1) / n)
-} 
 out <- numeric(r)
 for (l in 1:r) 
 	out[l] <- sum(w * cov(score[,,l])) * (n - 1) / n
