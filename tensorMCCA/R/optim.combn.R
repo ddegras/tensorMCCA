@@ -1,82 +1,40 @@
-optim.combn.exact <- function(score, w)
-{
-n <- dim(score)[1]
-m <- dim(score)[2]
+optim.combn.exact <- function(score, w) {
+dims <- dim(score)
+n <- dims[1]
+m <- dims[2]
 
-## Simpler case m = 2
-if (m == 2) {
-	a <- matrix(0, m, m)
-	for (i in 1:m)
-	for (j in 1:m)
-		a[i,j] <- w[1,1] * sum(score[,1,i]^2) +
-			(w[1,2] + w[2,1]) * sum(score[,1,i] * score[,2,j]) +
-			w[2,2] * sum(score[,2,j]^2)
-	idx <- arrayInd(which.max(a), dim(a))
-	return(list(idx = c(idx), sign = c(1,1), objective = a[idx]/n))
-} 
-
-
-## Cross-products between scores
-cp <- array(0, rep(m,4))
-for (i in 1:m) { 
+objective <- array(0, rep(c(m, 2*m), c(1, m-1)))
+for (i in 1:m) {
 	for (j in i:m) {
-		cp[,,i,j] <- if (i == j) {
-			diag(w[i,i] * colSums(score[,i,]^2))
+		if (w[i,j] == 0) next
+		if (i == 1 && j == 1) {
+			cp <- (w[1,1] / n) * colSums(score[,1,]^2)
+		} else if (i == 1) {
+			cp <- (w[i,j] / n) * crossprod(score[,i,], score[,j,])
+			cp <- cbind(cp, -cp)			
+		} else if (i == j) {
+			cp <- (w[i,j] / n) * colSums(score[,i,]^2)
+			cp <- rep(cp, 2)
 		} else {
-			2 * w[i,j] * crossprod(score[,i,], score[,j,])
+			cp <- (w[i,j] / n) * crossprod(score[,i,], score[,j,])
+			cp <- cbind(cp, -cp)
+			cp <- rbind(cp, -cp)			
+		}	
+		if (i == j) {
+			objective <- sweep(objective, i, cp, "+")
+		} else {
+			objective <- sweep(objective, c(i,j), cp, "+")
+			objective <- sweep(objective, c(j,i), t(cp), "+")
 		}
 	}
 }
 
-## Set of sign flips
-flip <- lapply(0:(m-1), 
-	function(size) as.list(data.frame(combn(2:m,size))))
-flip <- unlist(flip, FALSE, FALSE)
-
-objective.best <- -Inf
-iperm <- integer(m)
-
-for (f in 1:length(flip)) {
-	anyflip <- (length(flip[[f]]) > 0)
-	if (anyflip) {
-		idx <- flip[[f]] 
-		cp[,,idx,-idx] <- - cp[,,idx,-idx]
-		cp[,,-idx,idx] <- - cp[,,-idx,idx]
-	}
-	a <- array(0, rep(m,m))
-	for (i in 1:m) { 
-		for (j in i:m) {
-			if (i == j) {
-				cpij <- diag(cp[,,i,j])
-				perm <- c(i,(1:m)[-i])
-			} else {
-				cpij <- as.vector(cp[,,i,j])
-				perm <- c(i,j,(1:m)[-c(i,j)])
-			}
-			a <- aperm(a, perm)
-			a <- a + cpij
-			iperm[perm] <- 1:m
-			a <- aperm(a, iperm)	
-		}
-	}
-	objective <- max(a)
-	if (objective > objective.best) {
-		objective.best <- objective
-		idx.best <- arrayInd(which.max(a), dim(a))
-		flip.best <- flip[[f]] 
-	}
-	if (anyflip) {
-		idx <- flip[[f]] 
-		cp[,,idx,-idx] <- - cp[,,idx,-idx]
-		cp[,,-idx,idx] <- - cp[,,-idx,idx]
-	}	
+idx <- arrayInd(which.max(objective), dim(objective))
+idx <- as.vector(idx)
+list(idx = ifelse(idx <= m, idx, idx - m), 
+	sign = ifelse(idx <= m, 1, -1))
 }
 
-sign.best <- rep(1,m)
-sign.best[flip.best] <- -1
-return(list(idx = c(idx.best), sign = sign.best, objective = objective.best))
-
-}
 
 
 
@@ -158,3 +116,92 @@ for (f in 1:length(flip)) {
 return(list(idx = c(idx.best), sign = sign.best, objective = objective.best))
 
 }
+
+
+
+
+###################
+
+# Older, slower version
+
+
+# optim.combn.exact <- function(score, w)
+# {
+# n <- dim(score)[1]
+# m <- dim(score)[2]
+
+# ## Simpler case m = 2
+# if (m == 2) {
+	# a <- matrix(0, m, m)
+	# for (i in 1:m)
+	# for (j in 1:m)
+		# a[i,j] <- w[1,1] * sum(score[,1,i]^2) +
+			# (w[1,2] + w[2,1]) * sum(score[,1,i] * score[,2,j]) +
+			# w[2,2] * sum(score[,2,j]^2)
+	# idx <- arrayInd(which.max(a), dim(a))
+	# return(list(idx = c(idx), sign = c(1,1), objective = a[idx]/n))
+# } 
+
+
+# ## Cross-products between scores
+# cp <- array(0, rep(m,4))
+# for (i in 1:m) { 
+	# for (j in i:m) {
+		# cp[,,i,j] <- if (i == j) {
+			# diag(w[i,i] * colSums(score[,i,]^2))
+		# } else {
+			# 2 * w[i,j] * crossprod(score[,i,], score[,j,])
+		# }
+	# }
+# }
+
+# ## Set of sign flips
+# flip <- lapply(0:(m-1), 
+	# function(size) as.list(data.frame(combn(2:m,size))))
+# flip <- unlist(flip, FALSE, FALSE)
+
+# objective.best <- -Inf
+# iperm <- integer(m)
+
+# for (f in 1:length(flip)) {
+	# anyflip <- (length(flip[[f]]) > 0)
+	# if (anyflip) {
+		# idx <- flip[[f]] 
+		# cp[,,idx,-idx] <- - cp[,,idx,-idx]
+		# cp[,,-idx,idx] <- - cp[,,-idx,idx]
+	# }
+	# a <- array(0, rep(m,m))
+	# for (i in 1:m) { 
+		# for (j in i:m) {
+			# if (i == j) {
+				# cpij <- diag(cp[,,i,j])
+				# perm <- c(i,(1:m)[-i])
+			# } else {
+				# cpij <- as.vector(cp[,,i,j])
+				# perm <- c(i,j,(1:m)[-c(i,j)])
+			# }
+			# a <- aperm(a, perm)
+			# a <- a + cpij
+			# iperm[perm] <- 1:m
+			# a <- aperm(a, iperm)	
+		# }
+	# }
+	# objective <- max(a)
+	# if (objective > objective.best) {
+		# objective.best <- objective
+		# idx.best <- arrayInd(which.max(a), dim(a))
+		# flip.best <- flip[[f]] 
+	# }
+	# if (anyflip) {
+		# idx <- flip[[f]] 
+		# cp[,,idx,-idx] <- - cp[,,idx,-idx]
+		# cp[,,-idx,idx] <- - cp[,,-idx,idx]
+	# }	
+# }
+
+# sign.best <- rep(1,m)
+# sign.best[flip.best] <- -1
+# return(list(idx = c(idx.best), sign = sign.best, objective = objective.best))
+
+# }
+
