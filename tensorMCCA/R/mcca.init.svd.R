@@ -39,33 +39,8 @@ if (is.null(w)) {
 } else if (length(w) == 1) {
 	w <- matrix(1, m, m)
 }
-w <- (w + t(w)) / (2 * sum(w)) 
+w <- (w + t(w)) / 2
 
-## Check for constant datasets
-constant <- sapply(x, function(a) all(a == a[1]))
-w[, constant] <- w[constant,] <- 0
-wzero <- apply(w == 0, 2, all)
-wnzero <- which(!wzero)
-
-## Trivial case: all datasets have associated weights zero 
-if (all(wzero)) {
-	v <- relist(lapply(unlist(p), numeric), p)
-	return(v)
-}
-
-## Remove any constant dataset
-if (any(wzero)) {
-	vfull <- vector("list", m)
-	for (i in which(wzero)) 
-		vfull[[i]] <- lapply(p[[i]], numeric)
-	d <- d[wnzero]
-	k <- k[wnzero]
-	m <- length(wnzero)
-	p <- p[wnzero]
-	pp <- pp[wnzero]
-	w <- w[wnzero, wnzero]
-	x <- x[wnzero]
-}
 cumpp <- c(0, cumsum(pp))
 
 
@@ -181,9 +156,9 @@ if (objective == "cor") {
 }
 
 ## Calculate scores
-score <- canon.scores(x, v)
-if (any(uncentered)) 
-	score <- sweep(score, 2L, colMeans(score), check.margin = FALSE)
+# score <- canon.scores(x, v)
+# if (any(uncentered)) 
+	# score <- sweep(score, 2L, colMeans(score), check.margin = FALSE)
 
 ## Find best rescaling or orientation for weights
 ## IS THIS NECESSARY?
@@ -206,13 +181,6 @@ if (any(uncentered))
 		# v[[i]][[1]] <- (-v[[i]][[1]])
 # }
 
-## Put back any canonical weights for constant datasets
-if (any(wzero)) {
-	vfull[wnzero] <- v
-	v <- vfull
-	if (objective == "cov" && scope == "global")
-		v <- scale.v(v, "norm", "global")
-}
 
 v
 }
