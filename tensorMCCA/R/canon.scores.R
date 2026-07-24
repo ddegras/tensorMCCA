@@ -11,23 +11,28 @@ if (!(test1 || test2)) {
 	"whose number of rows equals the length of 'x'")) }
 
 m <- length(x)
-dimx <- lapply(x, dimfun)
-n <- tail(dimx[[1]], 1) 
-d <- pmax(sapply(dimx, length) - 1L, 1L)  
-r <- NCOL(v)
-if (r == 1) {
-	score <- matrix(nrow = n, ncol = m)
-	for (i in 1:m) 
-		score[, i] <- tnsr.vec.prod(x[[i]], v[[i]], 1:d[i])
-} else {
-	score <- array(dim = c(n, m, r))
-	for (i in 1:m) {
-		for (l in 1:r) {
-			score[, i, l] <- tnsr.vec.prod(x[[i]], v[[i,l]], 1:d[i])
-		}
+for (i in 1:m) {
+	if (is.vector(x[[i]])) {
+		dim(x[[i]]) <- c(1, length(x[[i]]))
 	}
 }
-score	
+dimx <- lapply(x, dim)
+n <- tail(dimx[[1]], 1) 
+d <- sapply(dimx, length) - 1L 
+if (is.null(dim(v))) {
+	dim(v) <- c(length(v), 1)
+}
+r <- ncol(v)
+score <- array(dim = c(n, m, r))
+for (i in 1:m) {
+	for (l in 1:r) {
+		score[, i, l] <- tnsr.vec.prod(x[[i]], v[[i,l]], 1:d[i])
+	}
+}
+
+score <- sweep(score, 2:3, colMeans(score), "-")
+score
+
 }
 
 
