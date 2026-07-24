@@ -13,7 +13,7 @@ mcca.cov.bca.block <- function(x, v, w, ortho, sweep,
 {
 	
 ## Determine data dimensions
-dimx <- lapply(x, dimfun)
+dimx <- lapply(x, dim)
 d <- sapply(dimx, length) - 1L
 m <- length(x)
 n <- tail(dimx[[1]], 1)
@@ -43,9 +43,6 @@ for (it in 1:maxit) {
 	if (sweep == "random") idxi <- sample(m)
 	for (ii in 1:m) { 	
 		i <- idxi[ii]	
-		# if (xzero[i]) next
-		# vprev <- v # DEBUG
-		# objprev <- obj
 		## Calculate the scores <X_jt, v_j> 
 		## After the first algorithm iteration (it = 1), in each 
 		## iteration of the i loop, only the inner products associated 
@@ -67,8 +64,6 @@ for (it in 1:maxit) {
 		## Update canonical vectors
 		v[[i]] <- optim.block.cov(v[[i]], a, b, ortho[i,], maxit, tol)
 		
-		# obj <- objective.cov(x,v,w) # DEBUG
-		# if (obj < objprev) stop() # DEBUG
 	}								
 	lastidx <- idxi[m]
 	
@@ -84,8 +79,8 @@ for (it in 1:maxit) {
 	## Check convergence 
 	if (it > 1) {
 		delta <- abs(objective[it + 1] - objective[it])
-		rel_tol <- max(1e-15, tol * abs(objective[it]))
-		if (delta <= rel_tol) break
+		convergence_threshold <- max(1e-15, tol * abs(objective[it]))
+		if (delta <= convergence_threshold) break
 	}
 }
 
