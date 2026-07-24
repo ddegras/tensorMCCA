@@ -16,18 +16,18 @@ m <- length(x)
 for (i in 1:m) { # matricize any vector dataset
 	if (is.vector(x[[i]])) dim(x[[i]]) <- c(1, length(x[[i]]))
 }
-dimx <- lapply(x, dimfun)
+dimx <- lapply(x, dim)
 d <- sapply(dimx, length) - 1L 
 p <- mapply(head, dimx, d, SIMPLIFY = FALSE)
 n <- tail(dimx[[1]], 1) 
 
 ## Objective weights
 w <- if (is.null(w)) {
-	(1 - diag(m)) / m / (m-1)
+	(1 - diag(m)) 
 } else if (length(w) == 1) {
-	matrix(1 / (m^2), m, m)
+	matrix(w, m, m)
 } else {
-	(w + t(w)) / (2 * sum(w)) 
+	(w + t(w)) / 2 
 }
 
 ## Match other arguments
@@ -51,18 +51,12 @@ if (is.character(init))
 		svd = mcca.init.svd, random = mcca.init.random)
 
 
-## Calculate tensor means across last dimension
-xbar <- vector("list", m)
-uncentered <- logical(m)
+## Center data if needed
 for(i in 1:m) {
-    xbar[[i]] <- if (d[i] == 0) {
-    	mean(x[[i]])
-    } else {
-	    as.vector(rowMeans(x[[i]], dims = d[i]))
-	}
-	uncentered[i] <- any(abs(xbar[[i]]) > 1e-16)
+    xbar <- rowMeans(x[[i]], dims = d[i])
+	if (any(abs(xbar) > 1e-16)) 
+		x[[i]] <- sweep(x[[i]], 1:d[i], xbar, "-")
 }
-uncentered <- which(uncentered)
 
 ## Adjust number of canonical components 
 pp <- sapply(p, prod)
@@ -137,8 +131,6 @@ for (l in 1:r) {
 	
 	## Create copy of original data for centering and deflating 
 	xl <- x
-	for (i in uncentered) 
-		xl[[i]] <- xl[[i]] - xbar[[i]]
 	
 	## Prepare orthogonality constraints and deflate data
 	if (l > 1) {
@@ -237,15 +229,15 @@ for (l in 1:r) {
 	
 	## Check orientation of canonical weights (can the objective be
 	## increased by flipping the orientation of some canonical tensors?)
-	test <- reorient(out$score, w)
-	if (any(test$flip)) {
-		objective[l] <- test$objective
-		for (i in which(test$flip)) {
-			v[[i,l]][[1]] <- (-v[[i,l]][[1]])
-			block.score[,i,l] <- -block.score[,i,l]
-		}
-		global.score[,l] <- rowMeans(block.score[,,l])
-	}
+	# test <- reorient(out$score, w)
+	# if (any(test$flip)) {
+		# objective[l] <- test$objective
+		# for (i in which(test$flip)) {
+			# v[[i,l]][[1]] <- (-v[[i,l]][[1]])
+			# block.score[,i,l] <- -block.score[,i,l]
+		# }
+		# global.score[,l] <- rowMeans(block.score[,,l])
+	# }
 	
 } 
 
