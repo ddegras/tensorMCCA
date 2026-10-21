@@ -6,7 +6,11 @@ mcca.boot <- function(x, object,
 ## Determine bootstrap targets
 lookup <- c("v", "score.cov", "noise.cov", "score.cor", "noise.cor")
 target <- lookup[pmatch(target, lookup)]
-stopifnot(length(target) > 0)
+if (length(target) == 0L || anyNA(target))
+	stop("Please specify at least one valid bootstrap target.")
+if (length(nboot) != 1L || !is.numeric(nboot) || is.complex(nboot) ||
+	!is.finite(nboot) || nboot < 1 || nboot != floor(nboot))
+	stop("'nboot' must be a positive integer.")
 
 ## Match other arguments
 resample <- match.arg(resample)
@@ -52,18 +56,18 @@ if (resample == "data") {
 
 ## Perform bootstrap in parallel or sequentially 
 if (parallel.flag) {
-	boot.out <- foreach(b = 1:nboot, .errorhandling = .errorhandling) %dopar% {
+	boot.out <- foreach(b = seq_len(nboot), .errorhandling = .errorhandling) %dopar% {
 			mcca.boot.single(xx, resample, target, call.args, 
 				unbiased.score.cov, unbiased.noise.cov) 
 	}
 } else {
 	boot.out <- vector("list", nboot)
 	if (.errorhandling == "stop") {
-		for (b in 1:nboot) 
+		for (b in seq_len(nboot))
 			boot.out[[b]] <- mcca.boot.single(xx, resample, target, call.args, 
 				unbiased.score.cov, unbiased.noise.cov)
 	} else {
-		for (b in 1:nboot) 
+		for (b in seq_len(nboot))
 			boot.out[[b]] <- tryCatch(
 				mcca.boot.single(xx, resample, target, call.args, 
 					unbiased.score.cov, unbiased.noise.cov), 
@@ -91,16 +95,28 @@ if (!is.null(noise.target))
 	mcca.out <- c(mcca.out, calculate.noise.cov(x, object, type = noise.target, 
 		unbiased.noise.cov, matrix.out = FALSE))
 
-## Realign the bootstrap estimates with original estimates
-if ("v" %in% target) {
-	for (b in 1:length(boot.out)) {
-		idx <- which(colMeans(cosine.dist(boot.out[[b]]$v, mcca.out$v)) > 1)
-		for (l in idx) { 
-			for (i in 1:m) {
-				boot.out[[b]]$v[[i,l]][[1]] <- - boot.out[[b]]$v[[i,l]][[1]]
-			}
-		}	
+## Use one common sign per component in the stacked tensor space.
+for (b in seq_along(boot.out)) {
+	if (inherits(boot.out[[b]], "error")) next
+	signs <- rep(1, r)
+	for (l in seq_len(r)) {
+		alignment <- sum(vapply(seq_len(m), function(i)
+			prod(mapply(function(a, b) sum(a * b),
+				boot.out[[b]]$v[[i,l]], v[[i,l]])), numeric(1)))
+		if (alignment < 0) {
+			signs[l] <- -1
+			for (i in seq_len(m))
+				boot.out[[b]]$v[[i,l]][[1]] <- -boot.out[[b]]$v[[i,l]][[1]]
+		}
 	}
+	## Cross-component score covariances must follow the same sign change.
+	for (field in c("global.score.cov", "global.score.cor")) {
+		if (!is.null(boot.out[[b]][[field]])) {
+			mask <- lower.tri(matrix(0, r, r), diag = field == "global.score.cov")
+			boot.out[[b]][[field]] <- boot.out[[b]][[field]] * outer(signs, signs)[mask]
+		}
+	}
+	if (!("v" %in% target)) boot.out[[b]]$v <- NULL
 }
 
 list(bootstrap = boot.out, original = mcca.out)
@@ -130,7 +146,8 @@ if ("cov" %in% type) {
 		array(apply(block.score, 3, cov), dim = c(m, m, r))
 	out$block.score.cov <- block.score.cov
 	if (unbiased) {
-		adjust <- rowMeans(apply(block.score, 2, cov))
+		adjust <- Reduce("+", lapply(seq_len(m), function(i)
+			stats::cov(matrix(block.score[,i,], n, r)))) / m
 		global.score.cov <- (m * cov(global.score) - adjust) / (m-1)
 	} else {
 		global.score.cov <- cov(global.score)
@@ -153,7 +170,8 @@ if ("cor" %in% type) {
 		out$block.score.cor <- 
 			array(apply(block.score, 3, cor), dim = c(m, m, r))
 		if (unbiased) {
-			adjust <- rowMeans(apply(block.score, 2, cov))
+			adjust <- Reduce("+", lapply(seq_len(m), function(i)
+				stats::cov(matrix(block.score[,i,], n, r)))) / m
 			out$global.score.cor <- cov2cor(m * cov(global.score) - adjust)
 		} else {
 			out$global.score.cor <- cor(global.score)
@@ -201,7 +219,7 @@ dimx <- lapply(x, dim)
 n <- tail(dimx[[1]], 1)
 r <- object$call.args$r	
 objective.type <- object$call.args$objective.type
-scale.cnstr <- object$call.args$scale
+scale.cnstr <- object$call.args$scope
 ortho.type <- object$call.args$ortho.type
 test <- ((objective.type == "cov") && (scale.cnstr == "block") && 
 	(ortho.type == "weight"))
@@ -210,9 +228,10 @@ for (i in 1:m) {
 	resid[[i]] <- matrix(x[[i]], ncol = n)
 	vi <- matrix(unlist(tnsr.rk1.expand(object$v[i,])), ncol = r) 
 	if (test) {
-		score <- object$block.score[,i,] 
+		score <- matrix(object$block.score[,i,], n, r)
 	} else {
-		vi <- qr.Q(qr(vi))
+		qr.vi <- qr(vi)
+		vi <- qr.Q(qr.vi)[,seq_len(qr.vi$rank), drop = FALSE]
 		score <- crossprod(resid[[i]], vi)
 	}
 	resid[[i]] <- resid[[i]]  - tcrossprod(vi, score)
@@ -235,6 +254,7 @@ out <- list()
 m <- length(x)
 n <- tail(dim(x[[1]]), 1)
 r <- NCOL(object$v)
+pp <- vapply(x, function(xx) length(xx) / n, numeric(1))
 if (unbiased) {
 	noise.cov <- vector("list", m)
 	global.score.var <- colSums(object$global.score^2) / (n-1)
@@ -292,31 +312,35 @@ if (resample == "data") {
 	p <- lapply(dimx, function(dims) dims[-length(dims)])
 	for (i in 1:m) {
 		dim(xstar[[i]]) <- c(prod(p[[i]]), n)
-		xstar[[i]] <- xstar[[i]][,idx]
+		xstar[[i]] <- xstar[[i]][,idx, drop = FALSE]
 		dim(xstar[[i]]) <- dimx[[i]]
 	}
 } else { # resample == "residuals"
 	xstar <- vector("list", m)
 	for (i in 1:m) {
-		xstar[[i]] <- x$fitted[[i]] + x$resid[[i]][,idx]
+		xstar[[i]] <- x$fitted[[i]] + x$resid[[i]][,idx, drop = FALSE]
 		dim(xstar[[i]]) <- dimx[[i]]
 	}
 }
 
+# Restore explicit initial values, or retain the fitted named initializer.
+initial <- if (!is.null(call.args$init.val)) call.args$init.val else call.args$init.method
 # Run mCCA on bootstrapped data
 result <- if (call.args$objective.type == "cor") {
 	mcca.cor(xstar, r = call.args$r, w = call.args$w, ortho = call.args$ortho.type,
-		optim = call.args$optim, init = call.args$init.method, sweep = call.args$sweep,
+		optim = call.args$optim, init = initial, sweep = call.args$sweep,
 		maxit = call.args$maxit, tol = call.args$tol, control = call.args$control)
 } else {
 	mcca.cov(xstar, r = call.args$r, w = call.args$w, scope = call.args$scope, 
-		ortho = call.args$ortho.type, optim = call.args$optim, init = call.args$init.method, 
+		ortho = call.args$ortho.type, optim = call.args$optim, init = initial,
 		sweep = call.args$sweep, maxit = call.args$maxit, tol = call.args$tol, 
 		control = call.args$control)
 }
+if (NROW(result$v) != m || NCOL(result$v) != call.args$r)
+	stop("Bootstrap fit did not return all requested components.")
 
 ## Add canonical weights to output
-if ("v" %in% target) out$v <- result$v
+out$v <- result$v # Retained until common-sign alignment of all targets.
 
 ## Calculate covariance and/or correlation of scores
 score.target <- NULL

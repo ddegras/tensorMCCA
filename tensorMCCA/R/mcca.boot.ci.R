@@ -6,14 +6,54 @@
 mcca.boot.ci <- function(object, level = 0.95, 
 	type = c("basic", "normal", "normal-debiased", "percentile"))
 {
+if (!is.numeric(level) || is.complex(level) || length(level) != 1L || !is.finite(level) ||
+    level <= 0 || level >= 1)
+    stop("'level' must be a finite number strictly between 0 and 1.")
 lookup <- c("basic", "normal", "normal-debiased", "percentile")
+if (!is.character(type) || length(type) == 0L)
+    stop("'type' must specify at least one supported interval type.")
 type <- lookup[pmatch(type, lookup)]
-if (all(is.na(type))) stop("Please specify 'type' as 'basic', 'normal',", 
+if (anyNA(type)) stop("Please specify 'type' as 'basic', 'normal',",
 	"'normal-debiased', 'percentile', or any combination thereof",
 	"(partial match allowed).")
+type <- unique(type)
 target <- names(object$original)
 out <- list()
 nboot <- length(object$bootstrap)
+if (nboot == 0L) stop("At least one bootstrap replicate is required.")
+for (name in target) {
+    values <- unlist(object$original[[name]])
+    if (length(values) && (!is.numeric(values) || is.complex(values) || any(!is.finite(values))))
+        stop("Original '", name, "' statistics must be finite real numbers.")
+}
+
+# Failed or incomplete refits must not silently disappear during unlisting.
+same.shape <- function(a, b) {
+    if (!identical(dim(a), dim(b)) || length(a) != length(b) ||
+        is.list(a) != is.list(b)) return(FALSE)
+    if (is.list(a)) return(all(mapply(same.shape, a, b)))
+    TRUE
+}
+for (b in seq_len(nboot)) {
+    replica <- object$bootstrap[[b]]
+    if (inherits(replica, "error"))
+        stop("Bootstrap replicate ", b, " failed: ", conditionMessage(replica))
+    for (name in target) {
+        if (!name %in% names(replica) ||
+            !same.shape(object$original[[name]], replica[[name]]))
+            stop("Bootstrap replicate ", b, " has a missing or incompatible '", name, "' target.")
+        values <- unlist(replica[[name]])
+        if (length(values) && (!is.numeric(values) || is.complex(values) || any(!is.finite(values))))
+            stop("Bootstrap replicate ", b, " has non-finite or non-real '", name, "' statistics.")
+    }
+}
+
+# Correlation diagonals are fixed: their bias and SE are zero, their bounds one.
+restore.cor.ci <- function(ci) {
+    result <- lapply(ci, vec2cor)
+    for (name in intersect(c("bias", "se"), names(result))) diag(result[[name]]) <- 0
+    result
+}
 
 
 if ("v" %in% target) {
@@ -70,27 +110,20 @@ if ("block.score.cov" %in% target) {
 	names(out$global.score.cov) <- names(ci)
 }
 
-if ("score.cor.block" %in% target) {
-	r <- ncol(object$original$score.cor.block) 
-	out$score.cor.block <- out$score.cor.global <- vector("list", r)
+if ("block.score.cor" %in% target) {
+	r <- ncol(object$original$block.score.cor)
+	out$block.score.cor <- out$global.score.cor <- vector("list", r)
 	for (l in 1:r) {
 		bootmat <- sapply(object$bootstrap, 
-			function(obj) obj$score.cor.block[,l])
-		stat <- object$original$score.cor.block[,l]
+			function(obj) obj$block.score.cor[,l])
+		stat <- object$original$block.score.cor[,l]
 		ci <- build.ci(bootmat, stat, level, type)	
-		out$score.cor.block[[l]] <- lapply(ci, vec2cor)
-		names(out$score.cor.block[[l]]) <- names(ci)
+		out$block.score.cor[[l]] <- restore.cor.ci(ci)
 	}	
-	# if (r > 1) {
-		# out$score.cor.global <- replicate(length(type), 
-			# c(lwr = 1, upr = 1), FALSE)		
-		# names(out$score.cor.global) <- type
-	# } else {
-		bootmat <- sapply(object$bootstrap, "[[", "score.cor.global")
-		stat <- object$original$score.cor.global
-		ci <- build.ci(bootmat, stat, level, type)	
-		out$score.cor.global <- lapply(ci, vec2cor)
-	# }
+	bootmat <- sapply(object$bootstrap, "[[", "global.score.cor")
+	stat <- object$original$global.score.cor
+	ci <- build.ci(bootmat, stat, level, type)
+	out$global.score.cor <- restore.cor.ci(ci)
 }
 
 if ("noise.cov" %in% target) {
@@ -118,8 +151,7 @@ if ("noise.cor" %in% target) {
 			bootmat <- matrix(bootmat, ncol = nboot)
 		stat <- object$original$noise.cor[[i]]
 		ci <- build.ci(bootmat, stat, level, type)
-		out$noise.cor[[i]] <- lapply(ci, vec2cor)	 
-		names(out$noise.cor[[i]]) <- names(ci)
+		out$noise.cor[[i]] <- restore.cor.ci(ci)
 	}	
 }
 
@@ -138,21 +170,29 @@ out
 build.ci <- function(bootmat, stat, level, type)
 {
 out <- list()
+stat <- as.numeric(stat)
+if (length(stat) == 0L) {
+    out$bias <- out$se <- numeric(0)
+    for (name in type) out[[name]] <- matrix(numeric(0), 0L, 2L)
+    return(out)
+}
 if (!is.matrix(bootmat)) 
 	bootmat <- matrix(bootmat, nrow = length(stat))
+if (nrow(bootmat) != length(stat) || ncol(bootmat) == 0L ||
+    any(!is.finite(bootmat)) || any(!is.finite(stat)))
+    stop("Bootstrap statistics must be finite, with matching dimensions and at least one replicate.")
 bootmean <- rowMeans(bootmat) 
 out$bias <- bootmean - stat
-out$se <- sqrt(rowMeans(bootmat^2) - bootmean^2) # standard error
-test <- is.nan(out$se)
-if (any(test)) out$se[test] <- 0
-alpha <- min(level, 1 - level) / 2
+# Retain denominator B while avoiding cancellation between large second moments.
+out$se <- sqrt(rowMeans((bootmat - bootmean)^2))
+alpha <- (1 - level) / 2
 if (any(c("basic", "percentile") %in% type)) {
 	percent.ci <- t(apply(bootmat, 1, quantile, 
 		probs = c(alpha, 1 - alpha), names = FALSE))
 	if ("percentile" %in% type) 
 		out$percentile <- percent.ci
 	if ("basic" %in% type) 
-		out$basic <- matrix(2 * bootmean - percent.ci[,2:1], ncol = 2)
+		out$basic <- 2 * stat - percent.ci[,2:1, drop = FALSE]
 }
 if 	("normal" %in% type) {
 	z <- qnorm(1 - alpha)
@@ -185,12 +225,11 @@ vec2cov <- function(vec) {
 	stopifnot(n %in% c(1,2))
 	m <- as.integer((sqrt(8 * nrow(mat) + 1) - 1) / 2)
 	if (m == 1) {
-		out <- vec
+		out <- mat
 	} else {
-		idxlo <- which(lower.tri(matrix(0, m, m)))
-		idxrow <- rep(1:(m-1), (m-1):1)
-		idxcol <- rep(2:m, 1:(m-1)) 
-		idxup <- (idxcol - 1L) * m + idxrow
+		grid <- matrix(seq_len(m^2), m, m)
+		idxlo <- which(lower.tri(grid))
+		idxup <- t(grid)[idxlo]
 		idxdiag <- cumsum(c(0L, m:2)) + 1L
 		idxdiag2 <- seq(0, by = m, len = m) + (1:m)
 		out <- matrix(0, m^2, n)
@@ -222,12 +261,11 @@ vec2cor <- function(vec) {
 	n <- max(1, ncol(mat))
 	m <- as.integer((sqrt(8 * nrow(mat) + 1) + 1) / 2)
 	if (m == 1) {
-		out <- 1
+		out <- rep(1, n)
 	} else {
-		idxlo <- which(lower.tri(matrix(0, m, m)))
-		idxrow <- rep(1:(m-1), (m-1):1)
-		idxcol <- rep(2:m, 1:(m-1)) 
-		idxup <- (idxcol - 1L) * m + idxrow
+		grid <- matrix(seq_len(m^2), m, m)
+		idxlo <- which(lower.tri(grid))
+		idxup <- t(grid)[idxlo]
 		idxdiag <- seq(0, by = m, len = m) + (1:m)
 		out <- matrix(1, m^2, n)
 		out[idxlo,] <- mat
