@@ -1,26 +1,27 @@
 \name{mcca.boot.ci}
 \alias{mcca.boot.ci}
-%- Also NEED an '\alias' for EACH other topic documented here.
 \title{
 Bootstrap Confidence Intervals for Multiple Canonical Correlation Analysis
 }
 \description{
-Calculate standard bootstrap CIs (basic, percentile, normal) 
+Calculate pointwise bootstrap confidence intervals (basic, percentile, normal,
+and bias-corrected normal)
 for various quantities involved in tensor mCCA: 
 canonical weights, covariance/correlation between canonical scores, 
 covariance/correlation structure of noise. 
 }
 
 \usage{
-mcca.boot.ci <- function(object, level = 0.95, 
+mcca.boot.ci(object, level = 0.95,
 	type = c("basic", "normal", "normal-debiased", "percentile"))
 }
-%- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{object}{
-The result of a call to the function \code{\link{mcca.boot}}}. 
+The result of a call to \code{\link{mcca.boot}}, containing successful
+bootstrap replicates with the same targets and dimensions as the original estimates.
+}
   \item{level}{
-confidence level (default = 0.95)
+A finite confidence level strictly between 0 and 1 (default = 0.95).
 }
   \item{type}{
 type of CIs: any combination of the strings \code{basic}, \code{normal}, \code{normal-debiased} and \code{percentile}. 
@@ -29,12 +30,32 @@ Partial matching is enabled.
 }
 
 \details{
-For each of the inferential targets stored in \code{object}, the function calculates bootstrap estimates of the estimation bias and standard error, as well as pointwise confidence intervals based on the basic, percentile, or normal method. The normal CIs are bias-corrected. 
+For each inferential target, the function calculates the bootstrap mean minus
+the original estimate as its estimated bias. The standard error is the square
+root of the mean squared deviation from the bootstrap mean, with the number of
+replicates as denominator.
+
+Basic intervals reflect the bootstrap quantiles about the original estimate.
+Percentile intervals use the bootstrap quantiles directly. Normal intervals
+are centered at the original estimate. The \code{normal-debiased} intervals
+subtract the estimated bias from that center. Both normal methods use the
+bootstrap standard error and standard normal quantiles.
+
+Correlation matrices have fixed unit diagonals. Their bias and standard error
+matrices therefore have zero diagonals, and their interval bounds have unit
+diagonals. Failed, incomplete, or non-finite bootstrap replicates produce an
+error identifying the affected replicate; they are not silently omitted.
 }
 
 
 \value{
-A list with possible fields \code{v}, \code{score.cov.block}, \code{score.cov.global}, code{score.cor.block}, \code{score.cor.global}, \code{noise.cov}, and \code{noise.cor}. Each of these fields represents a target for bootstrap inference and contains some or all of these subfields according to the contents of \code{object}: \code{bias}, \code{se}, \code{basic}, \code{percentile}, \code{normal}, and \code{normal-debiased}. 
+A list with possible fields \code{v}, \code{block.score.cov},
+\code{global.score.cov}, \code{block.score.cor}, \code{global.score.cor},
+\code{noise.cov}, and \code{noise.cor}, matching the target names in
+\code{object$original}. Each target contains \code{bias}, \code{se}, and the
+requested interval fields among \code{basic}, \code{percentile}, \code{normal},
+and \code{normal-debiased}. Interval arrays have a final dimension of length
+two for the lower and upper bounds.
 }
 
 \references{
@@ -46,35 +67,14 @@ A list with possible fields \code{v}, \code{score.cov.block}, \code{score.cov.gl
 }
 
 \examples{
-## Simulate data
-n <- 100 # number of samples
-m <- 3 # number of datasets
-p <- list(10, c(5,10), c(6,8,10)) # data dimensions
-d <- sapply(p, length) # tensor order
-dimx <- lapply(p, append, value = n) # full data dimensions
-r <- 4 # number of factors
-score.cov <- r:1 # score variance 
-noise.cov <- 0.5 # noise variance (will be recycled)
-x <- simulate.factor.model(dimx, r = r, score.cov = score.cov, 
-	noise.cov = noise.cov)$x
-
-## Run mCCA
-mcca.fit <- mcca.cor(x, r)
-
-## Perform bootstrap based on raw data
-library(foreach)
-library(doParallel)
-registerDoParallel()
-boot.object <- mcca.boot(x, mcca.fit)
-
-## Calculate bootstrap CIs
-boot.ci <- mcca.boot.ci(boot.object) 
-
-## Examine some results
-boot.ci$score.cov.block
-# Because the simulation model utilizes independent global scores, 
-# it is liekly that the above CIs for off-diagonal covariance terms
-# should contain zero and those for diagonal terms (score variances) 
-# should not contain zero 	
+set.seed(42)
+x <- list(matrix(rnorm(3 * 30), 3, 30),
+          matrix(rnorm(4 * 30), 4, 30))
+mcca.fit <- mcca.cov(x, r = 1, init = "svd")
+boot.object <- mcca.boot(x, mcca.fit, target = "v", nboot = 19,
+                         parallel = FALSE)
+boot.ci <- mcca.boot.ci(boot.object)
+boot.ci$v[[1,1]]$basic
+boot.ci$v[[1,1]][["normal-debiased"]]
 }
 
