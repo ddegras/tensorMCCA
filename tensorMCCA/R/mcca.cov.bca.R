@@ -149,9 +149,13 @@ nrmt.mk <- numeric(m) # products of norms of canonical vectors
 # except for the one being optimized
 
 ## Test if the objective weights are separable
-## Recall: weights are nonnegative and add up to 1
-csumw <- colSums(w)
-separable.w <- isTRUE(all.equal(w, tcrossprod(csumw)))
+## Recall: weights are nonnegative and add up to 1 @@@ NO
+# csumw <- colSums(w)
+# separable.w <- isTRUE(all.equal(w, tcrossprod(csumw)))
+eigw <- eigen(w, TRUE, TRUE)$values
+nonzero <- (abs(eigw) > eps)
+separable.w <- (sum(nonzero) == 1)
+
 
 ## Ensure that orthogonality constraints are in matrix format
 if (!is.null(ortho)) {
